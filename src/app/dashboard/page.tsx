@@ -75,11 +75,11 @@ export default function DashboardUnifiedPage() {
           const parsed = JSON.parse(session);
           if (parsed.role === 'kasir') {
             setRole('kasir');
-            const cName = parsed.name && parsed.name.toLowerCase() !== 'kasir' && parsed.name.toLowerCase() !== 'andi' ? parsed.name : 'Yuli';
+            const cName = parsed.name && !['kasir', 'andi', 'admin', 'user'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Yuli';
             setUserName(cName);
           } else {
             setRole('owner');
-            const oName = parsed.name && parsed.name.toLowerCase() !== 'owner' ? parsed.name : 'Wilson';
+            const oName = parsed.name && !['owner', 'admin', 'administrator', 'user'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Wilson';
             setUserName(oName);
           }
         } catch {}
@@ -648,7 +648,7 @@ export default function DashboardUnifiedPage() {
 
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
-                  <span>{isMounted ? greeting : 'Selamat malam'}, {userName && userName !== 'Owner' ? userName : 'Wilson'}</span>
+                  <span>{isMounted ? greeting : 'Selamat malam'}, {!userName || ['owner', 'admin', 'administrator', 'user'].includes(userName.toLowerCase()) ? 'Wilson' : userName}</span>
                   <span className="text-lg">👋</span>
                 </h1>
                 <p className="text-[11px] font-medium text-slate-400">

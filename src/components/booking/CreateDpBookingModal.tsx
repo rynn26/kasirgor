@@ -20,7 +20,8 @@ import {
   Sparkles,
   Info,
   CalendarCheck2,
-  Repeat
+  Repeat,
+  Tag
 } from 'lucide-react';
 import { getMemberDatesInMonth } from '@/lib/memberUtils';
 
@@ -86,8 +87,11 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
   // Payment info
   const [courtFee, setCourtFee] = useState<number>(160000);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
+
+  const finalTotal = Math.max(0, courtFee - (discountAmount || 0));
 
   // Load courts if not yet loaded
   useEffect(() => {
@@ -123,15 +127,15 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
 
   const quickNominals = [
-    courtFee,
+    finalTotal,
     50000,
     100000,
     150000,
     200000,
     300000,
-  ].filter((v, i, a) => v > 0 && a.indexOf(v) === i && v >= courtFee);
+  ].filter((v, i, a) => v > 0 && a.indexOf(v) === i && v >= finalTotal);
 
-  const cashChange = Math.max(0, (cashReceived || 0) - courtFee);
+  const cashChange = Math.max(0, (cashReceived || 0) - finalTotal);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,12 +150,12 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       return;
     }
 
-    if (courtFee <= 0) {
-      showToast('Total biaya sewa harus lebih dari Rp 0');
+    if (finalTotal < 0) {
+      showToast('Total biaya sewa tidak boleh negatif');
       return;
     }
 
-    if (paymentMethod === 'CASH' && (cashReceived || 0) < courtFee) {
+    if (paymentMethod === 'CASH' && (cashReceived || 0) < finalTotal) {
       showToast('Nominal uang tunai yang diterima kurang');
       return;
     }
@@ -186,22 +190,22 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       courtId: selectedCourt?.id || courtId || '',
       courtName: courtNameLabel,
       courtType: selectedCourt?.type || 'VIP Vinyl BWF',
-      courtPricePerHour: Math.round(courtFee / (durationHours * courtCount || 1)),
+      courtPricePerHour: Math.round(finalTotal / (durationHours * courtCount || 1)),
       startTime,
       endTime,
       durationHours,
       courtFee,
       additionalItems: [],
-      totalAmount: courtFee,
-      dpAmount: courtFee,
+      totalAmount: finalTotal,
+      dpAmount: finalTotal,
       dpPaymentMethod: paymentMethod,
       dpPaidAt: new Date().toISOString(),
       dpCashier: cashierName || 'Yuli',
-      settlementAmount: courtFee,
+      settlementAmount: finalTotal,
       settlementPaymentMethod: paymentMethod,
       settlementPaidAt: new Date().toISOString(),
       settlementCashier: cashierName || 'Yuli',
-      amountPaidTotal: courtFee,
+      amountPaidTotal: finalTotal,
       remainingBalance: 0,
       status: 'SETTLED',
       notes: finalNotes,
@@ -352,7 +356,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                  Nama Pemesan / PJ <span className="text-red-500">*</span>
+                  Nama Pemesan <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -473,25 +477,68 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               </span>
             </label>
 
-            {/* Manual Total Price Input */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                <span>Total Tarif Sewa Lapangan (Rp) *</span>
-                <span className="text-[11px] text-slate-400 font-normal">Ketik manual</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  required
-                  placeholder="Contoh: 160.000"
-                  value={courtFee ? formatNumber(courtFee) : ''}
-                  onChange={(e) => setCourtFee(parseNumberInput(e.target.value))}
-                  className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                />
+            {/* Manual Tarif Sewa & Diskon Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>Tarif Sewa Lapangan (Rp) *</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Ketik manual</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    placeholder="Contoh: 160.000"
+                    value={courtFee ? formatNumber(courtFee) : ''}
+                    onChange={(e) => setCourtFee(parseNumberInput(e.target.value))}
+                    className="w-full pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
+                  />
+                </div>
+              </div>
+
+              {/* Input Diskon Manual */}
+              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl space-y-1.5">
+                <label className="text-xs font-bold text-emerald-900 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Diskon / Potongan (Rp)</span>
+                  </span>
+                  {discountAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDiscountAmount(0)}
+                      className="text-[10px] text-rose-600 hover:underline font-bold"
+                    >
+                      Hapus Diskon
+                    </button>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-xs font-bold text-emerald-600">Rp</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={discountAmount ? formatNumber(discountAmount) : ''}
+                    onChange={(e) => setDiscountAmount(parseNumberInput(e.target.value))}
+                    className="w-full pl-10 pr-3 py-2 bg-white border border-emerald-200 rounded-xl text-sm font-black text-emerald-950 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Total Tagihan Bersih (Jika Ada Diskon) */}
+            {discountAmount > 0 && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-slate-500 block">Tarif Awal: {formatRupiah(courtFee)} (Diskon: -{formatRupiah(discountAmount)})</span>
+                  <span className="font-bold text-emerald-900">Total Tagihan Bersih:</span>
+                </div>
+                <span className="text-base font-black text-emerald-700">{formatRupiah(finalTotal)}</span>
+              </div>
+            )}
 
             {/* Payment Method Selector */}
             <div className="space-y-1.5 pt-1">
@@ -542,7 +589,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                     inputMode="numeric"
                     value={cashReceived ? formatNumber(cashReceived) : ''}
                     onChange={(e) => setCashReceived(parseNumberInput(e.target.value))}
-                    placeholder={formatNumber(courtFee) || '0'}
+                    placeholder={formatNumber(finalTotal) || '0'}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                   />
                 </div>
@@ -555,7 +602,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                       onClick={() => setCashReceived(nom)}
                       className="px-2.5 py-1 rounded-lg bg-white hover:bg-red-50 text-slate-700 text-[10px] font-bold border border-slate-200 transition-colors cursor-pointer"
                     >
-                      {nom === courtFee ? 'Uang Pas' : formatRupiah(nom)}
+                      {nom === finalTotal ? 'Uang Pas' : formatRupiah(nom)}
                     </button>
                   ))}
                 </div>
