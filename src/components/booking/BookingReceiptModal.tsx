@@ -38,9 +38,9 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
   onClose,
   onEdit,
   onDelete,
-  shopName = 'GOR & ARENA SPORT CENTER',
-  shopAddress = 'Jl. Stadion Olahraga No. 88, Jakarta Barat',
-  shopPhone = '0812-3456-7890',
+  shopName = 'GOR SINYO ARENA',
+  shopAddress = 'Jl. Perum. Pemda Graha Sukadami Blok A Raya',
+  shopPhone = '0821-2478-428',
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToastStore();
@@ -58,10 +58,8 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
 
     const text = `*BUKTI BOOKING LAPANGAN - ${shopName}*
 ----------------------------------------
-No. Booking: *${booking.bookingCode}*
-Nama Penyewa: *${booking.customerName}*
-${isMember ? `Kategori: *Member Bulanan (Rutin Tiap Minggu)*\n` : ''}${booking.notes ? `Jadwal Pertemuan: ${booking.notes}\n` : ''}Lapangan: *${booking.courtName}*
-Tanggal: *${booking.date}*
+Nama: *${booking.customerName}*
+${isMember ? `Kategori: *Member Bulanan (Rutin Tiap Minggu)*\n` : ''}${booking.notes ? `Jadwal Pertemuan: ${booking.notes}\n` : ''}Tanggal: *${booking.date}*
 Waktu: *${booking.startTime} - ${booking.endTime} WIB* (${booking.durationHours} Jam)
 ----------------------------------------
 Total Biaya Sewa: ${formatRupiah(booking.courtFee)}
@@ -85,12 +83,11 @@ Terima kasih telah bermain di ${shopName}!`;
     const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
 
     const message = encodeURIComponent(
-      `Halo Kak *${booking.customerName}*, berikut bukti reservasi lapangan badminton di *${shopName}*:\n\n` +
-      `📌 *Kode Booking*: ${booking.bookingCode}\n` +
-      (isMember ? `👤 *Kategori*: Member Bulanan (Rutin Tiap Minggu)\n` : '') +
+      `Halo Kak *${booking.customerName}*, berikut bukti reservasi lapangan di *${shopName}*:\n\n` +
+      `👤 *Nama*: ${booking.customerName}\n` +
+      (isMember ? `🏷️ *Kategori*: Member Bulanan (Rutin Tiap Minggu)\n` : '') +
       (booking.notes ? `🗓️ *Jadwal Member*: ${booking.notes}\n` : '') +
-      `🏸 *Lapangan*: ${booking.courtName}\n` +
-      `📅 *Tanggal Mulai*: ${booking.date}\n` +
+      `📅 *Tanggal*: ${booking.date}\n` +
       `⏰ *Waktu*: ${booking.startTime} - ${booking.endTime} WIB (${booking.durationHours} Jam)\n` +
       `💰 *Total*: ${formatRupiah(booking.totalAmount)}\n` +
       `💳 *DP Diterima*: ${formatRupiah(booking.dpAmount)}\n` +
@@ -120,7 +117,7 @@ Terima kasih telah bermain di ${shopName}!`;
                 {isLunas ? 'Struk Pelunasan Sewa' : 'Bukti DP Booking Lapangan'}
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                {booking.bookingCode}
+                {booking.customerName}
               </p>
             </div>
           </div>
@@ -155,23 +152,13 @@ Terima kasih telah bermain di ${shopName}!`;
             {/* Detail Transaksi */}
             <div className="space-y-1 text-[10px] py-1 border-b border-dashed border-gray-300">
               <div className="flex justify-between">
-                <span className="text-gray-600">No. Booking:</span>
-                <span className="font-bold">{booking.bookingCode}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-gray-600">Tanggal Transaksi:</span>
                 <span>{formatDate(booking.createdAt, true)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Penyewa:</span>
+                <span className="text-gray-600">Nama:</span>
                 <span className="font-bold">{booking.customerName}</span>
               </div>
-              {booking.phone && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">No. WhatsApp:</span>
-                  <span>{booking.phone}</span>
-                </div>
-              )}
               {booking.communityName && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">Kategori:</span>
@@ -183,17 +170,10 @@ Terima kasih telah bermain di ${shopName}!`;
                   {booking.notes}
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-gray-600">Kasir:</span>
-                <span>{booking.settlementCashier || booking.dpCashier || 'Yuli'}</span>
-              </div>
             </div>
 
             {/* Detail Sewa Lapangan */}
             <div className="py-2 border-b border-dashed border-gray-300 space-y-1.5">
-              <div className="font-bold text-xs text-gray-900">
-                {booking.courtName}
-              </div>
               <div className="flex justify-between text-[10px] text-gray-700">
                 <span>Jadwal Main:</span>
                 <span className="font-semibold">{booking.date}</span>
@@ -257,7 +237,7 @@ Terima kasih telah bermain di ${shopName}!`;
               <p className="font-bold">Terima Kasih Atas Reservasi Anda!</p>
               <p>Harap hadir tepat waktu. Tunjukkan nota ini kepada petugas lapangan.</p>
               <div className="pt-1 text-[8px] text-gray-400 tracking-widest">
-                *** KASIR GOR ARENA SYSTEM ***
+                *** GOR SINYO ARENA SYSTEM ***
               </div>
             </div>
           </div>

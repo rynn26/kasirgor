@@ -15,9 +15,9 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, ThermalReceiptPro
   (
     {
       transaction,
-      shopName = 'GOR & KAFE ARENA SPORT',
-      shopAddress = 'Jl. Stadion Olahraga No. 88, Jakarta',
-      shopPhone = '0812-3456-7890',
+      shopName = 'GOR SINYO ARENA',
+      shopAddress = 'Jl. Perum. Pemda Graha Sukadami Blok A Raya',
+      shopPhone = '0821-2478-428',
     },
     ref
   ) => {
