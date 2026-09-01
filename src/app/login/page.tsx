@@ -137,7 +137,6 @@ export default function LoginPage() {
 
         // If authError was invalid credentials, show clear message
         if (authError && authError.message.toLowerCase().includes('invalid login credentials')) {
-          setIsLoading(false);
           setErrorMsg('Email atau password salah.');
           return;
         }
@@ -163,13 +162,11 @@ export default function LoginPage() {
         );
 
         if (!isDefaultOwner && !foundOwnerInDb) {
-          setIsLoading(false);
           setErrorMsg('Akun Owner tidak ditemukan di database. Pastikan email atau nama sudah terdaftar.');
           return;
         }
 
         if (foundOwnerInDb && foundOwnerInDb.status === 'NONAKTIF') {
-          setIsLoading(false);
           setErrorMsg('Akun Owner ini sedang berstatus NONAKTIF.');
           return;
         }
@@ -197,20 +194,18 @@ export default function LoginPage() {
             s.phone === targetUser
         );
 
-        const isDefaultKasir = 
-          targetUser.toLowerCase() === 'yuli' || 
-          targetUser.toLowerCase() === 'asfia' || 
-          targetUser.toLowerCase() === 'andi' || 
+        const isDefaultKasir =
+          targetUser.toLowerCase() === 'yuli' ||
+          targetUser.toLowerCase() === 'asfia' ||
+          targetUser.toLowerCase() === 'andi' ||
           targetUser.toLowerCase() === 'kasir';
 
         if (!foundStaff && !isDefaultKasir) {
-          setIsLoading(false);
           setErrorMsg(`Akun "${targetUser}" tidak ditemukan di database staf. Silakan tambahkan staf di menu Karyawan terlebih dahulu.`);
           return;
         }
 
         if (foundStaff && foundStaff.status !== 'AKTIF') {
-          setIsLoading(false);
           setErrorMsg(`Akun "${foundStaff.name}" tidak dapat login karena berstatus ${foundStaff.status}.`);
           return;
         }
@@ -236,8 +231,9 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      setIsLoading(false);
       setErrorMsg(err?.message || 'Gagal login. Coba lagi.');
+    } finally {
+      setIsLoading(false);
     }
   };
 

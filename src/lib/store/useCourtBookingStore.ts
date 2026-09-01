@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { Court, CourtBooking, BookingStatus, PaymentMethod, AdditionalItem } from '@/types/booking';
 import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, deleteBooking as dbDeleteBooking, updateBooking as dbUpdateBooking, updateCourt as dbUpdateCourt } from '@/lib/db/bookings';
 
-export const COURTS_DATA: Court[] = [];
-
 interface CourtBookingState {
   courts: Court[];
   bookings: CourtBooking[];

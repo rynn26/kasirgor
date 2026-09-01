@@ -162,22 +162,20 @@ export const useCartStore = create<CartState>()(
           notes: state.notes || undefined,
         };
 
-        // Update stock locally first
-        const stockUpdates = state.items.map((item) => ({
-          id: item.product.id,
-          delta: -item.quantity,
-        }));
-
-        // Deduct stock via product store
-        for (const { id, delta } of stockUpdates) {
-          useProductStore.getState().updateStock(id, delta);
-        }
-
-        // Save transaction to DB
+        // Save transaction to DB first
         await useTransactionStore.getState().addTransaction({
           ...transaction,
           createdAt: new Date().toISOString(),
         });
+
+        // Deduct stock via product store after transaction is saved
+        const stockUpdates = state.items.map((item) => ({
+          id: item.product.id,
+          delta: -item.quantity,
+        }));
+        for (const { id, delta } of stockUpdates) {
+          await useProductStore.getState().updateStock(id, delta);
+        }
 
         set({ isProcessing: false });
       },

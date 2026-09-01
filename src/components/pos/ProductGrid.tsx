@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useProductStore } from '@/lib/store/useProductStore';
 import { useCartStore } from '@/lib/store/useCartStore';
 import { ProductCard } from './ProductCard';
@@ -11,17 +11,54 @@ export const ProductGrid: React.FC = () => {
   const { searchQuery, setSearchQuery, filteredProducts, products } = useProductStore();
   const { addItem } = useCartStore();
   const [barcodeAlert, setBarcodeAlert] = useState<string | null>(null);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [showBarcodeInput, setShowBarcodeInput] = useState(false);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   const displayedProducts = filteredProducts();
 
-  // Barcode scanner simulator
   const handleBarcodeClick = () => {
-    const randomProduct = products[Math.floor(Math.random() * products.length)];
-    if (randomProduct && randomProduct.stock > 0) {
-      addItem(randomProduct);
-      setBarcodeAlert(`Scan Berhasil: "${randomProduct.name}"`);
-      setTimeout(() => setBarcodeAlert(null), 3000);
+    setShowBarcodeInput(true);
+    setBarcodeInput('');
+    setTimeout(() => barcodeInputRef.current?.focus(), 50);
+  };
+
+  const handleBarcodeSubmit = () => {
+    const code = barcodeInput.trim();
+    if (!code) {
+      setShowBarcodeInput(false);
+      return;
     }
+
+    // Search by barcode or SKU first, then by name
+    const byBarcode = products.find((p) => p.barcode === code);
+    if (byBarcode) {
+      if (byBarcode.stock > 0) {
+        addItem(byBarcode);
+        setBarcodeAlert(`Scan Berhasil: "${byBarcode.name}"`);
+      } else {
+        setBarcodeAlert(`"${byBarcode.name}" stok habis`);
+      }
+    } else {
+      // Try matching by name (partial)
+      const byName = products.find(
+        (p) => p.name.toLowerCase().includes(code.toLowerCase())
+      );
+      if (byName) {
+        if (byName.stock > 0) {
+          addItem(byName);
+          setBarcodeAlert(`Scan Berhasil: "${byName.name}"`);
+        } else {
+          setBarcodeAlert(`"${byName.name}" stok habis`);
+        }
+      } else {
+        setBarcodeAlert(`Produk dengan kode "${code}" tidak ditemukan`);
+      }
+    }
+
+    setBarcodeInput('');
+    setShowBarcodeInput(false);
+    setTimeout(() => setBarcodeAlert(null), 3000);
   };
 
   return (
@@ -37,7 +74,7 @@ export const ProductGrid: React.FC = () => {
           className="w-full pl-11 pr-12 py-3 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#b92b10] focus:ring-1 focus:ring-[#b92b10] shadow-xs"
         />
         
-        {/* Right Barcode Scanner Icon Button */}
+        {/* Barcode Scanner Icon Button */}
         <button
           type="button"
           onClick={handleBarcodeClick}
@@ -47,6 +84,40 @@ export const ProductGrid: React.FC = () => {
           <ScanBarcode className="w-5 h-5 stroke-[1.75]" />
         </button>
       </div>
+
+      {/* Barcode Input Modal */}
+      {showBarcodeInput && (
+        <div className="bg-white border border-[#b92b10]/30 rounded-2xl p-3 shadow-md">
+          <div className="flex items-center gap-2">
+            <input
+              ref={barcodeInputRef}
+              type="text"
+              value={barcodeInput}
+              onChange={(e) => setBarcodeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleBarcodeSubmit();
+                if (e.key === 'Escape') setShowBarcodeInput(false);
+              }}
+              placeholder="Masukkan kode barcode / SKU / nama produk..."
+              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#b92b10] focus:bg-white"
+            />
+            <button
+              type="button"
+              onClick={handleBarcodeSubmit}
+              className="px-3 py-2 bg-[#b92b10] text-white rounded-xl text-xs font-bold hover:bg-[#a3250d] transition-colors cursor-pointer"
+            >
+              Cari
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBarcodeInput(false)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Barcode feedback banner */}
       {barcodeAlert && (

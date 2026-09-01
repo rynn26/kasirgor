@@ -91,10 +91,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       // 1. Simpan transaksi ke Supabase
       const saved = await addTransaction(newTxData);
 
-      // 2. Potong stok di Supabase
-      items.forEach((item) => {
-        updateStock(item.product.id, -item.quantity);
-      });
+      // 2. Potong stok di Supabase (await to ensure stock is updated)
+      for (const item of items) {
+        await updateStock(item.product.id, -item.quantity);
+      }
 
       // 3. Efek Confetti
       confetti({

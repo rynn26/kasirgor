@@ -108,7 +108,7 @@ export const useStaffStore = create<StaffState>((set, get) => ({
   toggleStaffStatus: async (id) => {
     const staff = get().staffList.find((s) => s.id === id);
     if (!staff) return;
-    const nextStatus = staff.status === 'AKTIF' ? 'CUTI' : staff.status === 'CUTI' ? 'NONAKTIF' : 'AKTIF';
+    const nextStatus = staff.status === 'AKTIF' ? 'NONAKTIF' : 'AKTIF';
     try {
       await updateStaff(id, { status: nextStatus });
       set((state) => ({

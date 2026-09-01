@@ -216,7 +216,7 @@ export async function createBooking(
   if (bookingError) throw bookingError;
 
   if (booking.additionalItems && booking.additionalItems.length > 0) {
-    const itemsToInsert = booking.additionalItems.map((item, idx) => ({
+    const itemsToInsert = booking.additionalItems.map((item) => ({
       id: crypto.randomUUID(),
       booking_id: bookingId,
       name: item.name,
@@ -258,7 +258,7 @@ export async function settleBooking(
   }
 ): Promise<CourtBooking> {
   if (settlementData.additionalItems && settlementData.additionalItems.length > 0) {
-    const itemsToInsert = settlementData.additionalItems.map((item, idx) => ({
+    const itemsToInsert = settlementData.additionalItems.map((item) => ({
       id: crypto.randomUUID(),
       booking_id: bookingId,
       name: item.name,
@@ -266,9 +266,10 @@ export async function settleBooking(
       qty: item.qty,
     }));
 
-    await supabase
+    const { error: insertError } = await supabase
       .from('booking_additional_items')
       .insert(itemsToInsert);
+    if (insertError) throw insertError;
   }
 
   const { data: current, error: fetchError } = await supabase

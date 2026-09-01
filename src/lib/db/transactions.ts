@@ -245,11 +245,19 @@ export async function updateTransaction(
     status?: 'COMPLETED' | 'CANCELLED';
   }
 ): Promise<Transaction> {
+  // Fetch existing transaction to preserve tax and service totals
+  const existingTx = await fetchTransactionById(id);
+  if (!existingTx) throw new Error('Transaksi tidak ditemukan');
+
   const subtotal = data.items.reduce(
     (sum, item) => sum + (item.product.price - (item.discountPerItem || 0)) * item.quantity,
     0
   );
-  const grandTotal = subtotal; // standard POS calculation
+  // Preserve existing tax/service totals and recalculate grandTotal properly
+  const taxTotal = existingTx.taxTotal;
+  const serviceTotal = existingTx.serviceTotal;
+  const discountTotal = existingTx.discountTotal;
+  const grandTotal = Math.max(0, subtotal - discountTotal + taxTotal + serviceTotal);
   const amountPaid = data.amountPaid !== undefined ? data.amountPaid : grandTotal;
   const change = Math.max(0, amountPaid - grandTotal);
 

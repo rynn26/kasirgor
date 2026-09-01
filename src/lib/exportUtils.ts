@@ -15,6 +15,16 @@ export interface KantinSalesItemRow {
   cuanTotal: number;
 }
 
+// Helper to escape HTML entities to prevent XSS
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /**
  * Helper to build grouped sales rows from real transactions
  */
@@ -174,7 +184,7 @@ export function printKantinPDF(
           (r, idx) => `
         <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; font-size: 11px;">
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${r.no}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px 8px; font-weight: bold; color: #0f172a;">${r.barang}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px 8px; font-weight: bold; color: #0f172a;">${escapeHtml(r.barang)}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; color: #475569;">${r.kategori}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-weight: bold;">${r.terjual} ${r.satuan}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: right;">Rp ${r.harga.toLocaleString('id-ID')}</td>
@@ -434,15 +444,15 @@ export function printCourtBookingsPDF(
           return `
         <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; font-size: 11px;">
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${b.bookingCode}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${escapeHtml(b.bookingCode)}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${b.date}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px 8px; font-weight: bold; color: #0f172a;">${b.customerName}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px 8px; font-weight: bold; color: #0f172a;">${escapeHtml(b.customerName)}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">
             <span style="display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; ${isMember ? 'background: #dbeafe; color: #1e40af;' : 'background: #f1f5f9; color: #475569;'}">
               ${isMember ? 'MEMBER' : 'INSIDENTIL'}
             </span>
           </td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px 8px;">${b.courtName}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px 8px;">${escapeHtml(b.courtName)}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${b.startTime}-${b.endTime} (${b.durationHours}j)</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: right; font-weight: bold;">Rp ${b.totalAmount.toLocaleString('id-ID')}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: right; font-weight: bold; color: #059669;">Rp ${b.amountPaidTotal.toLocaleString('id-ID')}</td>
