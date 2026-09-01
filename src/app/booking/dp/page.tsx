@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { CourtBooking, PaymentMethod } from '@/types/booking';
 import { 
   ArrowLeft, 
@@ -558,11 +558,12 @@ export default function InputDpBookingPage() {
           <div className="relative">
             <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               required
-              value={totalSewa || ''}
-              onChange={(e) => setTotalSewa(Number(e.target.value) || 0)}
-              placeholder="Contoh: 150000"
+              value={totalSewa ? formatNumber(totalSewa) : ''}
+              onChange={(e) => setTotalSewa(parseNumberInput(e.target.value))}
+              placeholder="Contoh: 150.000"
               className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
             />
           </div>
@@ -578,12 +579,12 @@ export default function InputDpBookingPage() {
             <div className="relative">
               <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
               <input
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
                 required
-                value={dpAmount || ''}
-                onChange={(e) => setDpAmount(Number(e.target.value))}
-                placeholder="150000"
+                value={dpAmount ? formatNumber(dpAmount) : ''}
+                onChange={(e) => setDpAmount(parseNumberInput(e.target.value))}
+                placeholder="Contoh: 150.000"
                 className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />
             </div>
@@ -649,10 +650,11 @@ export default function InputDpBookingPage() {
             <div className="relative">
               <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
               <input
-                type="number"
-                value={cashReceived || ''}
-                onChange={(e) => setCashReceived(Number(e.target.value))}
-                placeholder={dpAmount.toString()}
+                type="text"
+                inputMode="numeric"
+                value={cashReceived ? formatNumber(cashReceived) : ''}
+                onChange={(e) => setCashReceived(parseNumberInput(e.target.value))}
+                placeholder={formatNumber(dpAmount) || '0'}
                 className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
               />
             </div>

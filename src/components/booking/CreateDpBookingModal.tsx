@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { PaymentMethod, CourtBooking } from '@/types/booking';
 import { 
   X, 
@@ -242,44 +242,11 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           
-          {/* Section 1: Court & Schedule */}
+          {/* Section 1: Schedule & Duration */}
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span>1. Pilih Lapangan & Waktu Bermain</span>
+              <span>1. Waktu & Durasi Bermain</span>
             </label>
-
-            {/* Court Selection Radio Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
-              {courts.map((court) => {
-                const isSelected = court.id === courtId;
-                return (
-                  <button
-                    key={court.id}
-                    type="button"
-                    onClick={() => setCourtId(court.id)}
-                    className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative ${
-                      isSelected
-                        ? 'bg-red-50/50 border-[#b92b10] shadow-xs'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                        {court.type}
-                      </span>
-                      {isSelected && (
-                        <span className="w-4 h-4 rounded-full bg-[#b92b10] text-white flex items-center justify-center text-[10px]">
-                          <Check className="w-2.5 h-2.5 stroke-[3]" />
-                        </span>
-                      )}
-                    </div>
-                    <div className="font-bold text-xs sm:text-sm text-slate-900 mt-2 line-clamp-1">
-                      {court.name.split(' ')[0]} {court.name.split(' ')[1]}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
 
             {/* Date, Start Time, Court Count & Duration */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -515,11 +482,12 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               <div className="relative">
                 <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   required
-                  placeholder="Contoh: 160000"
-                  value={courtFee || ''}
-                  onChange={(e) => setCourtFee(Number(e.target.value) || 0)}
+                  placeholder="Contoh: 160.000"
+                  value={courtFee ? formatNumber(courtFee) : ''}
+                  onChange={(e) => setCourtFee(parseNumberInput(e.target.value))}
                   className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                 />
               </div>
@@ -570,10 +538,11 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
                   <input
-                    type="number"
-                    value={cashReceived || ''}
-                    onChange={(e) => setCashReceived(Number(e.target.value))}
-                    placeholder={courtFee.toString()}
+                    type="text"
+                    inputMode="numeric"
+                    value={cashReceived ? formatNumber(cashReceived) : ''}
+                    onChange={(e) => setCashReceived(parseNumberInput(e.target.value))}
+                    placeholder={formatNumber(courtFee) || '0'}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                   />
                 </div>

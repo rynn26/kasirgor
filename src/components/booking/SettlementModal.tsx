@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah, formatDate } from '@/lib/utils';
+import { formatRupiah, formatDate, formatNumber, parseNumberInput } from '@/lib/utils';
 import { PaymentMethod, CourtBooking, AdditionalItem } from '@/types/booking';
 import { 
   X, 
@@ -413,10 +413,11 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
                     <input
-                      type="number"
-                      value={cashReceived || ''}
-                      onChange={(e) => setCashReceived(Number(e.target.value))}
-                      placeholder={totalSettlementDue.toString()}
+                      type="text"
+                      inputMode="numeric"
+                      value={cashReceived ? formatNumber(cashReceived) : ''}
+                      onChange={(e) => setCashReceived(parseNumberInput(e.target.value))}
+                      placeholder={formatNumber(totalSettlementDue) || '0'}
                       className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-blue-600"
                     />
                   </div>

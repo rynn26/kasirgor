@@ -50,7 +50,7 @@ export const useCartStore = create<CartState>()(
       discountPercent: 0,
       discountType: 'fixed',
       taxRate: 0,
-      cashierName: 'Kasir Utama',
+      cashierName: 'Yuli',
       paymentMethod: 'CASH',
       cashReceived: 0,
       notes: '',

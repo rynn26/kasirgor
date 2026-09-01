@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { CourtBooking, PaymentMethod, BookingStatus } from '@/types/booking';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import {
   X,
   User,
@@ -419,11 +419,12 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
               <div className="relative">
                 <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   required
-                  value={totalSewa || ''}
-                  onChange={(e) => setTotalSewa(Number(e.target.value) || 0)}
-                  placeholder="Contoh: 160000"
+                  value={totalSewa ? formatNumber(totalSewa) : ''}
+                  onChange={(e) => setTotalSewa(parseNumberInput(e.target.value))}
+                  placeholder="Contoh: 160.000"
                   className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-[#b92b10]"
                 />
               </div>
@@ -456,10 +457,12 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                     </button>
                   </label>
                   <input
-                    type="number"
-                    value={dpAmount || ''}
-                    onChange={(e) => setDpAmount(Number(e.target.value) || 0)}
-                    className="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-[#b92b10]"
+                    type="text"
+                    inputMode="numeric"
+                    value={dpAmount ? formatNumber(dpAmount) : ''}
+                    onChange={(e) => setDpAmount(parseNumberInput(e.target.value))}
+                    placeholder="Contoh: 80.000"
+                    className="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-[#b92b10]"
                   />
                 </div>
               )}

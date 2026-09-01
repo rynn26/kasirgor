@@ -52,6 +52,7 @@ export default function ShiftSelectionPage() {
     const now = new Date();
     setCurrentDateStr(
       new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta',
         day: 'numeric',
         month: 'short',
         year: 'numeric',
@@ -59,6 +60,7 @@ export default function ShiftSelectionPage() {
     );
     setCurrentTimeStr(
       now.toLocaleTimeString('id-ID', {
+        timeZone: 'Asia/Jakarta',
         hour: '2-digit',
         minute: '2-digit',
       }) + ' WIB'

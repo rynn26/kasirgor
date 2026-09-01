@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, ShieldAlert, Lock, ArrowRight } from 'lucide-react';
 import { useProductStore } from '@/lib/store/useProductStore';
 import { useToastStore } from '@/lib/store/useToastStore';
+import { formatNumber, parseNumberInput } from '@/lib/utils';
 
 export default function TambahProdukOwnerPage() {
   const router = useRouter();
@@ -222,10 +223,11 @@ export default function TambahProdukOwnerPage() {
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  value={costPrice}
-                  onChange={(e) => setCostPrice(e.target.value)}
-                  placeholder="Rp"
+                  type="text"
+                  inputMode="numeric"
+                  value={costPrice ? formatNumber(costPrice) : ''}
+                  onChange={(e) => setCostPrice(parseNumberInput(e.target.value).toString())}
+                  placeholder="Contoh: 10.000"
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
                 />
               </div>
@@ -238,11 +240,12 @@ export default function TambahProdukOwnerPage() {
               </label>
               <div className="relative">
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   required
-                  value={sellingPrice}
-                  onChange={(e) => setSellingPrice(e.target.value)}
-                  placeholder="Rp"
+                  value={sellingPrice ? formatNumber(sellingPrice) : ''}
+                  onChange={(e) => setSellingPrice(parseNumberInput(e.target.value).toString())}
+                  placeholder="Contoh: 15.000"
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-bold placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
                 />
               </div>
@@ -286,29 +289,6 @@ export default function TambahProdukOwnerPage() {
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
               />
             </div>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* CARD 4: DETAIL LAINNYA */}
-        {/* ============================================================ */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
-          <h2 className="text-xs sm:text-sm font-bold text-slate-900">
-            Detail Lainnya
-          </h2>
-
-          {/* Deskripsi */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-slate-700 block">
-              Deskripsi (Opsional)
-            </label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Deskripsi singkat produk..."
-              className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all resize-none"
-            />
           </div>
         </div>
 

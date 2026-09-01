@@ -75,10 +75,12 @@ export default function DashboardUnifiedPage() {
           const parsed = JSON.parse(session);
           if (parsed.role === 'kasir') {
             setRole('kasir');
-            setUserName(parsed.name || parsed.user || 'Yuli');
+            const cName = parsed.name && parsed.name.toLowerCase() !== 'kasir' && parsed.name.toLowerCase() !== 'andi' ? parsed.name : 'Yuli';
+            setUserName(cName);
           } else {
             setRole('owner');
-            setUserName(parsed.name || parsed.user || 'Wilson');
+            const oName = parsed.name && parsed.name.toLowerCase() !== 'owner' ? parsed.name : 'Wilson';
+            setUserName(oName);
           }
         } catch {}
       }
@@ -646,7 +648,7 @@ export default function DashboardUnifiedPage() {
 
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
-                  <span>{isMounted ? greeting : 'Selamat sore'}, Owner</span>
+                  <span>{isMounted ? greeting : 'Selamat malam'}, {userName && userName !== 'Owner' ? userName : 'Wilson'}</span>
                   <span className="text-lg">👋</span>
                 </h1>
                 <p className="text-[11px] font-medium text-slate-400">
