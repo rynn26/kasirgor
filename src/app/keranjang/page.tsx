@@ -9,7 +9,7 @@ import { useProductStore } from '@/lib/store/useProductStore';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { PaymentMethod, Transaction } from '@/types/pos';
-import { formatRupiah, generateInvoiceNumber } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput, generateInvoiceNumber } from '@/lib/utils';
 import { 
   PlusCircle, 
   Minus, 
@@ -20,7 +20,10 @@ import {
   Banknote,
   QrCode,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Tag,
+  X,
+  Percent
 } from 'lucide-react';
 
 export default function KeranjangPage() {
@@ -35,6 +38,10 @@ export default function KeranjangPage() {
     customerName,
     tableOrCourtNumber,
     cashierName,
+    discountAmount,
+    discountPercent,
+    discountType,
+    setDiscount,
     clearCart
   } = useCartStore();
 
@@ -45,6 +52,10 @@ export default function KeranjangPage() {
   const [activeCashier, setActiveCashier] = useState('Yuli');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [discountTypeLocal, setDiscountTypeLocal] = useState<'percent' | 'fixed'>(discountType || 'percent');
+  const [discountValueLocal, setDiscountValueLocal] = useState<number>(
+    discountType === 'percent' ? discountPercent : discountAmount
+  );
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -259,6 +270,147 @@ export default function KeranjangPage() {
       {/* ============================================================ */}
       {items.length > 0 && (
         <div className="pt-2 space-y-3">
+          
+          {/* Card Diskon & Promo */}
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                  <Tag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                    Diskon & Potongan Harga
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    Potongan persen (%) atau nominal tetap (Rp)
+                  </p>
+                </div>
+              </div>
+
+              {discountTotal > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountValueLocal(0);
+                    setDiscount(0, 'fixed');
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Hapus Diskon</span>
+                </button>
+              )}
+            </div>
+
+            {/* Toggle Type: Persen vs Nominal */}
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setDiscountTypeLocal('percent');
+                  setDiscount(discountValueLocal, 'percent');
+                }}
+                className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  discountTypeLocal === 'percent'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Diskon Persen (%)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDiscountTypeLocal('fixed');
+                  setDiscount(discountValueLocal, 'fixed');
+                }}
+                className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  discountTypeLocal === 'fixed'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Nominal Tetap (Rp)
+              </button>
+            </div>
+
+            {/* Input Box & Quick Chips */}
+            <div className="space-y-2">
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">
+                  {discountTypeLocal === 'percent' ? '%' : 'Rp'}
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={discountValueLocal ? (discountTypeLocal === 'fixed' ? formatNumber(discountValueLocal) : discountValueLocal) : ''}
+                  onChange={(e) => {
+                    const val = parseNumberInput(e.target.value);
+                    const finalVal = discountTypeLocal === 'percent' ? Math.min(100, val) : val;
+                    setDiscountValueLocal(finalVal);
+                    setDiscount(finalVal, discountTypeLocal);
+                  }}
+                  placeholder={discountTypeLocal === 'percent' ? 'Contoh: 10 (%)' : 'Contoh: 5.000 (Rp)'}
+                  className="w-full pl-10 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600 focus:bg-white"
+                />
+              </div>
+
+              {/* Quick Chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {discountTypeLocal === 'percent'
+                  ? [5, 10, 15, 20, 50].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          setDiscountValueLocal(pct);
+                          setDiscount(pct, 'percent');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          discountTypeLocal === 'percent' && discountValueLocal === pct
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))
+                  : [2000, 5000, 10000, 20000, 50000].map((nom) => (
+                      <button
+                        key={nom}
+                        type="button"
+                        onClick={() => {
+                          setDiscountValueLocal(nom);
+                          setDiscount(nom, 'fixed');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          discountTypeLocal === 'fixed' && discountValueLocal === nom
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {formatRupiah(nom)}
+                      </button>
+                    ))}
+              </div>
+            </div>
+
+            {/* Breakdown Summary */}
+            {discountTotal > 0 && (
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-1 text-xs text-emerald-900">
+                <div className="flex justify-between text-slate-600">
+                  <span>Subtotal Barang:</span>
+                  <span>{formatRupiah(subtotal)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-emerald-700">
+                  <span>Potongan Diskon:</span>
+                  <span>- {formatRupiah(discountTotal)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Card Pembayaran */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-4">
             

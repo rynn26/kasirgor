@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useCartStore } from '@/lib/store/useCartStore';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { 
   ShoppingCart, 
   Trash2, 
@@ -14,7 +14,8 @@ import {
   FileText, 
   PlusCircle, 
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 
 interface CartSidebarProps {
@@ -42,10 +43,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
   } = useCartStore();
 
   const [isEditingDiscount, setIsEditingDiscount] = useState(false);
-  const [discountValInput, setDiscountValInput] = useState(
-    discountType === 'percent' ? discountPercent.toString() : discountAmount.toString()
+  const [discountValInput, setDiscountValInput] = useState<number>(
+    discountType === 'percent' ? discountPercent : discountAmount
   );
-  const [activeTabType, setActiveTabType] = useState<'fixed' | 'percent'>(discountType);
+  const [activeTabType, setActiveTabType] = useState<'fixed' | 'percent'>(discountType || 'percent');
 
   const subtotal = getSubtotal();
   const discountTotal = getDiscountTotal();
@@ -53,9 +54,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
   const grandTotal = getGrandTotal();
   const totalItemsCount = getTotalItems();
 
-  const handleApplyDiscount = () => {
-    const num = Number(discountValInput) || 0;
-    setDiscount(num, activeTabType);
+  const handleApplyDiscount = (val?: number, type?: 'fixed' | 'percent') => {
+    const targetType = type || activeTabType;
+    const targetVal = val !== undefined ? val : discountValInput;
+    setDiscount(targetVal, targetType);
     setIsEditingDiscount(false);
   };
 
@@ -190,32 +192,104 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
         <div className="p-4 bg-white border-t border-slate-200 space-y-3 shadow-lg">
           {/* Diskon Popup/Toggle */}
           {isEditingDiscount ? (
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 animate-in fade-in">
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5 animate-in fade-in">
               <div className="flex justify-between items-center text-xs font-bold text-slate-800">
-                <span>Atur Diskon Transaksi</span>
+                <span className="flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Atur Diskon Transaksi</span>
+                </span>
                 <button
                   type="button"
                   onClick={() => setIsEditingDiscount(false)}
-                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                  className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer rounded"
                 >
                   ✕
                 </button>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={discountValInput}
-                  onChange={(e) => setDiscountValInput(e.target.value)}
-                  placeholder="Nominal diskon (Rp)..."
-                  className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                />
+
+              {/* Toggle Persen vs Nominal */}
+              <div className="grid grid-cols-2 gap-1 bg-white p-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
-                  onClick={handleApplyDiscount}
+                  onClick={() => setActiveTabType('percent')}
+                  className={`py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    activeTabType === 'percent'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Persen (%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTabType('fixed')}
+                  className={`py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    activeTabType === 'fixed'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Nominal (Rp)
+                </button>
+              </div>
+
+              {/* Input Box */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-2.5 top-1.5 text-[11px] font-bold text-slate-400">
+                    {activeTabType === 'percent' ? '%' : 'Rp'}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={discountValInput ? (activeTabType === 'fixed' ? formatNumber(discountValInput) : discountValInput) : ''}
+                    onChange={(e) => {
+                      const val = parseNumberInput(e.target.value);
+                      const finalVal = activeTabType === 'percent' ? Math.min(100, val) : val;
+                      setDiscountValInput(finalVal);
+                    }}
+                    placeholder={activeTabType === 'percent' ? '10' : '5.000'}
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApplyDiscount(discountValInput, activeTabType)}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold cursor-pointer"
                 >
-                  OK
+                  Terapkan
                 </button>
+              </div>
+
+              {/* Quick Chips */}
+              <div className="flex flex-wrap gap-1">
+                {activeTabType === 'percent'
+                  ? [5, 10, 15, 20, 50].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          setDiscountValInput(pct);
+                          handleApplyDiscount(pct, 'percent');
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-white hover:bg-emerald-50 text-slate-700 text-[10px] font-bold border border-slate-200 cursor-pointer"
+                      >
+                        {pct}%
+                      </button>
+                    ))
+                  : [2000, 5000, 10000, 20000].map((nom) => (
+                      <button
+                        key={nom}
+                        type="button"
+                        onClick={() => {
+                          setDiscountValInput(nom);
+                          handleApplyDiscount(nom, 'fixed');
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-white hover:bg-emerald-50 text-slate-700 text-[10px] font-bold border border-slate-200 cursor-pointer"
+                      >
+                        {formatRupiah(nom)}
+                      </button>
+                    ))}
               </div>
             </div>
           ) : (
@@ -229,7 +303,8 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    setDiscountValInput(discountAmount.toString());
+                    setDiscountValInput(discountType === 'percent' ? discountPercent : discountAmount);
+                    setActiveTabType(discountType || 'percent');
                     setIsEditingDiscount(true);
                   }}
                   className="text-xs text-emerald-600 font-bold hover:underline flex items-center gap-1 cursor-pointer"
@@ -237,13 +312,25 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
                   <Tag className="w-3 h-3" />
                   <span>
                     {discountTotal > 0
-                      ? `Diskon Promo`
-                      : '+ Diskon Promo'}
+                      ? `Diskon Promo (${discountType === 'percent' ? `${discountPercent}%` : formatRupiah(discountAmount)})`
+                      : '+ Tambah Diskon'}
                   </span>
                 </button>
-                <span className="text-emerald-600 font-bold">
-                  {discountTotal > 0 ? `- ${formatRupiah(discountTotal)}` : 'Rp 0'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-600 font-bold">
+                    {discountTotal > 0 ? `- ${formatRupiah(discountTotal)}` : 'Rp 0'}
+                  </span>
+                  {discountTotal > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDiscount(0, 'fixed')}
+                      className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                      title="Hapus Diskon"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {taxTotal > 0 && (
