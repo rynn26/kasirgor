@@ -115,7 +115,7 @@ export default function PelunasanBookingPage() {
 
         <div className="text-right hidden sm:block">
           <span className="text-[10px] text-slate-400 font-semibold block">Kasir</span>
-          <span className="text-xs font-bold text-slate-800">{cashierName || 'Andi'}</span>
+          <span className="text-xs font-bold text-slate-800">{cashierName || 'Yuli'}</span>
         </div>
       </div>
 

@@ -328,6 +328,90 @@ export async function cancelBooking(bookingId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteBooking(bookingId: string): Promise<void> {
+  await supabase
+    .from('booking_additional_items')
+    .delete()
+    .eq('booking_id', bookingId);
+
+  const { error } = await supabase
+    .from('court_bookings')
+    .delete()
+    .eq('id', bookingId);
+
+  if (error) throw error;
+}
+
+export async function updateBooking(
+  bookingId: string,
+  data: Partial<{
+    customerName: string;
+    phone: string;
+    communityName: string;
+    memberType: 'MEMBER' | 'INSIDENTIL';
+    date: string;
+    courtId: string;
+    courtName: string;
+    courtType: CourtBooking['courtType'];
+    courtPricePerHour: number;
+    startTime: string;
+    endTime: string;
+    durationHours: number;
+    courtFee: number;
+    totalAmount: number;
+    dpAmount: number;
+    dpPaymentMethod: PaymentMethod;
+    settlementAmount: number;
+    settlementPaymentMethod: PaymentMethod;
+    amountPaidTotal: number;
+    remainingBalance: number;
+    status: BookingStatus;
+    notes: string;
+  }>
+): Promise<CourtBooking> {
+  const updatePayload: Record<string, unknown> = {};
+  if (data.customerName !== undefined) updatePayload.customer_name = data.customerName;
+  if (data.phone !== undefined) updatePayload.phone = data.phone;
+  if (data.communityName !== undefined) updatePayload.community_name = data.communityName;
+  if (data.date !== undefined) updatePayload.date = data.date;
+  if (data.courtId !== undefined) updatePayload.court_id = data.courtId;
+  if (data.courtName !== undefined) updatePayload.court_name = data.courtName;
+  if (data.courtType !== undefined) updatePayload.court_type = data.courtType;
+  if (data.courtPricePerHour !== undefined) updatePayload.court_price_per_hour = data.courtPricePerHour;
+  if (data.startTime !== undefined) updatePayload.start_time = data.startTime;
+  if (data.endTime !== undefined) updatePayload.end_time = data.endTime;
+  if (data.durationHours !== undefined) updatePayload.duration_hours = data.durationHours;
+  if (data.courtFee !== undefined) updatePayload.court_fee = data.courtFee;
+  if (data.totalAmount !== undefined) updatePayload.total_amount = data.totalAmount;
+  if (data.dpAmount !== undefined) updatePayload.dp_amount = data.dpAmount;
+  if (data.dpPaymentMethod !== undefined) updatePayload.dp_payment_method = data.dpPaymentMethod;
+  if (data.settlementAmount !== undefined) updatePayload.settlement_amount = data.settlementAmount;
+  if (data.settlementPaymentMethod !== undefined) updatePayload.settlement_payment_method = data.settlementPaymentMethod;
+  if (data.amountPaidTotal !== undefined) updatePayload.amount_paid_total = data.amountPaidTotal;
+  if (data.remainingBalance !== undefined) updatePayload.remaining_balance = data.remainingBalance;
+  if (data.status !== undefined) updatePayload.status = data.status;
+  if (data.notes !== undefined) updatePayload.notes = data.notes;
+
+  const { data: updated, error } = await supabase
+    .from('court_bookings')
+    .update(updatePayload)
+    .eq('id', bookingId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  const { data: items } = await supabase
+    .from('booking_additional_items')
+    .select('*')
+    .eq('booking_id', bookingId);
+
+  return mapDbToBooking(
+    updated as DbCourtBooking,
+    ((items as DbAdditionalItem[]) || []).map(mapDbAdditionalItem)
+  );
+}
+
 export async function updateCourt(
   courtId: string,
   data: Partial<Pick<Court, 'name' | 'type' | 'pricePerHour' | 'description' | 'isAvailable'>>

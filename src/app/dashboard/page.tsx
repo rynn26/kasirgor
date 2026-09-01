@@ -40,7 +40,7 @@ export default function DashboardUnifiedPage() {
   const { courts, bookings, loadCourts, loadBookings } = useCourtBookingStore();
 
   const [role, setRole] = useState<'owner' | 'kasir'>('owner');
-  const [userName, setUserName] = useState('Owner');
+  const [userName, setUserName] = useState('Wilson');
   const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan'>('kantin');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('HARI');
   const [hoveredPoint, setHoveredPoint] = useState<{ index: number; label: string; value: number } | null>(null);
@@ -75,10 +75,10 @@ export default function DashboardUnifiedPage() {
           const parsed = JSON.parse(session);
           if (parsed.role === 'kasir') {
             setRole('kasir');
-            setUserName(parsed.name || parsed.user || 'Andi');
+            setUserName(parsed.name || parsed.user || 'Yuli');
           } else {
             setRole('owner');
-            setUserName(parsed.name || parsed.user || 'Owner');
+            setUserName(parsed.name || parsed.user || 'Wilson');
           }
         } catch {}
       }

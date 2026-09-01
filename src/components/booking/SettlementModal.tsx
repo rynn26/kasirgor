@@ -137,7 +137,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     const updated = await settleBooking(currentBooking.id, {
       settlementAmount: totalSettlementDue,
       paymentMethod,
-      cashier: cashierName || 'Andi',
+      cashier: cashierName || 'Yuli',
       additionalItems: addedItems,
     });
 

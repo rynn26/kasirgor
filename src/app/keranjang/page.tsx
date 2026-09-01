@@ -42,7 +42,7 @@ export default function KeranjangPage() {
   const { addTransaction } = useTransactionStore();
   const { showToast } = useToastStore();
 
-  const [activeCashier, setActiveCashier] = useState('Andi');
+  const [activeCashier, setActiveCashier] = useState('Yuli');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
 

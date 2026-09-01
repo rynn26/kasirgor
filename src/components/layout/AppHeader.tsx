@@ -76,7 +76,7 @@ export const AppHeader: React.FC = () => {
             {getPageTitle()}
           </h2>
           <p className="text-[11px] text-slate-500 hidden sm:block">
-            {selectedShift?.name || 'Shift Pagi'} • Kasir: <strong className="text-slate-800 font-semibold">{cashierName || 'Andi'}</strong>
+            {selectedShift?.name || 'Shift Pagi - Siang'} • Kasir: <strong className="text-slate-800 font-semibold">{cashierName || 'Yuli'}</strong>
           </p>
         </div>
       </div>

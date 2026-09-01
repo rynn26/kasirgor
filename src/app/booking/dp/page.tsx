@@ -25,10 +25,12 @@ import {
   Phone,
   Sparkles,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Repeat
 } from 'lucide-react';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { BookingSuccessModal } from '@/components/booking/BookingSuccessModal';
+import { getMemberDatesInMonth } from '@/lib/memberUtils';
 
 const SPORT_TYPES = [
   { id: 'Badminton', name: 'Badminton', icon: '🏸' },
@@ -56,7 +58,12 @@ export default function InputDpBookingPage() {
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedSport, setSelectedSport] = useState('Badminton');
+  const [memberType, setMemberType] = useState<'MEMBER' | 'INSIDENTIL'>('INSIDENTIL');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedMemberDayIndex, setSelectedMemberDayIndex] = useState<number>(() => {
+    const d = new Date();
+    return d.getDay();
+  });
   const [startTime, setStartTime] = useState('19:00');
   const [endTime, setEndTime] = useState('21:00');
   const [courtCount, setCourtCount] = useState(1);
@@ -65,6 +72,27 @@ export default function InputDpBookingPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [notes, setNotes] = useState('');
+
+  // Auto calculate member weekly sessions in month
+  const memberSchedule = React.useMemo(() => {
+    return getMemberDatesInMonth(date, selectedMemberDayIndex);
+  }, [date, selectedMemberDayIndex]);
+
+  const handleSelectMemberDay = (dayIdx: number) => {
+    setSelectedMemberDayIndex(dayIdx);
+    const schedule = getMemberDatesInMonth(date, dayIdx);
+    if (schedule.dates.length > 0) {
+      setDate(schedule.dates[0]);
+    }
+  };
+
+  const handleDateChange = (newDateStr: string) => {
+    setDate(newDateStr);
+    const d = new Date(newDateStr + 'T00:00:00');
+    if (!isNaN(d.getDay())) {
+      setSelectedMemberDayIndex(d.getDay());
+    }
+  };
 
   // Receipt and Success Modal State
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
@@ -76,10 +104,40 @@ export default function InputDpBookingPage() {
   const endHour = parseInt(endTime.split(':')[0], 10);
   const calculatedDuration = Math.max(1, endHour > startHour ? endHour - startHour : 1);
 
-  // Price per hour default (e.g. Rp 85.000 / court / hour for Badminton, 75.000 for Pickleball)
-  const baseRatePerHour = selectedSport === 'Badminton' ? 85000 : 75000;
-  const totalSewa = baseRatePerHour * calculatedDuration * courtCount;
+  // State for manual total sewa & DP
+  const [totalSewa, setTotalSewa] = useState<number>(150000);
+  const baseRatePerHour = 75000;
   const sisaPembayaran = Math.max(0, totalSewa - (dpAmount || 0));
+
+  // Calculate max courts and available courts depending on sport
+  const maxCourts = selectedSport === 'Pickleball' ? 2 : 4;
+  const availableCourts = courts.slice(0, maxCourts);
+
+  // Auto-initialize selected court on courts loaded
+  useEffect(() => {
+    if (courts.length > 0 && selectedCourtIds.length === 0) {
+      setSelectedCourtIds([courts[0].id]);
+    }
+  }, [courts]);
+
+  const handleSelectSport = (sportId: string) => {
+    setSelectedSport(sportId);
+    if (sportId === 'Pickleball') {
+      setMemberType('INSIDENTIL');
+    }
+    const newMax = sportId === 'Pickleball' ? 2 : 4;
+    const newAvailable = courts.slice(0, newMax);
+    const validSelected = selectedCourtIds.filter((id) => newAvailable.some((c) => c.id === id));
+
+    if (validSelected.length === 0) {
+      const defaultIds = newAvailable.slice(0, 1).map((c) => c.id);
+      setSelectedCourtIds(defaultIds);
+      setCourtCount(defaultIds.length || 1);
+    } else {
+      setSelectedCourtIds(validSelected);
+      setCourtCount(validSelected.length);
+    }
+  };
 
   // Sync court count with court selections
   const handleToggleCourt = (courtId: string) => {
@@ -90,16 +148,18 @@ export default function InputDpBookingPage() {
         setCourtCount(next.length);
       }
     } else {
-      const next = [...selectedCourtIds, courtId];
-      setSelectedCourtIds(next);
-      setCourtCount(next.length);
+      if (selectedCourtIds.length < maxCourts) {
+        const next = [...selectedCourtIds, courtId];
+        setSelectedCourtIds(next);
+        setCourtCount(next.length);
+      }
     }
   };
 
   const handleCourtCountChange = (delta: number) => {
-    const nextCount = Math.max(1, Math.min(4, courtCount + delta));
+    const nextCount = Math.max(1, Math.min(maxCourts, courtCount + delta));
     setCourtCount(nextCount);
-    setSelectedCourtIds(courts.slice(0, nextCount).map((c) => c.id));
+    setSelectedCourtIds(availableCourts.slice(0, nextCount).map((c) => c.id));
   };
 
   // Quick DP Percentage Helpers
@@ -138,14 +198,32 @@ export default function InputDpBookingPage() {
       .map((c) => c.name)
       .join(' & ') || `${courtCount} Lapangan (${selectedSport})`;
 
+    const finalCommunityName = selectedSport === 'Badminton' 
+      ? (memberType === 'MEMBER' 
+          ? `Badminton (Member ${memberSchedule.sessionCount}x Pertemuan - Setiap ${memberSchedule.dayName})` 
+          : 'Badminton (Insidentil)') 
+      : 'Pickleball (Insidentil)';
+
+    const finalNotes = memberType === 'MEMBER'
+      ? `Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})${notes.trim() ? ` • ${notes.trim()}` : ''}`
+      : (notes.trim() || undefined);
+
+    const firstDate = memberType === 'MEMBER' && memberSchedule.dates.length > 0
+      ? memberSchedule.dates[0]
+      : date;
+
     const newBooking = await addBooking({
       customerName: customerName.trim(),
       phone: phone.trim() || '0812-0000-0000',
-      communityName: `${selectedSport} Community`,
-      date,
-      courtId: selectedCourtIds[0] || 'court-1',
+      communityName: finalCommunityName,
+      memberType: selectedSport === 'Badminton' ? memberType : 'INSIDENTIL',
+      memberDay: memberType === 'MEMBER' ? memberSchedule.dayName : undefined,
+      memberSessionsCount: memberType === 'MEMBER' ? memberSchedule.sessionCount : undefined,
+      memberDates: memberType === 'MEMBER' ? memberSchedule.dates : undefined,
+      date: firstDate,
+      courtId: selectedCourtIds[0] || courts[0]?.id || '',
       courtName: selectedCourtsNames,
-      courtType: 'VIP Vinyl BWF',
+      courtType: courts.find((c) => c.id === selectedCourtIds[0])?.type || courts[0]?.type || 'VIP Vinyl BWF',
       courtPricePerHour: baseRatePerHour,
       startTime,
       endTime,
@@ -156,11 +234,11 @@ export default function InputDpBookingPage() {
       dpAmount,
       dpPaymentMethod: paymentMethod,
       dpPaidAt: new Date().toISOString(),
-      dpCashier: cashierName || 'Andi',
+      dpCashier: cashierName || 'Yuli',
       amountPaidTotal: dpAmount,
       remainingBalance: sisaPembayaran,
       status: sisaPembayaran === 0 ? 'SETTLED' : 'DP_PAID',
-      notes: notes.trim() || undefined,
+      notes: finalNotes,
     });
 
     setLastCreatedBooking(newBooking);
@@ -197,7 +275,7 @@ export default function InputDpBookingPage() {
 
         <div className="text-right hidden sm:block">
           <span className="text-[10px] text-slate-400 font-semibold block">Kasir</span>
-          <span className="text-xs font-bold text-slate-800">{cashierName || 'Andi'}</span>
+          <span className="text-xs font-bold text-slate-800">{cashierName || 'Yuli'}</span>
         </div>
       </div>
 
@@ -244,7 +322,7 @@ export default function InputDpBookingPage() {
                 <button
                   key={sport.id}
                   type="button"
-                  onClick={() => setSelectedSport(sport.id)}
+                  onClick={() => handleSelectSport(sport.id)}
                   className={`py-3 px-4 rounded-2xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-[#b92b10] text-white border-[#b92b10] shadow-sm'
@@ -260,11 +338,121 @@ export default function InputDpBookingPage() {
           </div>
         </div>
 
+        {/* 2b. Kategori Sewa Khusus Badminton (Member vs Insidentil) */}
+        {selectedSport === 'Badminton' && (
+          <div className="space-y-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800">
+                Kategori Sewa Badminton:
+              </label>
+              <span className="text-[10px] font-semibold text-slate-500">
+                {memberType === 'MEMBER' ? 'Langganan Mingguan 1 Bulan' : 'Sekali Main / Insidentil'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMemberType('MEMBER')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  memberType === 'MEMBER'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>👤 Member (Rutin Tiap Minggu)</span>
+                {memberType === 'MEMBER' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMemberType('INSIDENTIL')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  memberType === 'INSIDENTIL'
+                    ? 'bg-[#b92b10] text-white border-[#b92b10] shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <span>⚡ Insidentil (Sekali Main)</span>
+                {memberType === 'INSIDENTIL' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+              </button>
+            </div>
+
+            {/* Pengaturan Jadwal Khusus Member Badminton */}
+            {memberType === 'MEMBER' && (
+              <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span>Pilih Hari Main Rutin (Tiap Minggu):</span>
+                    <span className="text-blue-700 font-black">Hari {memberSchedule.dayName}</span>
+                  </label>
+                  <div className="grid grid-cols-7 gap-1">
+                    {[
+                      { idx: 1, label: 'Sen' },
+                      { idx: 2, label: 'Sel' },
+                      { idx: 3, label: 'Rab' },
+                      { idx: 4, label: 'Kam' },
+                      { idx: 5, label: 'Jum' },
+                      { idx: 6, label: 'Sab' },
+                      { idx: 0, label: 'Min' },
+                    ].map((d) => (
+                      <button
+                        key={d.idx}
+                        type="button"
+                        onClick={() => handleSelectMemberDay(d.idx)}
+                        className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          selectedMemberDayIndex === d.idx
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info Card Jadwal 1 Bulan Member */}
+                <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/90 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between font-bold text-blue-900">
+                    <span className="flex items-center gap-1.5">
+                      <Repeat className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Paket {memberSchedule.sessionCount}x Pertemuan (1 Bulan)</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px]">
+                      {memberSchedule.monthName} {memberSchedule.year}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-blue-800">
+                    Rutin main tiap hari <strong>{memberSchedule.dayName}</strong>:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {memberSchedule.dates.map((dt, i) => (
+                      <span
+                        key={dt}
+                        className="px-2 py-1 rounded-md bg-white border border-blue-200 text-blue-950 font-bold text-[11px] shadow-2xs"
+                      >
+                        Pertemuan {i + 1}: {dt.split('-')[2]}/{dt.split('-')[1]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 3. Tanggal */}
         <div className="space-y-1">
-          <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
-            <span>Tanggal Main</span>
-            <span className="text-red-500">*</span>
+          <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center gap-1">
+              <span>{memberType === 'MEMBER' ? 'Bulan & Tanggal Mulai Main' : 'Tanggal Main'}</span>
+              <span className="text-red-500">*</span>
+            </span>
+            {memberType === 'MEMBER' && (
+              <span className="text-[11px] text-blue-600 font-semibold">
+                Periode Bulan: {memberSchedule.monthName} {memberSchedule.year}
+              </span>
+            )}
           </label>
           <div className="relative">
             <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -272,7 +460,7 @@ export default function InputDpBookingPage() {
               type="date"
               required
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white cursor-pointer"
             />
           </div>
@@ -343,7 +531,7 @@ export default function InputDpBookingPage() {
               <button
                 type="button"
                 onClick={() => handleCourtCountChange(1)}
-                disabled={courtCount >= 4}
+                disabled={courtCount >= maxCourts}
                 className="w-9 h-9 rounded-xl bg-white disabled:opacity-40 text-slate-800 font-black text-sm flex items-center justify-center border border-slate-200 shadow-2xs hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
@@ -361,72 +549,41 @@ export default function InputDpBookingPage() {
           </div>
         </div>
 
-        {/* Pilih Lapangan Spesifik Chip Selector */}
-        <div className="space-y-1.5 pt-1">
-          <label className="text-[11px] font-semibold text-slate-600 block">
-            Pilihan Nomor Lapangan ({selectedCourtIds.length} dipilih):
+        {/* Total Sewa Input Box */}
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span>Total Tagihan Sewa (Rp) *</span>
+            <span className="text-[11px] text-slate-400 font-normal">Ketik manual</span>
           </label>
-          <div className="grid grid-cols-2 gap-1.5">
-            {courts.map((court) => {
-              const isChecked = selectedCourtIds.includes(court.id);
-              return (
-                <button
-                  key={court.id}
-                  type="button"
-                  onClick={() => handleToggleCourt(court.id)}
-                  className={`p-2 rounded-xl border text-left text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
-                    isChecked
-                      ? 'bg-red-50/60 border-[#b92b10] text-[#b92b10]'
-                      : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  <span className="truncate">{court.name.split(' ')[0]} {court.name.split(' ')[1]}</span>
-                  {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Total Sewa Highlight Box */}
-        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-between">
-          <div>
-            <span className="text-[10px] text-slate-400 font-semibold block uppercase">Total Tagihan Sewa</span>
-            <span className="text-xs text-slate-300">
-              {courtCount} Lapangan × {calculatedDuration} Jam @ {formatRupiah(baseRatePerHour)}
-            </span>
-          </div>
-          <div className="text-lg font-black text-white">
-            {formatRupiah(totalSewa)}
+          <div className="relative">
+            <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
+            <input
+              type="number"
+              required
+              value={totalSewa || ''}
+              onChange={(e) => setTotalSewa(Number(e.target.value) || 0)}
+              placeholder="Contoh: 150000"
+              className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
+            />
           </div>
         </div>
 
         {/* 6. Nominal DP & Sisa Pembayaran */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                <span>Nominal DP</span>
-                <span className="text-red-500">*</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => handleSetDpPercent(0.5)}
-                className="text-[10px] font-bold text-[#b92b10] hover:underline cursor-pointer"
-              >
-                Set 50% ({formatRupiah(totalSewa * 0.5)})
-              </button>
-            </div>
+            <label className="text-xs font-bold text-slate-800 flex items-center gap-1">
+              <span>Nominal DP</span>
+              <span className="text-red-500">*</span>
+            </label>
             <div className="relative">
               <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
               <input
                 type="number"
                 min={0}
-                max={totalSewa}
                 required
                 value={dpAmount || ''}
                 onChange={(e) => setDpAmount(Number(e.target.value))}
-                placeholder="150.000"
+                placeholder="150000"
                 className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />
             </div>

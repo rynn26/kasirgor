@@ -14,7 +14,10 @@ import {
   Clock,
   MapPin,
   User,
-  ShieldCheck
+  ShieldCheck,
+  Pencil,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { useToastStore } from '@/lib/store/useToastStore';
 
@@ -22,6 +25,8 @@ interface BookingReceiptModalProps {
   isOpen: boolean;
   booking: CourtBooking | null;
   onClose: () => void;
+  onEdit?: (booking: CourtBooking) => void;
+  onDelete?: (booking: CourtBooking) => void;
   shopName?: string;
   shopAddress?: string;
   shopPhone?: string;
@@ -31,6 +36,8 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
   isOpen,
   booking,
   onClose,
+  onEdit,
+  onDelete,
   shopName = 'GOR & ARENA SPORT CENTER',
   shopAddress = 'Jl. Stadion Olahraga No. 88, Jakarta Barat',
   shopPhone = '0812-3456-7890',
@@ -47,11 +54,13 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
   };
 
   const handleCopyWhatsApp = () => {
+    const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
+
     const text = `*BUKTI BOOKING LAPANGAN - ${shopName}*
 ----------------------------------------
 No. Booking: *${booking.bookingCode}*
 Nama Penyewa: *${booking.customerName}*
-${booking.communityName ? `Komunitas: ${booking.communityName}\n` : ''}Lapangan: *${booking.courtName}*
+${isMember ? `Kategori: *Member Bulanan (Rutin Tiap Minggu)*\n` : ''}${booking.notes ? `Jadwal Pertemuan: ${booking.notes}\n` : ''}Lapangan: *${booking.courtName}*
 Tanggal: *${booking.date}*
 Waktu: *${booking.startTime} - ${booking.endTime} WIB* (${booking.durationHours} Jam)
 ----------------------------------------
@@ -73,11 +82,15 @@ Terima kasih telah bermain di ${shopName}!`;
       cleanPhone = '62' + cleanPhone.slice(1);
     }
 
+    const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
+
     const message = encodeURIComponent(
       `Halo Kak *${booking.customerName}*, berikut bukti reservasi lapangan badminton di *${shopName}*:\n\n` +
       `📌 *Kode Booking*: ${booking.bookingCode}\n` +
+      (isMember ? `👤 *Kategori*: Member Bulanan (Rutin Tiap Minggu)\n` : '') +
+      (booking.notes ? `🗓️ *Jadwal Member*: ${booking.notes}\n` : '') +
       `🏸 *Lapangan*: ${booking.courtName}\n` +
-      `📅 *Tanggal*: ${booking.date}\n` +
+      `📅 *Tanggal Mulai*: ${booking.date}\n` +
       `⏰ *Waktu*: ${booking.startTime} - ${booking.endTime} WIB (${booking.durationHours} Jam)\n` +
       `💰 *Total*: ${formatRupiah(booking.totalAmount)}\n` +
       `💳 *DP Diterima*: ${formatRupiah(booking.dpAmount)}\n` +
@@ -161,13 +174,18 @@ Terima kasih telah bermain di ${shopName}!`;
               )}
               {booking.communityName && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Klub / PB:</span>
-                  <span>{booking.communityName}</span>
+                  <span className="text-gray-600">Kategori:</span>
+                  <span className="font-semibold text-blue-900">{booking.communityName}</span>
+                </div>
+              )}
+              {booking.notes && booking.memberType === 'MEMBER' && (
+                <div className="text-[9px] bg-blue-50 p-1.5 rounded text-blue-950 font-medium">
+                  {booking.notes}
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Kasir:</span>
-                <span>{booking.settlementCashier || booking.dpCashier || 'Kasir'}</span>
+                <span>{booking.settlementCashier || booking.dpCashier || 'Yuli'}</span>
               </div>
             </div>
 
@@ -247,6 +265,7 @@ Terima kasih telah bermain di ${shopName}!`;
 
         {/* Action Buttons Footer */}
         <div className="p-3.5 sm:p-4 bg-white border-t border-slate-100 flex flex-col gap-2">
+          {/* Print & WA */}
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={handlePrint}
@@ -263,6 +282,31 @@ Terima kasih telah bermain di ${shopName}!`;
               <MessageCircle className="w-4 h-4" />
               <span>Kirim WhatsApp</span>
             </button>
+          </div>
+
+          {/* Edit & Delete Actions */}
+          <div className="grid grid-cols-2 gap-2">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(booking)}
+                className="py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Edit Data</span>
+              </button>
+            )}
+
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(booking)}
+                className="py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus / Void</span>
+              </button>
+            )}
           </div>
 
           <div className="flex gap-2">

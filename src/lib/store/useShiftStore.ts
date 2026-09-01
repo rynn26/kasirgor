@@ -48,7 +48,7 @@ export const useShiftStore = create<ShiftState>()(
       selectedUnit: 'POS_TOKO',
       selectedShift: SHIFT_OPTIONS[0],
       openingCash: 500000,
-      cashierName: 'Andi',
+      cashierName: 'Yuli',
       startTime: '08:00 AM',
 
       setUnit: (unit: AppUnit) => set({ selectedUnit: unit }),

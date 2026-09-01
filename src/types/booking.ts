@@ -26,6 +26,10 @@ export interface CourtBooking {
   customerName: string;
   phone: string;
   communityName?: string;
+  memberType?: 'MEMBER' | 'INSIDENTIL';
+  memberDay?: string;
+  memberSessionsCount?: number;
+  memberDates?: string[];
   date: string; // YYYY-MM-DD
   courtId: string;
   courtName: string;

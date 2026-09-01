@@ -174,7 +174,7 @@ export default function LoginPage() {
           return;
         }
 
-        const sessionName = foundOwnerInDb?.name || 'Owner';
+        const sessionName = foundOwnerInDb?.name || 'Wilson';
         if (typeof window !== 'undefined') {
           localStorage.setItem(
             'kasir_session',
@@ -197,7 +197,11 @@ export default function LoginPage() {
             s.phone === targetUser
         );
 
-        const isDefaultKasir = targetUser.toLowerCase() === 'andi' || targetUser.toLowerCase() === 'andi_kasir';
+        const isDefaultKasir = 
+          targetUser.toLowerCase() === 'yuli' || 
+          targetUser.toLowerCase() === 'asfia' || 
+          targetUser.toLowerCase() === 'andi' || 
+          targetUser.toLowerCase() === 'kasir';
 
         if (!foundStaff && !isDefaultKasir) {
           setIsLoading(false);
@@ -211,9 +215,7 @@ export default function LoginPage() {
           return;
         }
 
-        const sessionName = foundStaff?.name || 'Andi';
-        // Semua role non-owner (Kasir, Admin Lapangan, Supervisor) → simpan sebagai 'kasir'
-        // agar punya akses ke halaman POS dan Booking Lapangan sekaligus
+        const sessionName = foundStaff?.name || targetUser || 'Yuli';
         const sessionRole = foundStaff?.role?.toLowerCase() === 'owner' ? 'owner' : 'kasir';
 
         if (typeof window !== 'undefined') {
@@ -224,8 +226,8 @@ export default function LoginPage() {
               role: sessionRole,
               name: sessionName,
               id: foundStaff?.id || 'staff-default',
-              shift: foundStaff?.assigned_shift,
-              unit: foundStaff?.assigned_unit,
+              shift: foundStaff?.assigned_shift || 'Shift Pagi (08:00 - 17:00)',
+              unit: foundStaff?.assigned_unit || 'Semua Unit',
             })
           );
         }
@@ -239,15 +241,16 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = (targetRole: RoleType) => {
+  const handleQuickLogin = (targetRole: RoleType, customName?: string) => {
     if (targetRole === 'OWNER') {
-      setUsernameOrEmail('owner@kasirgor.com');
+      setUsernameOrEmail('Wilson');
       setPassword('123456');
-      handleLogin(undefined, 'OWNER', 'Owner');
+      handleLogin(undefined, 'OWNER', 'Wilson');
     } else {
-      setUsernameOrEmail('Andi');
+      const name = customName || 'Yuli';
+      setUsernameOrEmail(name);
       setPassword('123456');
-      handleLogin(undefined, 'KASIR', 'Andi');
+      handleLogin(undefined, 'KASIR', name);
     }
   };
 
@@ -441,23 +444,32 @@ export default function LoginPage() {
             Akses Cepat 1-Klik (Demo)
           </span>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={() => handleQuickLogin('OWNER')}
-              className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100/80 border border-orange-200/60 text-[#eb4b2b] text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100/80 border border-orange-200/60 text-[#eb4b2b] text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Login Owner</span>
+              <span>Wilson (Owner)</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleQuickLogin('KASIR')}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              onClick={() => handleQuickLogin('KASIR', 'Yuli')}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
             >
               <Store className="w-3.5 h-3.5" />
-              <span>Login Kasir</span>
+              <span>Yuli (Kasir)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('KASIR', 'Asfia')}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Asfia (Kasir)</span>
             </button>
           </div>
         </div>

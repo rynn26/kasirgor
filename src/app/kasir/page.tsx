@@ -21,7 +21,7 @@ export default function KasirPage() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
-  const [cashierName, setCashierName] = useState('Andi');
+  const [cashierName, setCashierName] = useState('Yuli');
 
   useEffect(() => {
     loadProducts();

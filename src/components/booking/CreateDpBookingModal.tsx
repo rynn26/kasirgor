@@ -19,8 +19,10 @@ import {
   Check, 
   Sparkles,
   Info,
-  CalendarCheck2
+  CalendarCheck2,
+  Repeat
 } from 'lucide-react';
+import { getMemberDatesInMonth } from '@/lib/memberUtils';
 
 interface CreateDpBookingModalProps {
   isOpen: boolean;
@@ -41,34 +43,49 @@ const TIME_OPTIONS = [
 export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   isOpen,
   initialCourtId,
-  initialStartTime = '08:00',
+  initialStartTime = '19:00',
   initialDate,
-  initialMode = 'DP',
+  initialMode = 'FULL',
   onClose,
   onSuccess,
 }) => {
-  const todayStr = new Date().toISOString().split('T')[0];
-  const { addBooking, courts, loadCourts } = useCourtBookingStore();
+  const { courts, loadCourts, addBooking } = useCourtBookingStore();
   const { cashierName } = useShiftStore();
   const { showToast } = useToastStore();
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Form State
   const [courtId, setCourtId] = useState(initialCourtId || courts[0]?.id || 'court-00001');
   const [courtCount, setCourtCount] = useState(1);
   const [date, setDate] = useState(initialDate || todayStr);
+  const [selectedMemberDayIndex, setSelectedMemberDayIndex] = useState<number>(() => {
+    const d = new Date();
+    return d.getDay();
+  });
   const [startTime, setStartTime] = useState(initialStartTime);
   const [durationHours, setDurationHours] = useState(2);
   
   // Customer info
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
-  const [communityName, setCommunityName] = useState('');
+  const [memberType, setMemberType] = useState<'MEMBER' | 'INSIDENTIL'>('INSIDENTIL');
+
+  // Auto calculate member weekly sessions in month
+  const memberSchedule = React.useMemo(() => {
+    return getMemberDatesInMonth(date, selectedMemberDayIndex);
+  }, [date, selectedMemberDayIndex]);
+
+  const handleSelectMemberDay = (dayIdx: number) => {
+    setSelectedMemberDayIndex(dayIdx);
+    const schedule = getMemberDatesInMonth(date, dayIdx);
+    if (schedule.dates.length > 0) {
+      setDate(schedule.dates[0]);
+    }
+  };
 
   // Payment info
-  const [paymentType, setPaymentType] = useState<'DP_50' | 'DP_CUSTOM' | 'FULL'>(
-    initialMode === 'FULL' ? 'FULL' : 'DP_50'
-  );
-  const [customDpAmount, setCustomDpAmount] = useState<number>(50000);
+  const [courtFee, setCourtFee] = useState<number>(160000);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
 
@@ -84,48 +101,37 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
     if (initialCourtId) setCourtId(initialCourtId);
     if (initialStartTime) setStartTime(initialStartTime);
     setDate(initialDate || todayStr);
-    if (initialMode) setPaymentType(initialMode === 'FULL' ? 'FULL' : 'DP_50');
-  }, [initialCourtId, initialStartTime, initialDate, initialMode, isOpen]);
+  }, [initialCourtId, initialStartTime, initialDate, isOpen]);
+
+  // Sync courtId when courts load from database
+  useEffect(() => {
+    if (courts.length > 0 && (!courtId || !courts.some((c) => c.id === courtId))) {
+      setCourtId(courts[0].id);
+    }
+  }, [courts, courtId]);
 
   if (!isOpen) return null;
 
-  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0] || {
-    id: 'court-00001',
-    name: 'Lapangan 1 (VIP Vinyl BWF)',
-    type: 'VIP Vinyl BWF',
-    pricePerHour: 80000,
-  };
-  const courtPricePerHour = selectedCourt ? selectedCourt.pricePerHour : 80000;
-  const courtFee = courtPricePerHour * durationHours * courtCount;
+  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
+  const isPickleball = selectedCourt 
+    ? (selectedCourt.type.toLowerCase().includes('pickleball') || selectedCourt.name.toLowerCase().includes('pickleball'))
+    : false;
 
   // Calculate End Time
   const startHourNum = parseInt(startTime.split(':')[0], 10);
   const endHourNum = startHourNum + durationHours;
   const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
 
-  // Calculate DP amount
-  let dpAmountToPay = 0;
-  if (paymentType === 'FULL') {
-    dpAmountToPay = courtFee;
-  } else if (paymentType === 'DP_50') {
-    dpAmountToPay = Math.round(courtFee * 0.5);
-  } else {
-    dpAmountToPay = Math.min(courtFee, Math.max(0, customDpAmount));
-  }
-
-  const remainingBalance = Math.max(0, courtFee - dpAmountToPay);
-  const isFullSettled = remainingBalance === 0;
-
   const quickNominals = [
-    dpAmountToPay,
+    courtFee,
     50000,
     100000,
     150000,
     200000,
     300000,
-  ].filter((v, i, a) => v > 0 && a.indexOf(v) === i && v >= dpAmountToPay);
+  ].filter((v, i, a) => v > 0 && a.indexOf(v) === i && v >= courtFee);
 
-  const cashChange = Math.max(0, (cashReceived || 0) - dpAmountToPay);
+  const cashChange = Math.max(0, (cashReceived || 0) - courtFee);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,40 +146,68 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       return;
     }
 
-    if (paymentMethod === 'CASH' && (cashReceived || 0) < dpAmountToPay) {
+    if (courtFee <= 0) {
+      showToast('Total biaya sewa harus lebih dari Rp 0');
+      return;
+    }
+
+    if (paymentMethod === 'CASH' && (cashReceived || 0) < courtFee) {
       showToast('Nominal uang tunai yang diterima kurang');
       return;
     }
 
     const courtNameLabel = courtCount === 1 
-      ? selectedCourt.name 
+      ? selectedCourt?.name || 'Lapangan 1'
       : `${courtCount} Lapangan (${courts.slice(0, courtCount).map(c => c.name.split(' ')[0] + ' ' + c.name.split(' ')[1]).join(', ')})`;
+
+    const finalCommunityName = isPickleball 
+      ? 'Pickleball (Insidentil)' 
+      : (memberType === 'MEMBER' 
+          ? `Badminton (Member ${memberSchedule.sessionCount}x Pertemuan - Setiap ${memberSchedule.dayName})` 
+          : 'Badminton (Insidentil)');
+
+    const finalNotes = !isPickleball && memberType === 'MEMBER'
+      ? `Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})`
+      : undefined;
+
+    const firstDate = !isPickleball && memberType === 'MEMBER' && memberSchedule.dates.length > 0
+      ? memberSchedule.dates[0]
+      : date;
 
     const newBooking = await addBooking({
       customerName: customerName.trim(),
       phone: phone.trim(),
-      communityName: communityName.trim() || undefined,
-      date,
-      courtId: selectedCourt.id,
+      communityName: finalCommunityName,
+      memberType: isPickleball ? 'INSIDENTIL' : memberType,
+      memberDay: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.dayName : undefined,
+      memberSessionsCount: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.sessionCount : undefined,
+      memberDates: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.dates : undefined,
+      date: firstDate,
+      courtId: selectedCourt?.id || courtId || '',
       courtName: courtNameLabel,
-      courtType: selectedCourt.type,
-      courtPricePerHour,
+      courtType: selectedCourt?.type || 'VIP Vinyl BWF',
+      courtPricePerHour: Math.round(courtFee / (durationHours * courtCount || 1)),
       startTime,
       endTime,
       durationHours,
       courtFee,
       additionalItems: [],
       totalAmount: courtFee,
-      dpAmount: dpAmountToPay,
+      dpAmount: courtFee,
       dpPaymentMethod: paymentMethod,
       dpPaidAt: new Date().toISOString(),
-      dpCashier: cashierName || 'Kasir',
-      amountPaidTotal: dpAmountToPay,
-      remainingBalance,
-      status: isFullSettled ? 'SETTLED' : 'DP_PAID',
+      dpCashier: cashierName || 'Yuli',
+      settlementAmount: courtFee,
+      settlementPaymentMethod: paymentMethod,
+      settlementPaidAt: new Date().toISOString(),
+      settlementCashier: cashierName || 'Yuli',
+      amountPaidTotal: courtFee,
+      remainingBalance: 0,
+      status: 'SETTLED',
+      notes: finalNotes,
     });
 
-    showToast(isFullSettled ? 'Sewa lapangan LUNAS berhasil dicatat!' : 'DP Booking lapangan berhasil dicatat!');
+    showToast('Sewa lapangan LUNAS berhasil dicatat!');
     onSuccess(newBooking);
   };
 
@@ -189,10 +223,10 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             </div>
             <div>
               <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight">
-                {paymentType === 'FULL' ? 'Sewa Langsung (Bayar Lunas)' : 'Catat DP Booking Lapangan'}
+                Sewa Langsung (Bayar Lunas)
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Pilih lapangan, waktu main, dan penerimaan uang muka
+                Pilih lapangan, waktu main, dan penerimaan pembayaran
               </p>
             </div>
           </div>
@@ -239,11 +273,8 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                         </span>
                       )}
                     </div>
-                    <div className="font-bold text-xs sm:text-sm text-slate-900 mt-1.5 line-clamp-1">
-                      {court.name}
-                    </div>
-                    <div className="text-xs font-black text-[#b92b10] mt-0.5">
-                      {formatRupiah(court.pricePerHour)}/jam
+                    <div className="font-bold text-xs sm:text-sm text-slate-900 mt-2 line-clamp-1">
+                      {court.name.split(' ')[0]} {court.name.split(' ')[1]}
                     </div>
                   </button>
                 );
@@ -339,8 +370,8 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                   {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan
                 </span>
               </div>
-              <div className="font-black text-amber-950 text-sm">
-                Total Sewa: {formatRupiah(courtFee)}
+              <div className="font-bold text-amber-900">
+                {selectedCourt.name.split(' ')[0]} {selectedCourt.name.split(' ')[1]}
               </div>
             </div>
           </div>
@@ -348,7 +379,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
           {/* Section 2: Customer Identity */}
           <div className="space-y-3 pt-2 border-t border-slate-100">
             <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span>2. Informasi Penyewa / Komunitas</span>
+              <span>2. Informasi Penyewa</span>
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -387,115 +418,118 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                Nama Klub / Komunitas (Opsional)
-              </label>
-              <div className="relative">
-                <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Contoh: PB Smash Ceria"
-                  value={communityName}
-                  onChange={(e) => setCommunityName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
-                />
+            {/* Kategori Sewa Khusus Badminton (Member vs Insidentil) */}
+            {!isPickleball && (
+              <div className="pt-1 space-y-2">
+                <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setMemberType('MEMBER')}
+                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      memberType === 'MEMBER'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>👤 Member (Rutin Tiap Minggu)</span>
+                    {memberType === 'MEMBER' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMemberType('INSIDENTIL')}
+                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      memberType === 'INSIDENTIL'
+                        ? 'bg-[#b92b10] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>⚡ Insidentil (Sekali Main)</span>
+                    {memberType === 'INSIDENTIL' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </button>
+                </div>
+
+                {/* Pengaturan Jadwal Khusus Member Badminton */}
+                {memberType === 'MEMBER' && (
+                  <div className="p-3 bg-blue-50/90 border border-blue-200/90 rounded-xl space-y-2 text-xs animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-900">Pilih Hari Main Rutin:</span>
+                      <span className="font-black text-blue-700">Setiap {memberSchedule.dayName}</span>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {[
+                        { idx: 1, label: 'Sen' },
+                        { idx: 2, label: 'Sel' },
+                        { idx: 3, label: 'Rab' },
+                        { idx: 4, label: 'Kam' },
+                        { idx: 5, label: 'Jum' },
+                        { idx: 6, label: 'Sab' },
+                        { idx: 0, label: 'Min' },
+                      ].map((d) => (
+                        <button
+                          key={d.idx}
+                          type="button"
+                          onClick={() => handleSelectMemberDay(d.idx)}
+                          className={`py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                            selectedMemberDayIndex === d.idx
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-white border border-blue-200 text-blue-900 hover:bg-blue-100'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="pt-1 text-[11px] text-blue-900 font-medium">
+                      <span>🏸 Paket {memberSchedule.sessionCount}x Pertemuan di Bulan <strong>{memberSchedule.monthName} {memberSchedule.year}</strong>:</span>
+                      <div className="flex flex-wrap gap-1 mt-1 font-bold">
+                        {memberSchedule.dates.map((dt, i) => (
+                          <span key={dt} className="px-1.5 py-0.5 rounded bg-white text-blue-950 border border-blue-200 text-[10px]">
+                            {i + 1}: {dt.split('-')[2]}/{dt.split('-')[1]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Section 3: Down Payment & Payment Method */}
+          {/* Section 3: Direct Payment (Lunas) */}
           <div className="space-y-3 pt-2 border-t border-slate-100">
             <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
-              <span>3. Pembayaran Uang Muka (DP) / Pelunasan</span>
+              <span>3. Total Biaya Sewa (Lunas)</span>
               <span className="text-emerald-700 text-[11px] font-bold">
-                Kasir: {cashierName || 'Andi'}
+                Kasir: {cashierName || 'Yuli'}
               </span>
             </label>
 
-            {/* Payment Type Selection Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => setPaymentType('DP_50')}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                  paymentType === 'DP_50'
-                    ? 'bg-white text-[#b92b10] shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                DP 50% ({formatRupiah(courtFee * 0.5)})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentType('DP_CUSTOM')}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                  paymentType === 'DP_CUSTOM'
-                    ? 'bg-white text-[#b92b10] shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                DP Nominal Lain
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPaymentType('FULL')}
-                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
-                  paymentType === 'FULL'
-                    ? 'bg-white text-emerald-700 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Bayar Lunas (100%)
-              </button>
-            </div>
-
-            {/* Custom DP Input if active */}
-            {paymentType === 'DP_CUSTOM' && (
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
-                <label className="text-[11px] font-semibold text-slate-600 block">
-                  Ketik Nominal Uang Muka (DP)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={courtFee}
-                    value={customDpAmount || ''}
-                    onChange={(e) => setCustomDpAmount(Number(e.target.value))}
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Financial Summary Card */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white space-y-2 shadow-md">
-              <div className="flex justify-between text-xs text-slate-300">
-                <span>Total Tarif Sewa:</span>
-                <span className="font-bold text-white">{formatRupiah(courtFee)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-bold text-emerald-400">
-                <span>Nominal Diterima Sekarang:</span>
-                <span>{formatRupiah(dpAmountToPay)}</span>
-              </div>
-              <div className="flex justify-between text-xs text-amber-300 pt-1.5 border-t border-slate-700">
-                <span>Sisa Pelunasan di Lokasi:</span>
-                <span className="font-bold">
-                  {remainingBalance > 0 ? formatRupiah(remainingBalance) : 'LUNAS (Rp 0)'}
-                </span>
+            {/* Manual Total Price Input */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>Total Tarif Sewa Lapangan (Rp) *</span>
+                <span className="text-[11px] text-slate-400 font-normal">Ketik manual</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
+                <input
+                  type="number"
+                  required
+                  placeholder="Contoh: 160000"
+                  value={courtFee || ''}
+                  onChange={(e) => setCourtFee(Number(e.target.value) || 0)}
+                  className="w-full pl-10 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
+                />
               </div>
             </div>
 
             {/* Payment Method Selector */}
             <div className="space-y-1.5 pt-1">
               <label className="text-[11px] font-semibold text-slate-600 block">
-                Metode Pembayaran Sekarang
+                Metode Pembayaran
               </label>
-              {/* Payment Method Selector (QRIS & Cash only) */}
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'QRIS', label: 'QRIS', icon: QrCode },
@@ -508,14 +542,14 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                       key={item.id}
                       type="button"
                       onClick={() => setPaymentMethod(item.id as PaymentMethod)}
-                      className={`p-2.5 rounded-2xl border text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                      className={`p-2.5 rounded-2xl border text-center flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                          ? 'bg-[#b92b10] text-white border-[#b92b10] shadow-xs font-bold'
                           : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
-                      <span className="text-[11px] font-bold">{item.label}</span>
+                      <span className="text-xs font-bold">{item.label}</span>
                     </button>
                   );
                 })}
@@ -539,7 +573,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                     type="number"
                     value={cashReceived || ''}
                     onChange={(e) => setCashReceived(Number(e.target.value))}
-                    placeholder={dpAmountToPay.toString()}
+                    placeholder={courtFee.toString()}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                   />
                 </div>
@@ -552,7 +586,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                       onClick={() => setCashReceived(nom)}
                       className="px-2.5 py-1 rounded-lg bg-white hover:bg-red-50 text-slate-700 text-[10px] font-bold border border-slate-200 transition-colors cursor-pointer"
                     >
-                      {nom === dpAmountToPay ? 'Uang Pas' : formatRupiah(nom)}
+                      {nom === courtFee ? 'Uang Pas' : formatRupiah(nom)}
                     </button>
                   ))}
                 </div>
@@ -575,7 +609,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               className="flex-2 py-3 px-4 rounded-2xl bg-[#b92b10] hover:bg-[#a3250d] text-white font-bold text-xs shadow-lg shadow-[#b92b10]/25 transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
-              <span>Simpan & Cetak Bukti DP</span>
+              <span>Simpan & Cetak Nota Lunas</span>
             </button>
           </div>
         </form>

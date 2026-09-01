@@ -28,9 +28,8 @@ export default function ShiftSelectionPage() {
     startShift 
   } = useShiftStore();
 
-  // Workflow order: 1. SELECT_SHIFT -> 2. SELECT_UNIT -> 3. START_SHIFT
   const [step, setStep] = useState<'SELECT_SHIFT' | 'SELECT_UNIT' | 'START_SHIFT'>('SELECT_SHIFT');
-  const [cashierName, setCashierName] = useState('Andi');
+  const [cashierName, setCashierName] = useState('Yuli');
   const [chosenShift, setChosenShift] = useState<ShiftInfo>(selectedShift || SHIFT_OPTIONS[0]);
   const [chosenUnit, setChosenUnit] = useState<AppUnit>('POS_TOKO');
   const [openingCashInput, setOpeningCashInput] = useState('500000');
@@ -295,8 +294,23 @@ export default function ShiftSelectionPage() {
             {/* Shift Metadata Box */}
             <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
               <div className="flex justify-between items-center text-slate-600">
-                <span>Nama Kasir</span>
-                <span className="font-bold text-slate-900">{cashierName}</span>
+                <span>Nama Kasir Jaga</span>
+                <div className="flex items-center gap-1.5">
+                  {['Yuli', 'Asfia'].map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setCashierName(name)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        cashierName === name
+                          ? 'bg-[#eb4b2b] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="flex justify-between items-center text-slate-600">

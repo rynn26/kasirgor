@@ -39,11 +39,11 @@ export const BottomNav: React.FC = () => {
           const parsed = JSON.parse(session);
           if (parsed.role === 'kasir') {
             setCurrentRole('kasir');
-            setCashierName(parsed.name || parsed.user || 'Andi');
-            setCashierRole('Kasir • Shift Pagi');
+            setCashierName(parsed.name || parsed.user || 'Yuli');
+            setCashierRole('Kasir • Shift Pagi - Siang');
           } else {
             setCurrentRole('owner');
-            setCashierName(parsed.name || parsed.user || 'Owner');
+            setCashierName(parsed.name || parsed.user || 'Wilson');
             setCashierRole('Owner / Pemilik Bisnis');
           }
         } catch { }

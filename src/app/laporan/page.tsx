@@ -23,7 +23,12 @@ import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { exportSalesToExcel, printSalesPDF } from '@/lib/exportUtils';
+import { 
+  exportKantinToExcel, 
+  printKantinPDF, 
+  exportCourtBookingsToExcel, 
+  printCourtBookingsPDF 
+} from '@/lib/exportUtils';
 
 type PeriodType = 'BULAN_INI' | 'HARI_INI' | 'MINGGU_INI';
 
@@ -181,6 +186,7 @@ export default function LaporanPenjualanPage() {
       categoriesBreakdown,
       chartPoints,
       growthPct,
+      filteredTransactions: filtered,
     };
   }, [transactions, period]);
 
@@ -278,6 +284,7 @@ export default function LaporanPenjualanPage() {
       courtBreakdown,
       chartPoints,
       growthPct,
+      filteredBookings: filtered,
     };
   }, [bookings, courts, period]);
 
@@ -308,19 +315,23 @@ export default function LaporanPenjualanPage() {
   let accumulatedPercent = 0;
 
   const handleExportExcel = () => {
-    const title = isLapangan
-      ? `Laporan Sewa Lapangan (${current.label})`
-      : `Laporan Penjualan Toko (${current.label})`;
-    exportSalesToExcel(title);
-    showToast(`Laporan Excel berhasil diunduh!`);
+    if (isLapangan) {
+      exportCourtBookingsToExcel(lapanganData.label, lapanganData.filteredBookings);
+      showToast('Laporan Excel Sewa Lapangan berhasil diunduh!');
+    } else {
+      exportKantinToExcel(kantinData.label, kantinData.filteredTransactions);
+      showToast('Laporan Excel Penjualan Toko & Kantin berhasil diunduh!');
+    }
   };
 
   const handleExportPDF = () => {
-    const title = isLapangan
-      ? `Laporan Sewa Lapangan GOR (${current.label})`
-      : `Laporan Penjualan Toko & Kantin (${current.label})`;
-    printSalesPDF(title);
-    showToast('Membuka format cetak PDF Laporan...');
+    if (isLapangan) {
+      printCourtBookingsPDF(lapanganData.label, lapanganData.filteredBookings);
+      showToast('Membuka format cetak PDF Laporan Sewa Lapangan...');
+    } else {
+      printKantinPDF(kantinData.label, kantinData.filteredTransactions);
+      showToast('Membuka format cetak PDF Laporan Penjualan Kantin...');
+    }
   };
 
   return (

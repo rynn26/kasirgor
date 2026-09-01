@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
+import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { CourtBooking } from '@/types/booking';
 import {
@@ -22,14 +23,23 @@ import {
   Banknote,
   Clock,
   TrendingUp,
-  Wallet
+  Wallet,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Ban,
+  XCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
+import { EditCourtBookingModal } from '@/components/booking/EditCourtBookingModal';
+import { exportCourtBookingsToExcel, printCourtBookingsPDF } from '@/lib/exportUtils';
 
 export default function HistoryBookingPage() {
   const router = useRouter();
-  const { bookings, loadBookings } = useCourtBookingStore();
+  const { bookings, loadBookings, deleteBooking, cancelBooking } = useCourtBookingStore();
   const { cashierName } = useShiftStore();
+  const { showToast } = useToastStore();
 
   useEffect(() => {
     loadBookings();
@@ -37,16 +47,20 @@ export default function HistoryBookingPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState<'ALL' | 'CASH' | 'QRIS'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SETTLED' | 'DP_PAID'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SETTLED' | 'DP_PAID' | 'CANCELLED'>('ALL');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<CourtBooking | null>(null);
+  const [editingBooking, setEditingBooking] = useState<CourtBooking | null>(null);
+  const [deletingBooking, setDeletingBooking] = useState<CourtBooking | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Financial Summary
-  const totalRevenue = bookings.reduce((sum, b) => sum + b.amountPaidTotal, 0);
+  const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
+  const totalRevenue = activeBookings.reduce((sum, b) => sum + b.amountPaidTotal, 0);
   const totalBookingsCount = bookings.length;
-  const lunasCount = bookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
-  const pendingDpCount = bookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
-  const totalPiutang = bookings.reduce((sum, b) => sum + b.remainingBalance, 0);
+  const lunasCount = activeBookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
+  const pendingDpCount = activeBookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
+  const totalPiutang = activeBookings.reduce((sum, b) => sum + b.remainingBalance, 0);
 
   // Filtered List
   const filtered = bookings.filter((bkg) => {
@@ -68,8 +82,13 @@ export default function HistoryBookingPage() {
 
     // Status filter
     if (statusFilter !== 'ALL') {
-      if (statusFilter === 'SETTLED' && bkg.status !== 'SETTLED' && bkg.remainingBalance > 0) return false;
-      if (statusFilter === 'DP_PAID' && (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0)) return false;
+      if (statusFilter === 'CANCELLED') {
+        if (bkg.status !== 'CANCELLED') return false;
+      } else if (statusFilter === 'SETTLED') {
+        if (bkg.status !== 'SETTLED' && bkg.remainingBalance > 0) return false;
+      } else if (statusFilter === 'DP_PAID') {
+        if (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0) return false;
+      }
     }
 
     // Date filter
@@ -77,6 +96,34 @@ export default function HistoryBookingPage() {
 
     return true;
   });
+
+  const handleCancelBooking = async () => {
+    if (!deletingBooking) return;
+    setIsDeleting(true);
+    try {
+      await cancelBooking(deletingBooking.id);
+      showToast('⚠️ Transaksi booking berhasil dibatalkan (Void)');
+      setDeletingBooking(null);
+    } catch {
+      showToast('Gagal membatalkan booking');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteBooking = async () => {
+    if (!deletingBooking) return;
+    setIsDeleting(true);
+    try {
+      await deleteBooking(deletingBooking.id);
+      showToast('🗑️ Transaksi booking berhasil dihapus permanen');
+      setDeletingBooking(null);
+    } catch {
+      showToast('Gagal menghapus booking');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-5 max-w-2xl mx-auto space-y-4 pb-28">
@@ -95,13 +142,39 @@ export default function HistoryBookingPage() {
               <span>Riwayat Transaksi Lapangan</span>
             </h1>
             <p className="text-[11px] text-slate-500 font-medium">
-              Daftar nota, bukti DP, dan pelunasan sewa lapangan GOR
+              Daftar nota, bukti DP, edit, dan pelunasan sewa lapangan GOR
             </p>
           </div>
         </div>
 
-        <div className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black">
-          {filtered.length} Transaksi
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              exportCourtBookingsToExcel(selectedDate ? `Tanggal ${selectedDate}` : 'Semua Riwayat', filtered);
+              showToast('Export Excel berhasil diunduh!');
+            }}
+            className="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+            title="Unduh Excel"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              printCourtBookingsPDF(selectedDate ? `Tanggal ${selectedDate}` : 'Semua Riwayat', filtered);
+              showToast('Membuka PDF Cetak Laporan...');
+            }}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+            title="Cetak PDF"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+          <div className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
+            {filtered.length} Nota
+          </div>
         </div>
       </div>
 
@@ -116,7 +189,7 @@ export default function HistoryBookingPage() {
             {formatRupiah(totalRevenue)}
           </div>
           <span className="text-[10px] text-slate-400 block font-medium">
-            Dari {totalBookingsCount} transaksi sewa
+            Dari {activeBookings.length} transaksi aktif
           </span>
         </div>
 
@@ -211,6 +284,7 @@ export default function HistoryBookingPage() {
             { id: 'ALL', label: 'Semua Status' },
             { id: 'SETTLED', label: 'Lunas' },
             { id: 'DP_PAID', label: 'DP Terbayar' },
+            { id: 'CANCELLED', label: 'Dibatalkan (Void)' },
           ].map((tab) => {
             const isSelected = statusFilter === tab.id;
             return (
@@ -260,8 +334,9 @@ export default function HistoryBookingPage() {
       <div className="space-y-2.5">
         {filtered.length > 0 ? (
           filtered.map((bkg) => {
+            const isCancelled = bkg.status === 'CANCELLED';
             const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
-            const isDP = !isLunas && (bkg.status === 'DP_PAID' || bkg.dpAmount > 0);
+            const isDP = !isLunas && !isCancelled && (bkg.status === 'DP_PAID' || bkg.dpAmount > 0);
             const sportName = bkg.communityName?.includes('Pickleball') ? 'Pickleball' : 'Badminton';
             const paymentMethodUsed = bkg.settlementPaymentMethod || bkg.dpPaymentMethod || 'Cash';
 
@@ -269,24 +344,36 @@ export default function HistoryBookingPage() {
               <div
                 key={bkg.id}
                 onClick={() => setSelectedBooking(bkg)}
-                className="p-4 sm:p-5 rounded-3xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 transition-all flex items-center justify-between gap-3 cursor-pointer shadow-xs group"
+                className={`p-4 sm:p-5 rounded-3xl bg-white hover:bg-slate-50 border transition-all flex items-center justify-between gap-3 cursor-pointer shadow-xs group ${
+                  isCancelled
+                    ? 'border-red-200/80 bg-red-50/20 opacity-80'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
               >
                 <div className="flex items-start space-x-3.5 min-w-0">
                   {/* Badge Icon */}
                   <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
-                    isLunas 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                      : 'bg-amber-50 text-amber-700 border-amber-100'
+                    isCancelled
+                      ? 'bg-red-50 text-red-500 border-red-200'
+                      : isLunas 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                        : 'bg-amber-50 text-amber-700 border-amber-100'
                   }`}>
                     <Receipt className="w-5 h-5" />
                   </div>
 
                   <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] font-bold text-slate-500">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`font-mono text-[11px] font-bold ${
+                        isCancelled ? 'line-through text-slate-400' : 'text-slate-500'
+                      }`}>
                         {bkg.bookingCode}
                       </span>
-                      {isLunas ? (
+                      {isCancelled ? (
+                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-red-100 text-red-600">
+                          VOID
+                        </span>
+                      ) : isLunas ? (
                         <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
                           Lunas
                         </span>
@@ -295,13 +382,20 @@ export default function HistoryBookingPage() {
                           DP
                         </span>
                       )}
+                      {(bkg.memberType === 'MEMBER' || bkg.communityName?.includes('Member')) && (
+                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200">
+                          Member
+                        </span>
+                      )}
                     </div>
 
-                    <h4 className="font-black text-sm text-slate-900 truncate group-hover:text-emerald-800 transition-colors">
+                    <h4 className={`font-black text-sm truncate group-hover:text-emerald-800 transition-colors ${
+                      isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
+                    }`}>
                       {bkg.customerName}
                     </h4>
 
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-500 truncate">
                       {sportName} · {bkg.courtName}
                     </p>
 
@@ -313,7 +407,9 @@ export default function HistoryBookingPage() {
 
                 <div className="text-right shrink-0 flex items-center space-x-2.5">
                   <div>
-                    <div className="text-sm font-black text-slate-900">
+                    <div className={`text-sm font-black ${
+                      isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
+                    }`}>
                       {formatRupiah(bkg.amountPaidTotal)}
                     </div>
 
@@ -330,7 +426,34 @@ export default function HistoryBookingPage() {
                     )}
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      title="Edit Booking"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingBooking(bkg);
+                      }}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Hapus / Batalkan"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingBooking(bkg);
+                      }}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                  </div>
                 </div>
               </div>
             );
@@ -351,7 +474,78 @@ export default function HistoryBookingPage() {
         isOpen={Boolean(selectedBooking)}
         booking={selectedBooking}
         onClose={() => setSelectedBooking(null)}
+        onEdit={(b) => {
+          setSelectedBooking(null);
+          setEditingBooking(b);
+        }}
+        onDelete={(b) => {
+          setSelectedBooking(null);
+          setDeletingBooking(b);
+        }}
       />
+
+      {/* Edit Booking Modal */}
+      <EditCourtBookingModal
+        isOpen={Boolean(editingBooking)}
+        booking={editingBooking}
+        onClose={() => setEditingBooking(null)}
+        onSuccess={(updated) => {
+          if (selectedBooking?.id === updated.id) {
+            setSelectedBooking(updated);
+          }
+        }}
+      />
+
+      {/* Delete / Void Confirmation Modal */}
+      {deletingBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="font-bold text-slate-900 text-base">
+                Kelola Pembatalan / Hapus
+              </h3>
+              <p className="text-xs text-slate-500">
+                Pilih tindakan untuk booking <strong className="text-slate-800">{deletingBooking.bookingCode}</strong> ({deletingBooking.customerName}):
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleCancelBooking}
+                className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Ban className="w-4 h-4" />
+                <span>Batalkan Booking (Tandai Void)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteBooking}
+                className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Hapus Permanen dari Database</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingBooking(null)}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Tutup / Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

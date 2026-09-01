@@ -1,42 +1,8 @@
 import { create } from 'zustand';
 import { Court, CourtBooking, BookingStatus, PaymentMethod, AdditionalItem } from '@/types/booking';
-import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, updateCourt as dbUpdateCourt } from '@/lib/db/bookings';
+import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, deleteBooking as dbDeleteBooking, updateBooking as dbUpdateBooking, updateCourt as dbUpdateCourt } from '@/lib/db/bookings';
 
-// Re-export COURTS_DATA constant for backward compatibility with existing components
-export const COURTS_DATA: Court[] = [
-  {
-    id: 'court-00001',
-    name: 'Lapangan 1 (VIP Vinyl BWF)',
-    type: 'VIP Vinyl BWF',
-    pricePerHour: 80000,
-    description: 'Karpet Standar BWF Hijau, Pencahayaan 1000 Lux LED',
-    isAvailable: true,
-  },
-  {
-    id: 'court-00002',
-    name: 'Lapangan 2 (Karpet Standar)',
-    type: 'Standar Karpet',
-    pricePerHour: 60000,
-    description: 'Karpet Karet Matras Badminton, Ruang Luas',
-    isAvailable: true,
-  },
-  {
-    id: 'court-00003',
-    name: 'Lapangan 3 (Karpet Standar)',
-    type: 'Standar Karpet',
-    pricePerHour: 60000,
-    description: 'Karpet Karet Matras Badminton, Ventilasi Sejuk',
-    isAvailable: true,
-  },
-  {
-    id: 'court-00004',
-    name: 'Lapangan 4 (Parket Kayu)',
-    type: 'Parket Kayu',
-    pricePerHour: 50000,
-    description: 'Lantai Kayu Solid Anti-Slip',
-    isAvailable: true,
-  },
-];
+export const COURTS_DATA: Court[] = [];
 
 interface CourtBookingState {
   courts: Court[];
@@ -65,12 +31,14 @@ interface CourtBookingState {
     }
   ) => Promise<CourtBooking>;
   cancelBooking: (bookingId: string) => Promise<void>;
+  updateBooking: (bookingId: string, data: Parameters<typeof dbUpdateBooking>[1]) => Promise<CourtBooking>;
+  deleteBooking: (bookingId: string) => Promise<void>;
   updateCourt: (courtId: string, data: Partial<Pick<Court, 'name' | 'type' | 'pricePerHour' | 'description' | 'isAvailable'>>) => Promise<Court>;
   getBookingsForDate: (date: string) => CourtBooking[];
 }
 
 export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
-  courts: COURTS_DATA,
+  courts: [],
   bookings: [],
   selectedBooking: null,
   selectedDate: new Date().toISOString().split('T')[0],
@@ -138,10 +106,42 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
         bookings: state.bookings.map((b) =>
           b.id === bookingId ? { ...b, status: 'CANCELLED' as BookingStatus } : b
         ),
+        selectedBooking: state.selectedBooking?.id === bookingId ? { ...state.selectedBooking, status: 'CANCELLED' as BookingStatus } : state.selectedBooking,
         isLoading: false,
       }));
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal membatalkan booking', isLoading: false });
+      throw err;
+    }
+  },
+
+  updateBooking: async (bookingId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await dbUpdateBooking(bookingId, data);
+      set((state) => ({
+        bookings: state.bookings.map((b) => (b.id === bookingId ? updated : b)),
+        selectedBooking: state.selectedBooking?.id === bookingId ? updated : state.selectedBooking,
+        isLoading: false,
+      }));
+      return updated;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal memperbarui booking', isLoading: false });
+      throw err;
+    }
+  },
+
+  deleteBooking: async (bookingId) => {
+    set({ isLoading: true, error: null });
+    try {
+      await dbDeleteBooking(bookingId);
+      set((state) => ({
+        bookings: state.bookings.filter((b) => b.id !== bookingId),
+        selectedBooking: state.selectedBooking?.id === bookingId ? null : state.selectedBooking,
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal menghapus booking', isLoading: false });
       throw err;
     }
   },
