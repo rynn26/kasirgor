@@ -208,3 +208,97 @@ export async function fetchTransactionsByDate(
 
   return transactions;
 }
+
+export async function cancelTransaction(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('transactions')
+    .update({ status: 'CANCELLED' })
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  // transaction_items has ON DELETE CASCADE, but delete explicitly just in case
+  await supabase
+    .from('transaction_items')
+    .delete()
+    .eq('transaction_id', id);
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+export async function updateTransaction(
+  id: string,
+  data: {
+    items: CartItem[];
+    paymentMethod?: PaymentMethod;
+    customerName?: string;
+    tableOrCourtNumber?: string;
+    notes?: string;
+    amountPaid?: number;
+    status?: 'COMPLETED' | 'CANCELLED';
+  }
+): Promise<Transaction> {
+  const subtotal = data.items.reduce(
+    (sum, item) => sum + (item.product.price - (item.discountPerItem || 0)) * item.quantity,
+    0
+  );
+  const grandTotal = subtotal; // standard POS calculation
+  const amountPaid = data.amountPaid !== undefined ? data.amountPaid : grandTotal;
+  const change = Math.max(0, amountPaid - grandTotal);
+
+  const updateFields: Record<string, unknown> = {
+    subtotal,
+    grand_total: grandTotal,
+    amount_paid: amountPaid,
+    change_amount: change,
+  };
+
+  if (data.paymentMethod) updateFields.payment_method = data.paymentMethod;
+  if (data.customerName !== undefined) updateFields.customer_name = data.customerName || null;
+  if (data.tableOrCourtNumber !== undefined) updateFields.table_or_court_number = data.tableOrCourtNumber || null;
+  if (data.notes !== undefined) updateFields.notes = data.notes || null;
+  if (data.status) updateFields.status = data.status;
+
+  const { error: txError } = await supabase
+    .from('transactions')
+    .update(updateFields)
+    .eq('id', id);
+
+  if (txError) throw txError;
+
+  // Replace items
+  await supabase
+    .from('transaction_items')
+    .delete()
+    .eq('transaction_id', id);
+
+  const itemsToInsert = data.items.map((item) => ({
+    id: crypto.randomUUID(),
+    transaction_id: id,
+    product_id: item.product.id || null,
+    product_name: item.product.name,
+    product_sku: item.product.sku || null,
+    category: item.product.category || null,
+    price: item.product.price,
+    quantity: item.quantity,
+    discount_per_item: item.discountPerItem || 0,
+    note: item.note || null,
+  }));
+
+  const { error: itemsError } = await supabase
+    .from('transaction_items')
+    .insert(itemsToInsert);
+
+  if (itemsError) throw itemsError;
+
+  const updatedTx = await fetchTransactionById(id);
+  if (!updatedTx) throw new Error('Transaksi tidak ditemukan setelah diupdate');
+  return updatedTx;
+}

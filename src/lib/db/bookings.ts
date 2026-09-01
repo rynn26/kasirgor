@@ -327,3 +327,25 @@ export async function cancelBooking(bookingId: string): Promise<void> {
 
   if (error) throw error;
 }
+
+export async function updateCourt(
+  courtId: string,
+  data: Partial<Pick<Court, 'name' | 'type' | 'pricePerHour' | 'description' | 'isAvailable'>>
+): Promise<Court> {
+  const updatePayload: Record<string, unknown> = {};
+  if (data.name !== undefined) updatePayload.name = data.name;
+  if (data.type !== undefined) updatePayload.type = data.type;
+  if (data.pricePerHour !== undefined) updatePayload.price_per_hour = data.pricePerHour;
+  if (data.description !== undefined) updatePayload.description = data.description;
+  if (data.isAvailable !== undefined) updatePayload.is_available = data.isAvailable;
+
+  const { data: updated, error } = await supabase
+    .from('courts')
+    .update(updatePayload)
+    .eq('id', courtId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return mapDbToCourt(updated as DbCourt);
+}

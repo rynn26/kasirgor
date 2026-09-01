@@ -13,7 +13,8 @@ import {
   X, 
   ShieldCheck,
   CalendarCheck,
-  Repeat
+  Repeat,
+  Settings
 } from 'lucide-react';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 
@@ -297,6 +298,21 @@ export const BottomNav: React.FC = () => {
                   <span>Keluar</span>
                 </button>
               </div>
+
+              {/* Setting Lapangan (Lapangan context only) */}
+              {isLapanganContext && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    router.push('/setting/lapangan');
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Setting Harga Lapangan</span>
+                </button>
+              )}
 
               <button
                 type="button"

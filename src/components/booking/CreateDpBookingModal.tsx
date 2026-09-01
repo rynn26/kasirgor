@@ -48,12 +48,13 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   onSuccess,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
-  const { addBooking, courts } = useCourtBookingStore();
+  const { addBooking, courts, loadCourts } = useCourtBookingStore();
   const { cashierName } = useShiftStore();
   const { showToast } = useToastStore();
 
   // Form State
-  const [courtId, setCourtId] = useState(initialCourtId || courts[0]?.id || '');
+  const [courtId, setCourtId] = useState(initialCourtId || courts[0]?.id || 'court-00001');
+  const [courtCount, setCourtCount] = useState(1);
   const [date, setDate] = useState(initialDate || todayStr);
   const [startTime, setStartTime] = useState(initialStartTime);
   const [durationHours, setDurationHours] = useState(2);
@@ -62,7 +63,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [communityName, setCommunityName] = useState('');
-  const [notes, setNotes] = useState('');
 
   // Payment info
   const [paymentType, setPaymentType] = useState<'DP_50' | 'DP_CUSTOM' | 'FULL'>(
@@ -71,6 +71,13 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const [customDpAmount, setCustomDpAmount] = useState<number>(50000);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
+
+  // Load courts if not yet loaded
+  useEffect(() => {
+    if (courts.length === 0) {
+      loadCourts();
+    }
+  }, [courts.length, loadCourts]);
 
   // Sync props if modal re-opens
   useEffect(() => {
@@ -82,9 +89,14 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
   if (!isOpen) return null;
 
-  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
+  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0] || {
+    id: 'court-00001',
+    name: 'Lapangan 1 (VIP Vinyl BWF)',
+    type: 'VIP Vinyl BWF',
+    pricePerHour: 80000,
+  };
   const courtPricePerHour = selectedCourt ? selectedCourt.pricePerHour : 80000;
-  const courtFee = courtPricePerHour * durationHours;
+  const courtFee = courtPricePerHour * durationHours * courtCount;
 
   // Calculate End Time
   const startHourNum = parseInt(startTime.split(':')[0], 10);
@@ -133,13 +145,17 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       return;
     }
 
+    const courtNameLabel = courtCount === 1 
+      ? selectedCourt.name 
+      : `${courtCount} Lapangan (${courts.slice(0, courtCount).map(c => c.name.split(' ')[0] + ' ' + c.name.split(' ')[1]).join(', ')})`;
+
     const newBooking = await addBooking({
       customerName: customerName.trim(),
       phone: phone.trim(),
       communityName: communityName.trim() || undefined,
       date,
       courtId: selectedCourt.id,
-      courtName: selectedCourt.name,
+      courtName: courtNameLabel,
       courtType: selectedCourt.type,
       courtPricePerHour,
       startTime,
@@ -155,7 +171,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       amountPaidTotal: dpAmountToPay,
       remainingBalance,
       status: isFullSettled ? 'SETTLED' : 'DP_PAID',
-      notes: notes.trim() || undefined,
     });
 
     showToast(isFullSettled ? 'Sewa lapangan LUNAS berhasil dicatat!' : 'DP Booking lapangan berhasil dicatat!');
@@ -235,8 +250,8 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               })}
             </div>
 
-            {/* Date, Start Time & Duration */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            {/* Date, Start Time, Court Count & Duration */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="text-[11px] font-semibold text-slate-600 block mb-1">
                   Tanggal Main
@@ -267,6 +282,31 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                   ))}
                 </select>
               </div>
+            </div>
+
+            {/* Jumlah Lapangan & Durasi Sewa */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                  Jumlah Lapangan
+                </label>
+                <div className="grid grid-cols-4 gap-1">
+                  {[1, 2, 3, 4].map((cnt) => (
+                    <button
+                      key={cnt}
+                      type="button"
+                      onClick={() => setCourtCount(cnt)}
+                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        courtCount === cnt
+                          ? 'bg-[#b92b10] text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {cnt} Lap
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div>
                 <label className="text-[11px] font-semibold text-slate-600 block mb-1">
@@ -296,7 +336,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-700" />
                 <span className="font-semibold text-amber-900">
-                  {startTime} - {endTime} WIB ({durationHours} Jam)
+                  {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan
                 </span>
               </div>
               <div className="font-black text-amber-950 text-sm">
@@ -347,30 +387,18 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                  Nama Klub / Komunitas (Opsional)
-                </label>
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Nama Klub / Komunitas (Opsional)
+              </label>
+              <div className="relative">
+                <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="Contoh: PB Smash Ceria"
                   value={communityName}
                   onChange={(e) => setCommunityName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                  Catatan Khusus (Opsional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Minta jaring net kencang"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
                 />
               </div>
             </div>

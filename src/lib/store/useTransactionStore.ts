@@ -1,6 +1,13 @@
 import { create } from 'zustand';
-import { Transaction, DailySummary } from '@/types/pos';
-import { fetchTransactions, createTransaction, fetchTransactionsByDate } from '@/lib/db/transactions';
+import { Transaction, DailySummary, CartItem, PaymentMethod } from '@/types/pos';
+import { 
+  fetchTransactions, 
+  createTransaction, 
+  fetchTransactionsByDate,
+  cancelTransaction as dbCancelTransaction,
+  deleteTransaction as dbDeleteTransaction,
+  updateTransaction as dbUpdateTransaction
+} from '@/lib/db/transactions';
 
 interface TransactionState {
   transactions: Transaction[];
@@ -10,6 +17,20 @@ interface TransactionState {
 
   loadTransactions: () => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<Transaction>;
+  cancelTransaction: (id: string) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  updateTransaction: (
+    id: string,
+    data: {
+      items: CartItem[];
+      paymentMethod?: PaymentMethod;
+      customerName?: string;
+      tableOrCourtNumber?: string;
+      notes?: string;
+      amountPaid?: number;
+      status?: 'COMPLETED' | 'CANCELLED';
+    }
+  ) => Promise<Transaction>;
   setSelectedTransaction: (transaction: Transaction | null) => void;
   getDailySummary: () => DailySummary;
   loadTransactionsByDate: (date: string) => Promise<void>;
@@ -42,6 +63,53 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       return created;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal menyimpan transaksi', isLoading: false });
+      throw err;
+    }
+  },
+
+  cancelTransaction: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await dbCancelTransaction(id);
+      set((state) => ({
+        transactions: state.transactions.map((t) =>
+          t.id === id ? { ...t, status: 'CANCELLED' as const } : t
+        ),
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal membatalkan transaksi', isLoading: false });
+      throw err;
+    }
+  },
+
+  deleteTransaction: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await dbDeleteTransaction(id);
+      set((state) => ({
+        transactions: state.transactions.filter((t) => t.id !== id),
+        selectedTransaction: state.selectedTransaction?.id === id ? null : state.selectedTransaction,
+        isLoading: false,
+      }));
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal menghapus transaksi', isLoading: false });
+      throw err;
+    }
+  },
+
+  updateTransaction: async (id, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await dbUpdateTransaction(id, data);
+      set((state) => ({
+        transactions: state.transactions.map((t) => (t.id === id ? updated : t)),
+        selectedTransaction: state.selectedTransaction?.id === id ? updated : state.selectedTransaction,
+        isLoading: false,
+      }));
+      return updated;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal mengupdate transaksi', isLoading: false });
       throw err;
     }
   },
@@ -99,3 +167,4 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     }
   },
 }));
+

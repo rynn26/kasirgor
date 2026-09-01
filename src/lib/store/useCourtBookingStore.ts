@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Court, CourtBooking, BookingStatus, PaymentMethod, AdditionalItem } from '@/types/booking';
-import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking } from '@/lib/db/bookings';
+import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, updateCourt as dbUpdateCourt } from '@/lib/db/bookings';
 
 // Re-export COURTS_DATA constant for backward compatibility with existing components
 export const COURTS_DATA: Court[] = [
@@ -65,11 +65,12 @@ interface CourtBookingState {
     }
   ) => Promise<CourtBooking>;
   cancelBooking: (bookingId: string) => Promise<void>;
+  updateCourt: (courtId: string, data: Partial<Pick<Court, 'name' | 'type' | 'pricePerHour' | 'description' | 'isAvailable'>>) => Promise<Court>;
   getBookingsForDate: (date: string) => CourtBooking[];
 }
 
 export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
-  courts: [],
+  courts: COURTS_DATA,
   bookings: [],
   selectedBooking: null,
   selectedDate: new Date().toISOString().split('T')[0],
@@ -141,6 +142,21 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
       }));
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal membatalkan booking', isLoading: false });
+      throw err;
+    }
+  },
+
+  updateCourt: async (courtId, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updated = await dbUpdateCourt(courtId, data);
+      set((state) => ({
+        courts: state.courts.map((c) => (c.id === courtId ? updated : c)),
+        isLoading: false,
+      }));
+      return updated;
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal memperbarui lapangan', isLoading: false });
       throw err;
     }
   },
