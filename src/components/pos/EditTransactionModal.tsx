@@ -290,11 +290,10 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             <label className="text-xs font-bold text-slate-700 block">
               Metode Pembayaran
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { id: 'CASH', label: 'Tunai', icon: Banknote },
                 { id: 'QRIS', label: 'QRIS', icon: QrCode },
-                { id: 'TRANSFER', label: 'Transfer', icon: CreditCard },
               ].map((m) => {
                 const Icon = m.icon;
                 const isSelected = paymentMethod === m.id;

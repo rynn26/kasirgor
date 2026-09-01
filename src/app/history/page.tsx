@@ -97,7 +97,6 @@ export default function HistoryPage() {
             { id: 'ALL', label: 'Semua Metode' },
             { id: 'CASH', label: 'Tunai (Cash)' },
             { id: 'QRIS', label: 'QRIS' },
-            { id: 'TRANSFER', label: 'Transfer' },
           ].map((tab) => {
             const isSelected = methodFilter === tab.id;
             return (

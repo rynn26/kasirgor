@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  Home, 
-  Store, 
-  Package, 
+import {
+  Home,
+  Store,
+  Package,
   BarChart3,
-  User, 
-  LogOut, 
-  X, 
+  User,
+  LogOut,
+  X,
   ShieldCheck,
   CalendarCheck,
   Repeat,
@@ -46,7 +46,7 @@ export const BottomNav: React.FC = () => {
             setCashierName(parsed.name || parsed.user || 'Owner');
             setCashierRole('Owner / Pemilik Bisnis');
           }
-        } catch {}
+        } catch { }
       }
 
       const savedUnit = localStorage.getItem('active_dashboard_unit');
@@ -114,17 +114,17 @@ export const BottomNav: React.FC = () => {
   // Navigation Items specifically tailored for Lapangan vs POS Toko
   const navItems = isLapanganContext
     ? [
-        { name: 'Beranda', href: '/dashboard', icon: Home },
-        { name: 'Booking', href: '/booking', icon: CalendarCheck },
-        { name: 'Riwayat', href: '/booking/history', icon: Repeat },
-        { name: 'Laporan', href: '/laporan', icon: BarChart3 },
-      ]
+      { name: 'Beranda', href: '/dashboard', icon: Home },
+      { name: 'Booking', href: '/booking', icon: CalendarCheck },
+      { name: 'Riwayat', href: '/booking/history', icon: Repeat },
+      { name: 'Laporan', href: '/laporan', icon: BarChart3 },
+    ]
     : [
-        { name: 'Beranda', href: '/dashboard', icon: Home },
-        { name: 'Transaksi', href: '/kasir', icon: Store },
-        { name: 'Produk', href: '/produk', icon: Package },
-        { name: 'History', href: '/history', icon: BarChart3 },
-      ];
+      { name: 'Beranda', href: '/dashboard', icon: Home },
+      { name: 'Transaksi', href: '/kasir', icon: Store },
+      { name: 'Produk', href: '/produk', icon: Package },
+      { name: 'History', href: '/history', icon: BarChart3 },
+    ];
 
   return (
     <>
@@ -149,11 +149,10 @@ export const BottomNav: React.FC = () => {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all duration-150 relative ${
-                  isActive
-                    ? `${activeColor} font-bold`
-                    : 'text-slate-500 hover:text-slate-900 font-medium'
-                }`}
+                className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all duration-150 relative ${isActive
+                  ? `${activeColor} font-bold`
+                  : 'text-slate-500 hover:text-slate-900 font-medium'
+                  }`}
               >
                 <div className={`p-1 rounded-lg transition-transform ${isActive ? 'scale-110' : ''}`}>
                   <Icon className={`w-5 h-5 ${isActive ? `stroke-[2.5] ${activeColor}` : 'stroke-2'}`} />
@@ -251,11 +250,10 @@ export const BottomNav: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleSwitchUnit('POS_TOKO')}
-                  className={`py-3 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
-                    selectedUnit !== 'BOOKING_LAPANGAN'
-                      ? 'bg-[#eb4b2b] text-white border-[#eb4b2b] shadow-xs'
-                      : 'bg-red-50 hover:bg-red-100 text-[#eb4b2b] border-red-100'
-                  }`}
+                  className={`py-3 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${selectedUnit !== 'BOOKING_LAPANGAN'
+                    ? 'bg-[#eb4b2b] text-white border-[#eb4b2b] shadow-xs'
+                    : 'bg-red-50 hover:bg-red-100 text-[#eb4b2b] border-red-100'
+                    }`}
                 >
                   <Store className="w-4 h-4" />
                   <span>Kantin / Kasir</span>
@@ -264,11 +262,10 @@ export const BottomNav: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleSwitchUnit('BOOKING_LAPANGAN')}
-                  className={`py-3 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
-                    selectedUnit === 'BOOKING_LAPANGAN'
-                      ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100'
-                  }`}
+                  className={`py-3 px-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${selectedUnit === 'BOOKING_LAPANGAN'
+                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100'
+                    }`}
                 >
                   <CalendarCheck className="w-4 h-4" />
                   <span>Lapangan</span>
