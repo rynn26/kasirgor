@@ -1241,7 +1241,11 @@ export default function DashboardUnifiedPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">Notifikasi Owner</h3>
-                  <p className="text-[10px] text-slate-400">Pembaruan performa & inventaris toko</p>
+                  <p className="text-[10px] text-slate-400">
+                    {activeUnit === 'lapangan'
+                      ? 'Pembaruan reservasi & operasional lapangan GOR'
+                      : 'Pembaruan performa & inventaris kantin/toko'}
+                  </p>
                 </div>
               </div>
               <button
@@ -1254,56 +1258,102 @@ export default function DashboardUnifiedPage() {
             </div>
 
             <div className="space-y-2.5 text-xs">
-              {/* Stok Menipis */}
-              {lowStockCount > 0 || outOfStockCount > 0 ? (
-                <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
-                  <div className="flex items-center justify-between font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                      Peringatan Stok
-                    </span>
+              {/* NOTIFIKASI KHUSUS UNIT LAPANGAN */}
+              {activeUnit === 'lapangan' ? (
+                <>
+                  {/* Pendapatan & Booking Lapangan Hari Ini */}
+                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                        Sewa Lapangan Hari Ini
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800">
+                      {todayCourtBookings.length > 0
+                        ? `${todayCourtBookings.length} booking tercatat • Total ${formatRupiah(totalBookingRevenue)}.`
+                        : 'Belum ada booking jadwal lapangan untuk hari ini.'}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-amber-800">
-                    {outOfStockCount > 0 && `${outOfStockCount} produk habis stok. `}
-                    {lowStockCount > 0 && `${lowStockCount} produk stok menipis (≤ 15).`}
-                  </p>
-                </div>
+
+                  {/* Status Pelunasan */}
+                  {bookingsPendingSettlement > 0 ? (
+                    <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                        Perlu Pelunasan
+                      </div>
+                      <p className="text-[11px] text-amber-800">
+                        {bookingsPendingSettlement} booking lapangan masih menunggu pelunasan.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Pelunasan Aman
+                      </div>
+                      <p className="text-[11px] text-emerald-800">
+                        Semua booking lapangan yang tercatat sudah lunas.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Okupansi Lapangan */}
+                  <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-blue-900 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
+                      Status Okupansi Lapangan
+                    </div>
+                    <p className="text-[11px] text-blue-800">
+                      {courtsInPlay > 0
+                        ? `${courtsInPlay} dari ${courts.length || 4} lapangan sedang aktif digunakan saat ini.`
+                        : 'Saat ini belum ada pertandingan yang sedang berjalan.'}
+                    </p>
+                  </div>
+                </>
               ) : (
-                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Stok Aman
-                  </div>
-                  <p className="text-[11px] text-emerald-800">Semua produk memiliki stok yang cukup.</p>
-                </div>
-              )}
+                /* NOTIFIKASI KHUSUS UNIT KANTIN / POS */
+                <>
+                  {/* Stok Menipis */}
+                  {lowStockCount > 0 || outOfStockCount > 0 ? (
+                    <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                          Peringatan Stok
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-amber-800">
+                        {outOfStockCount > 0 && `${outOfStockCount} produk habis stok. `}
+                        {lowStockCount > 0 && `${lowStockCount} produk stok menipis (≤ 15).`}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Stok Aman
+                      </div>
+                      <p className="text-[11px] text-emerald-800">Semua produk kantin memiliki stok yang cukup.</p>
+                    </div>
+                  )}
 
-              {/* Penjualan Hari Ini */}
-              <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
-                <div className="flex items-center justify-between font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                    Penjualan Hari Ini
-                  </span>
-                </div>
-                <p className="text-[11px] text-emerald-800">
-                  {summary.totalTransactions > 0
-                    ? `${summary.totalTransactions} transaksi • Total ${formatRupiah(todayRevenue)}.`
-                    : 'Belum ada transaksi hari ini.'}
-                </p>
-              </div>
-
-              {/* Pelunasan Booking */}
-              {bookingsPendingSettlement > 0 && (
-                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-blue-900 space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
-                    Perlu Pelunasan
+                  {/* Penjualan Hari Ini */}
+                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                        Penjualan Hari Ini
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800">
+                      {summary.totalTransactions > 0
+                        ? `${summary.totalTransactions} transaksi • Total ${formatRupiah(todayRevenue)}.`
+                        : 'Belum ada transaksi kantin hari ini.'}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-blue-800">
-                    {bookingsPendingSettlement} booking lapangan menunggu pelunasan hari ini.
-                  </p>
-                </div>
+                </>
               )}
             </div>
 
