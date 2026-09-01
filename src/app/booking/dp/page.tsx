@@ -176,24 +176,12 @@ export default function InputDpBookingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!customerName.trim()) {
-      showToast('Harap isi nama customer');
-      return;
-    }
+    const finalCustomerName = customerName.trim() || 'Penyewa Umum';
+    const finalPhone = phone.trim() || '-';
+    const finalDp = dpAmount > 0 ? Math.min(dpAmount, netTotalSewa) : netTotalSewa;
 
-    if (dpAmount <= 0) {
-      showToast('Nominal DP harus lebih besar dari Rp 0');
-      return;
-    }
-
-    if (dpAmount > totalSewa) {
-      showToast('Nominal DP tidak boleh melebihi total sewa');
-      return;
-    }
-
-    if (paymentMethod === 'CASH' && (cashReceived || 0) < dpAmount) {
-      showToast('Uang tunai yang diterima kurang dari nominal DP');
-      return;
+    if (paymentMethod === 'CASH' && (cashReceived || 0) < finalDp) {
+      setCashReceived(finalDp);
     }
 
     const selectedCourtsNames = courts
@@ -215,9 +203,11 @@ export default function InputDpBookingPage() {
       ? memberSchedule.dates[0]
       : date;
 
+    const remaining = Math.max(0, netTotalSewa - finalDp);
+
     const newBooking = await addBooking({
-      customerName: customerName.trim(),
-      phone: phone.trim() || '0812-0000-0000',
+      customerName: finalCustomerName,
+      phone: finalPhone,
       communityName: finalCommunityName,
       memberType: selectedSport === 'Badminton' ? memberType : 'INSIDENTIL',
       memberDay: memberType === 'MEMBER' ? memberSchedule.dayName : undefined,
@@ -234,13 +224,13 @@ export default function InputDpBookingPage() {
       courtFee: totalSewa,
       additionalItems: [],
       totalAmount: netTotalSewa,
-      dpAmount,
+      dpAmount: finalDp,
       dpPaymentMethod: paymentMethod,
       dpPaidAt: new Date().toISOString(),
       dpCashier: cashierName || 'Yuli',
-      amountPaidTotal: dpAmount,
-      remainingBalance: sisaPembayaran,
-      status: sisaPembayaran === 0 ? 'SETTLED' : 'DP_PAID',
+      amountPaidTotal: finalDp,
+      remainingBalance: remaining,
+      status: remaining === 0 ? 'SETTLED' : 'DP_PAID',
       notes: finalNotes,
     });
 

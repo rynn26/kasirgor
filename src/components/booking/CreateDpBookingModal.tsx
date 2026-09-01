@@ -140,15 +140,8 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!customerName.trim()) {
-      showToast('Harap isi nama penyewa lapangan');
-      return;
-    }
-
-    if (!phone.trim()) {
-      showToast('Harap isi nomor telepon / WhatsApp');
-      return;
-    }
+    const finalCustomerName = customerName.trim() || 'Penyewa Umum';
+    const finalPhone = phone.trim() || '-';
 
     if (finalTotal < 0) {
       showToast('Total biaya sewa tidak boleh negatif');
@@ -156,8 +149,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
     }
 
     if (paymentMethod === 'CASH' && (cashReceived || 0) < finalTotal) {
-      showToast('Nominal uang tunai yang diterima kurang');
-      return;
+      setCashReceived(finalTotal);
     }
 
     const courtNameLabel = courtCount === 1 
@@ -179,8 +171,8 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       : date;
 
     const newBooking = await addBooking({
-      customerName: customerName.trim(),
-      phone: phone.trim(),
+      customerName: finalCustomerName,
+      phone: finalPhone,
       communityName: finalCommunityName,
       memberType: isPickleball ? 'INSIDENTIL' : memberType,
       memberDay: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.dayName : undefined,

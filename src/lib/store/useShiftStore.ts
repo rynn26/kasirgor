@@ -77,6 +77,13 @@ export const useShiftStore = create<ShiftState>()(
     }),
     {
       name: 'kasir_shift_storage',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          if (!state.cashierName || ['andi', 'admin', 'kasir', 'user'].includes(state.cashierName.toLowerCase())) {
+            state.cashierName = 'Yuli';
+          }
+        }
+      },
     }
   )
 );

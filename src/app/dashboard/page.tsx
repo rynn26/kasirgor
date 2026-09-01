@@ -75,11 +75,11 @@ export default function DashboardUnifiedPage() {
           const parsed = JSON.parse(session);
           if (parsed.role === 'kasir') {
             setRole('kasir');
-            const cName = parsed.name && !['kasir', 'andi', 'admin', 'user'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Yuli';
+            const cName = parsed.name && !['kasir', 'admin', 'user', 'andi'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Yuli';
             setUserName(cName);
           } else {
             setRole('owner');
-            const oName = parsed.name && !['owner', 'admin', 'administrator', 'user'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Wilson';
+            const oName = parsed.name && !['owner', 'admin', 'administrator', 'user', 'andi'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Wilson';
             setUserName(oName);
           }
         } catch {}
@@ -504,7 +504,13 @@ export default function DashboardUnifiedPage() {
             {/* Greeting & Shift */}
             <div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                <span>Selamat bertugas, {storedCashierName || userName}</span>
+                <span>
+                  Selamat bertugas, {
+                    storedCashierName && !['andi', 'admin', 'kasir', 'user'].includes(storedCashierName.toLowerCase())
+                      ? storedCashierName
+                      : (userName && !['andi', 'admin', 'kasir', 'user', 'owner'].includes(userName.toLowerCase()) ? userName : 'Yuli')
+                  }
+                </span>
                 <span>🏸</span>
               </h1>
               <p className="text-xs text-slate-500 mt-0.5 font-medium">
@@ -648,7 +654,7 @@ export default function DashboardUnifiedPage() {
 
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
-                  <span>{isMounted ? greeting : 'Selamat malam'}, {!userName || ['owner', 'admin', 'administrator', 'user'].includes(userName.toLowerCase()) ? 'Wilson' : userName}</span>
+                  <span>{isMounted ? greeting : 'Selamat malam'}, {!userName || ['owner', 'admin', 'administrator', 'user', 'andi'].includes(userName.toLowerCase()) ? 'Wilson' : userName}</span>
                   <span className="text-lg">👋</span>
                 </h1>
                 <p className="text-[11px] font-medium text-slate-400">
