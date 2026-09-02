@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { useCourtPricingStore } from '@/lib/store/useCourtPricingStore';
 import { formatRupiah } from '@/lib/utils';
 import { CourtBooking } from '@/types/booking';
 import { 
@@ -35,6 +36,7 @@ export const CourtScheduleGrid: React.FC<CourtScheduleGridProps> = ({
   onSettleClick,
 }) => {
   const { courts, getBookingsForDate } = useCourtBookingStore();
+  const { getPriceForSlot } = useCourtPricingStore();
   const dateBookings = getBookingsForDate(date);
 
   const getBookingForSlot = (courtId: string, timeSlot: string) => {
@@ -86,30 +88,32 @@ export const CourtScheduleGrid: React.FC<CourtScheduleGridProps> = ({
             <div className="p-2.5 rounded-2xl bg-slate-100 text-slate-600 font-black text-xs flex items-center justify-center">
               Jam Main
             </div>
-            {courts.map((court) => (
-              <div
-                key={court.id}
-                className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-center"
-              >
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-emerald-700 block w-fit mx-auto">
-                  Karpet
-                </span>
-                <h4 className="font-black text-xs text-slate-900 mt-1 line-clamp-1">
-                  {court.name}
-                </h4>
-                <p className="text-[10px] font-bold text-[#b92b10]">
-                  {formatRupiah(court.pricePerHour)}/jam
-                </p>
-              </div>
-            ))}
+            {courts.map((court) => {
+              const daySlotPrice = getPriceForSlot(court.id, date, '10:00', court.pricePerHour);
+              const nightSlotPrice = getPriceForSlot(court.id, date, '19:00', court.pricePerHour);
+
+              return (
+                <div
+                  key={court.id}
+                  className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-center"
+                >
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-emerald-700 block w-fit mx-auto">
+                    Karpet
+                  </span>
+                  <h4 className="font-black text-xs text-slate-900 mt-1 line-clamp-1">
+                    {court.name}
+                  </h4>
+                  <p className="text-[10px] font-bold text-[#b92b10]">
+                    {formatRupiah(daySlotPrice.price)} - {formatRupiah(nightSlotPrice.price)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
           {/* Time Slot Rows */}
           <div className="space-y-1.5">
             {TIME_SLOTS.map((time) => {
-              const nextHour = parseInt(time.split(':')[0], 10) + 1;
-              const formattedNext = `${nextHour < 10 ? '0' : ''}${nextHour}:00`;
-
               return (
                 <div key={time} className="grid grid-cols-5 gap-2 items-center">
                   {/* Time Label */}
@@ -121,6 +125,7 @@ export const CourtScheduleGrid: React.FC<CourtScheduleGridProps> = ({
                   {/* 4 Court Cells */}
                   {courts.map((court) => {
                     const booking = getBookingForSlot(court.id, time);
+                    const slotPrice = getPriceForSlot(court.id, date, time, court.pricePerHour);
 
                     if (!booking) {
                       // Slot is AVAILABLE
@@ -129,15 +134,15 @@ export const CourtScheduleGrid: React.FC<CourtScheduleGridProps> = ({
                           key={court.id}
                           type="button"
                           onClick={() => onSlotClick(court.id, time)}
-                          title={`Booking ${court.name} pukul ${time}`}
+                          title={`Booking ${court.name} pukul ${time} (${slotPrice.period} - ${formatRupiah(slotPrice.price)})`}
                           className="h-14 p-1.5 rounded-2xl bg-emerald-50/40 hover:bg-emerald-100/70 border border-dashed border-emerald-200 hover:border-emerald-400 text-emerald-700 flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer group"
                         >
                           <div className="flex items-center gap-1 text-[11px] font-bold group-hover:scale-105 transition-transform">
                             <Plus className="w-3.5 h-3.5" />
                             <span>Tersedia</span>
                           </div>
-                          <span className="text-[9px] text-emerald-600 font-medium">
-                            {formatRupiah(court.pricePerHour)}
+                          <span className="text-[9px] text-emerald-600 font-semibold">
+                            {formatRupiah(slotPrice.price)}
                           </span>
                         </button>
                       );
@@ -145,8 +150,6 @@ export const CourtScheduleGrid: React.FC<CourtScheduleGridProps> = ({
 
                     // Slot is BOOKED
                     const isDP = booking.status === 'DP_PAID';
-                    const isSettled = booking.status === 'SETTLED';
-                    const isStartSlot = booking.startTime === time;
 
                     return (
                       <div

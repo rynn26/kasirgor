@@ -41,6 +41,14 @@ interface ShiftState {
   closeShift: () => void;
 }
 
+export const getDefaultShift = (name?: string): ShiftInfo => {
+  if (name && name.toLowerCase() === 'asfia') {
+    return SHIFT_OPTIONS[1]; // Shift Sore - Malam
+  }
+  const currentHour = new Date().getHours();
+  return currentHour >= 16 ? SHIFT_OPTIONS[1] : SHIFT_OPTIONS[0];
+};
+
 export const useShiftStore = create<ShiftState>()(
   persist(
     (set) => ({
@@ -56,15 +64,18 @@ export const useShiftStore = create<ShiftState>()(
       selectShift: (shift: ShiftInfo) => set({ selectedShift: shift }),
 
       startShift: (cashierName: string, openingCash: number) => {
-        set({
+        set((state) => ({
           isShiftActive: true,
           cashierName,
+          selectedShift: cashierName.toLowerCase() === 'asfia' && state.selectedShift?.id === 'SHIFT_PAGI' 
+            ? SHIFT_OPTIONS[1] 
+            : state.selectedShift,
           openingCash,
           startTime: new Date().toLocaleTimeString('id-ID', {
             hour: '2-digit',
             minute: '2-digit',
           }),
-        });
+        }));
       },
 
       closeShift: () =>
@@ -81,6 +92,9 @@ export const useShiftStore = create<ShiftState>()(
         if (state) {
           if (!state.cashierName || ['andi', 'admin', 'kasir', 'user'].includes(state.cashierName.toLowerCase())) {
             state.cashierName = 'Yuli';
+          }
+          if (state.cashierName?.toLowerCase() === 'asfia' && (!state.selectedShift || state.selectedShift.id === 'SHIFT_PAGI')) {
+            state.selectedShift = SHIFT_OPTIONS[1];
           }
         }
       },

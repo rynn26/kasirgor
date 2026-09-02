@@ -132,7 +132,7 @@ export default function BookingLapanganPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Kasir: <strong className="text-slate-800 font-semibold">{cashierName || 'Yuli'}</strong> • {selectedShift?.name || 'Shift Pagi - Siang'}
+              Kasir: <strong className="text-slate-800 font-semibold">{cashierName || 'Yuli'}</strong> • {selectedShift?.name || (cashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')}
             </p>
           </div>
         </div>

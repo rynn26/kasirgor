@@ -212,6 +212,8 @@ export default function LoginPage() {
 
         const sessionName = foundStaff?.name || targetUser || 'Yuli';
         const sessionRole = foundStaff?.role?.toLowerCase() === 'owner' ? 'owner' : 'kasir';
+        const isAsfia = sessionName.toLowerCase() === 'asfia' || targetUser.toLowerCase() === 'asfia';
+        const defaultShift = isAsfia ? 'Shift Sore (17:00 - 23:00)' : 'Shift Pagi (08:00 - 17:00)';
 
         if (typeof window !== 'undefined') {
           localStorage.setItem(
@@ -221,7 +223,7 @@ export default function LoginPage() {
               role: sessionRole,
               name: sessionName,
               id: foundStaff?.id || 'staff-default',
-              shift: foundStaff?.assigned_shift || 'Shift Pagi (08:00 - 17:00)',
+              shift: foundStaff?.assigned_shift || defaultShift,
               unit: foundStaff?.assigned_unit || 'Semua Unit',
             })
           );

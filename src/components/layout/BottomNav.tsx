@@ -14,14 +14,17 @@ import {
   ShieldCheck,
   CalendarCheck,
   Repeat,
-  Settings
+  Settings,
+  Sun,
+  Moon,
+  Check
 } from 'lucide-react';
-import { useShiftStore } from '@/lib/store/useShiftStore';
+import { useShiftStore, SHIFT_OPTIONS, ShiftInfo, getDefaultShift } from '@/lib/store/useShiftStore';
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const { selectedUnit, setUnit } = useShiftStore();
+  const { selectedUnit, setUnit, selectedShift, selectShift } = useShiftStore();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentRole, setCurrentRole] = useState<'owner' | 'kasir'>('owner');
@@ -34,21 +37,53 @@ export const BottomNav: React.FC = () => {
   const syncSession = () => {
     if (typeof window !== 'undefined') {
       const session = localStorage.getItem('kasir_session');
+      let roleVal: 'owner' | 'kasir' = 'owner';
+      let nameVal = 'Wilson';
+      let sessionShift: string | null = null;
+
       if (session) {
         try {
           const parsed = JSON.parse(session);
           if (parsed.role === 'kasir') {
-            setCurrentRole('kasir');
-            const cName = parsed.name && !['kasir', 'admin', 'user', 'andi'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Yuli';
-            setCashierName(cName);
-            setCashierRole('Kasir • Shift Pagi - Siang');
+            roleVal = 'kasir';
+            nameVal = parsed.name && !['kasir', 'admin', 'user', 'andi'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Yuli';
+            sessionShift = parsed.shift || null;
           } else {
-            setCurrentRole('owner');
-            const oName = parsed.name && !['owner', 'admin', 'administrator', 'user', 'andi'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Wilson';
-            setCashierName(oName);
-            setCashierRole('Owner / Pemilik Bisnis');
+            roleVal = 'owner';
+            nameVal = parsed.name && !['owner', 'admin', 'administrator', 'user', 'andi'].includes(parsed.name.toLowerCase()) ? parsed.name : 'Wilson';
           }
         } catch { }
+      }
+
+      if (roleVal === 'kasir') {
+        setCurrentRole('kasir');
+        setCashierName(nameVal);
+
+        const isAsfia = nameVal.toLowerCase() === 'asfia';
+        let targetShift: ShiftInfo;
+
+        if (sessionShift?.toLowerCase().includes('sore') || sessionShift?.toLowerCase().includes('malam')) {
+          targetShift = SHIFT_OPTIONS[1];
+        } else if (sessionShift?.toLowerCase().includes('pagi') || sessionShift?.toLowerCase().includes('siang')) {
+          targetShift = SHIFT_OPTIONS[0];
+        } else if (selectedShift) {
+          targetShift = selectedShift;
+        } else if (isAsfia) {
+          targetShift = SHIFT_OPTIONS[1];
+        } else {
+          targetShift = getDefaultShift(nameVal);
+        }
+
+        if (!selectedShift || (isAsfia && selectedShift.id === 'SHIFT_PAGI' && !sessionShift)) {
+          selectShift(targetShift);
+        }
+
+        const activeShiftName = selectedShift?.name || targetShift.name;
+        setCashierRole(`Kasir • ${activeShiftName}`);
+      } else {
+        setCurrentRole('owner');
+        setCashierName(nameVal);
+        setCashierRole('Owner / Pemilik Bisnis');
       }
 
       const savedUnit = localStorage.getItem('active_dashboard_unit');
@@ -68,18 +103,48 @@ export const BottomNav: React.FC = () => {
       }
     };
 
+    const handleShiftChange = () => {
+      syncSession();
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('dashboard_unit_change', handleUnitChange);
+      window.addEventListener('shift_change', handleShiftChange);
       window.addEventListener('storage', handleUnitChange);
+      window.addEventListener('storage', handleShiftChange);
     }
 
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('dashboard_unit_change', handleUnitChange);
+        window.removeEventListener('shift_change', handleShiftChange);
         window.removeEventListener('storage', handleUnitChange);
+        window.removeEventListener('storage', handleShiftChange);
       }
     };
   }, [pathname]);
+
+  useEffect(() => {
+    if (currentRole === 'kasir' && selectedShift) {
+      setCashierRole(`Kasir • ${selectedShift.name}`);
+    }
+  }, [selectedShift, currentRole]);
+
+  const handleSwitchShift = (shift: ShiftInfo) => {
+    selectShift(shift);
+    setCashierRole(`Kasir • ${shift.name}`);
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          parsed.shift = shift.name;
+          localStorage.setItem('kasir_session', JSON.stringify(parsed));
+        } catch {}
+      }
+      window.dispatchEvent(new Event('shift_change'));
+    }
+  };
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
@@ -272,6 +337,49 @@ export const BottomNav: React.FC = () => {
                   <CalendarCheck className="w-4 h-4" />
                   <span>Lapangan</span>
                 </button>
+              </div>
+
+              {/* Switch Shift Tugas */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Pilih Shift Tugas
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    {selectedShift?.name || (cashierName.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {SHIFT_OPTIONS.map((shift) => {
+                    const activeShiftId = selectedShift?.id || (cashierName.toLowerCase() === 'asfia' ? 'SHIFT_SORE' : 'SHIFT_PAGI');
+                    const isSelected = activeShiftId === shift.id;
+                    const isMorning = shift.id === 'SHIFT_PAGI';
+                    const Icon = isMorning ? Sun : Moon;
+
+                    return (
+                      <button
+                        key={shift.id}
+                        type="button"
+                        onClick={() => handleSwitchShift(shift)}
+                        className={`py-2 px-2 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer border ${
+                          isSelected
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-xs ring-2 ring-amber-400/40'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : isMorning ? 'text-amber-500' : 'text-indigo-500'}`} />
+                          <span className="leading-tight text-[11px]">{shift.name}</span>
+                          {isSelected && <Check className="w-3 h-3 text-white ml-0.5" />}
+                        </div>
+                        <span className={`text-[9px] font-medium ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>
+                          {shift.timeRange} WIB
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Ganti Shift & Logout */}

@@ -43,7 +43,12 @@ export default function ShiftSelectionPage() {
         try {
           const parsed = JSON.parse(session);
           if (parsed.name || parsed.user) {
-            setCashierName(parsed.name || parsed.user);
+            const name = parsed.name || parsed.user;
+            setCashierName(name);
+            if (name.toLowerCase() === 'asfia' && (!selectedShift || selectedShift.id === 'SHIFT_PAGI')) {
+              setChosenShift(SHIFT_OPTIONS[1]);
+              selectShift(SHIFT_OPTIONS[1]);
+            }
           }
         } catch {}
       }
@@ -85,7 +90,21 @@ export default function ShiftSelectionPage() {
   const handleStartShiftSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cashNum = Number(openingCashInput.replace(/\D/g, '')) || 0;
+    selectShift(chosenShift);
     startShift(cashierName, cashNum);
+
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          parsed.shift = chosenShift.name;
+          parsed.name = cashierName;
+          localStorage.setItem('kasir_session', JSON.stringify(parsed));
+        } catch {}
+      }
+      window.dispatchEvent(new Event('shift_change'));
+    }
 
     if (chosenUnit === 'BOOKING_LAPANGAN') {
       router.push('/booking');
@@ -302,7 +321,13 @@ export default function ShiftSelectionPage() {
                     <button
                       key={name}
                       type="button"
-                      onClick={() => setCashierName(name)}
+                      onClick={() => {
+                        setCashierName(name);
+                        if (name.toLowerCase() === 'asfia') {
+                          setChosenShift(SHIFT_OPTIONS[1]);
+                          selectShift(SHIFT_OPTIONS[1]);
+                        }
+                      }}
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         cashierName === name
                           ? 'bg-[#eb4b2b] text-white shadow-xs'

@@ -32,6 +32,7 @@ import {
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { BookingSuccessModal } from '@/components/booking/BookingSuccessModal';
 import { getMemberDatesInMonth } from '@/lib/memberUtils';
+import { useCourtPricingStore } from '@/lib/store/useCourtPricingStore';
 
 const SPORT_TYPES = [
   { id: 'Badminton', name: 'Badminton', icon: '🏸' },
@@ -48,6 +49,7 @@ export default function InputDpBookingPage() {
   const router = useRouter();
   const { addBooking, courts, loadCourts } = useCourtBookingStore();
   const { cashierName, selectedShift } = useShiftStore();
+  const { calculateBookingFee } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
   // Load courts from Supabase on mount
@@ -55,12 +57,14 @@ export default function InputDpBookingPage() {
     loadCourts();
   }, []);
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   // Form State
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [selectedSport, setSelectedSport] = useState('Badminton');
   const [memberType, setMemberType] = useState<'MEMBER' | 'INSIDENTIL'>('INSIDENTIL');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayStr);
   const [selectedMemberDayIndex, setSelectedMemberDayIndex] = useState<number>(() => {
     const d = new Date();
     return d.getDay();
@@ -69,7 +73,7 @@ export default function InputDpBookingPage() {
   const [endTime, setEndTime] = useState('21:00');
   const [courtCount, setCourtCount] = useState(1);
   const [selectedCourtIds, setSelectedCourtIds] = useState<string[]>([]);
-  const [dpAmount, setDpAmount] = useState<number>(0);
+  const [dpAmount, setDpAmount] = useState<number>(100000);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [notes, setNotes] = useState('');
@@ -108,9 +112,31 @@ export default function InputDpBookingPage() {
   // State for manual total sewa, discount & DP
   const [totalSewa, setTotalSewa] = useState<number>(150000);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [baseRatePerHour, setBaseRatePerHour] = useState<number>(75000);
   const netTotalSewa = Math.max(0, totalSewa - (discountAmount || 0));
-  const baseRatePerHour = 75000;
   const sisaPembayaran = Math.max(0, netTotalSewa - (dpAmount || 0));
+
+  // Dynamic fee calculation based on time and month
+  useEffect(() => {
+    const firstCourt = courts.find((c) => selectedCourtIds.includes(c.id)) || courts[0];
+    if (firstCourt) {
+      const calc = calculateBookingFee(
+        firstCourt.id,
+        date,
+        startTime,
+        calculatedDuration,
+        courtCount,
+        firstCourt.pricePerHour
+      );
+      setBaseRatePerHour(calc.ratePerHour);
+      if (memberType === 'MEMBER') {
+        const sessionCount = memberSchedule.sessionCount || 4;
+        setTotalSewa(calc.totalFee * sessionCount);
+      } else {
+        setTotalSewa(calc.totalFee);
+      }
+    }
+  }, [selectedCourtIds, date, startTime, calculatedDuration, courtCount, memberType, memberSchedule.sessionCount]);
 
   // Calculate max courts and available courts depending on sport
   const maxCourts = selectedSport === 'Pickleball' ? 2 : 4;

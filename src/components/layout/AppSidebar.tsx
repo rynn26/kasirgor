@@ -155,7 +155,7 @@ export const AppSidebar: React.FC = () => {
             <div>
               <p className="text-xs font-bold text-slate-900">{cashierName || 'Kasir'}</p>
               <p className="text-[10px] text-slate-500">
-                {selectedShift?.name || 'Shift Pagi'} • Bertugas
+                {selectedShift?.name || (cashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')} • Bertugas
               </p>
             </div>
           </div>

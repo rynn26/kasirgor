@@ -24,6 +24,7 @@ import {
   Tag
 } from 'lucide-react';
 import { getMemberDatesInMonth } from '@/lib/memberUtils';
+import { useCourtPricingStore } from '@/lib/store/useCourtPricingStore';
 
 interface CreateDpBookingModalProps {
   isOpen: boolean;
@@ -38,13 +39,13 @@ interface CreateDpBookingModalProps {
 const TIME_OPTIONS = [
   '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
   '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+  '18:00', '19:00', '20:00', '21:00', '22:00', '23:00',
 ];
 
 export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   isOpen,
   initialCourtId,
-  initialStartTime = '19:00',
+  initialStartTime = '08:00',
   initialDate,
   initialMode = 'FULL',
   onClose,
@@ -52,6 +53,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 }) => {
   const { courts, loadCourts, addBooking } = useCourtBookingStore();
   const { cashierName } = useShiftStore();
+  const { calculateBookingFee } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -114,9 +116,30 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
     }
   }, [courts, courtId]);
 
+  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
+
+  // Auto calculate fee dynamically based on court, date, startTime, and duration
+  useEffect(() => {
+    if (selectedCourt) {
+      const calc = calculateBookingFee(
+        selectedCourt.id,
+        date,
+        startTime,
+        durationHours,
+        courtCount,
+        selectedCourt.pricePerHour
+      );
+      if (memberType === 'MEMBER') {
+        const sessionCount = memberSchedule.sessionCount || 4;
+        setCourtFee(calc.totalFee * sessionCount);
+      } else {
+        setCourtFee(calc.totalFee);
+      }
+    }
+  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount]);
+
   if (!isOpen) return null;
 
-  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
   const isPickleball = selectedCourt 
     ? (selectedCourt.type.toLowerCase().includes('pickleball') || selectedCourt.name.toLowerCase().includes('pickleball'))
     : false;
@@ -329,12 +352,18 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-700" />
-                <span className="font-semibold text-amber-900">
-                  {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan
-                </span>
+                <div>
+                  <span className="font-semibold text-amber-900 block">
+                    {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan
+                  </span>
+                  <span className="text-[10px] text-amber-800 font-medium">
+                    {courtFee > 0 && `Tarif Waktu Otomatis: ${formatRupiah(courtFee)}`}
+                  </span>
+                </div>
               </div>
-              <div className="font-bold text-amber-900">
-                {selectedCourt.name.split(' ')[0]} {selectedCourt.name.split(' ')[1]}
+              <div className="font-bold text-amber-900 text-right">
+                <span>{selectedCourt?.name.split(' ')[0]} {selectedCourt?.name.split(' ')[1]}</span>
+                <span className="block text-[11px] font-black text-[#b92b10]">{formatRupiah(courtFee)}</span>
               </div>
             </div>
           </div>

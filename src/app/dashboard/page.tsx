@@ -105,7 +105,7 @@ export default function DashboardUnifiedPage() {
   const totalCartItems = getTotalItems();
   const summary = getDailySummary();
   const recentTransactions = transactions.slice(0, 5);
-  const activeShiftName = selectedShift?.name || 'Shift Pagi - Siang';
+  const activeShiftName = selectedShift?.name || (storedCashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang');
 
   // Low stock products (stok <= 15 dan stok > 0)
   const lowStockCount = products.filter(p => p.stock > 0 && p.stock <= 15).length;
