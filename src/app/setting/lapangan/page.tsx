@@ -573,14 +573,6 @@ export default function SettingLapanganPage() {
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                               />
                             </div>
-                            <div className="flex gap-1 flex-wrap">
-                              {[50000, 60000, 70000].map((p) => (
-                                <button key={p} type="button" onClick={() => setEditState({ ...editState, dayPrice: p })}
-                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.dayPrice === p ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-600 border-slate-200' }`}>
-                                  {formatRupiah(p)}
-                                </button>
-                              ))}
-                            </div>
                           </div>
                           {/* Sore-Malam Insidentil */}
                           <div className="space-y-1">
@@ -596,14 +588,6 @@ export default function SettingLapanganPage() {
                                 onChange={(e) => setEditState({ ...editState, nightPrice: Number(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                               />
-                            </div>
-                            <div className="flex gap-1 flex-wrap">
-                              {[75000, 85000, 100000].map((p) => (
-                                <button key={p} type="button" onClick={() => setEditState({ ...editState, nightPrice: p })}
-                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.nightPrice === p ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200' }`}>
-                                  {formatRupiah(p)}
-                                </button>
-                              ))}
                             </div>
                           </div>
                         </div>
@@ -630,14 +614,6 @@ export default function SettingLapanganPage() {
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
                               />
                             </div>
-                            <div className="flex gap-1 flex-wrap">
-                              {[50000, 60000, 70000].map((p) => (
-                                <button key={p} type="button" onClick={() => setEditState({ ...editState, memberDayPrice: p })}
-                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.memberDayPrice === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200' }`}>
-                                  {formatRupiah(p)}
-                                </button>
-                              ))}
-                            </div>
                           </div>
                           {/* Sore-Malam Member */}
                           <div className="space-y-1">
@@ -653,14 +629,6 @@ export default function SettingLapanganPage() {
                                 onChange={(e) => setEditState({ ...editState, memberNightPrice: Number(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
                               />
-                            </div>
-                            <div className="flex gap-1 flex-wrap">
-                              {[75000, 85000, 100000].map((p) => (
-                                <button key={p} type="button" onClick={() => setEditState({ ...editState, memberNightPrice: p })}
-                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.memberNightPrice === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200' }`}>
-                                  {formatRupiah(p)}
-                                </button>
-                              ))}
                             </div>
                           </div>
                         </div>
