@@ -371,9 +371,6 @@ export default function BookingLapanganPage() {
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="font-mono text-[10px] font-bold text-slate-400 block">
-                            {bkg.bookingCode}
-                          </span>
                           <h3 className="font-black text-sm text-slate-900 mt-0.5">
                             {bkg.customerName}
                           </h3>

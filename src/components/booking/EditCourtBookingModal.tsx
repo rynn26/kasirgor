@@ -207,9 +207,8 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div>
-            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-              <span>Edit Transaksi Booking</span>
-              <span className="font-mono text-xs text-slate-500 font-medium">({booking.bookingCode})</span>
+            <h3 className="font-bold text-slate-900 text-base">
+              Edit Transaksi Booking
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Perbaiki kesalahan nama, jadwal, nomor lapangan, atau pembayaran

@@ -1,4 +1,4 @@
-export type CourtType = 'VIP Vinyl BWF' | 'Standar Karpet' | 'Parket Kayu';
+export type CourtType = 'VIP Vinyl BWF' | 'Standar Karpet' | 'Parket Kayu' | 'Karpet' | string;
 
 export interface Court {
   id: string;

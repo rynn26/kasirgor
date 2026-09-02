@@ -18,13 +18,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-const COURT_TYPES: CourtType[] = ['VIP Vinyl BWF', 'Standar Karpet', 'Parket Kayu'];
-
 interface EditState {
   name: string;
-  type: CourtType;
   pricePerHour: number;
-  description: string;
   isAvailable: boolean;
 }
 
@@ -44,9 +40,7 @@ export default function SettingLapanganPage() {
     setEditingId(court.id);
     setEditState({
       name: court.name,
-      type: court.type,
       pricePerHour: court.pricePerHour,
-      description: court.description || '',
       isAvailable: court.isAvailable,
     });
   };
@@ -70,9 +64,9 @@ export default function SettingLapanganPage() {
     try {
       await updateCourt(courtId, {
         name: editState.name.trim(),
-        type: editState.type,
+        type: 'Karpet',
         pricePerHour: editState.pricePerHour,
-        description: editState.description.trim(),
+        description: '',
         isAvailable: editState.isAvailable,
       });
       showToast('Data lapangan berhasil disimpan!');
@@ -98,12 +92,6 @@ export default function SettingLapanganPage() {
     }
   };
 
-  const typeColor: Record<CourtType, string> = {
-    'VIP Vinyl BWF': 'bg-amber-100 text-amber-800',
-    'Standar Karpet': 'bg-blue-100 text-blue-800',
-    'Parket Kayu': 'bg-emerald-100 text-emerald-800',
-  };
-
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-5 max-w-xl mx-auto space-y-4 pb-28">
 
@@ -126,7 +114,7 @@ export default function SettingLapanganPage() {
               </h1>
             </div>
             <p className="text-[11px] text-slate-500 font-medium">
-              Atur nama, tipe, harga, dan status lapangan GOR
+              Atur nama, harga, dan status lapangan GOR
             </p>
           </div>
         </div>
@@ -192,16 +180,13 @@ export default function SettingLapanganPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeColor[court.type] || 'bg-slate-100 text-slate-700'}`}>
-                          {court.type}
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          Karpet
                         </span>
                         <span className="font-black text-[#b92b10] text-xs">
                           {formatRupiah(court.pricePerHour)}<span className="text-slate-400 font-semibold">/jam</span>
                         </span>
                       </div>
-                      {court.description && (
-                        <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{court.description}</p>
-                      )}
                     </div>
                   </div>
 
@@ -252,29 +237,8 @@ export default function SettingLapanganPage() {
                         value={editState.name}
                         onChange={(e) => setEditState({ ...editState, name: e.target.value })}
                         className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white transition-all"
-                        placeholder="Contoh: Lapangan 1 (VIP Vinyl BWF)"
+                        placeholder="Contoh: Lapangan 1"
                       />
-                    </div>
-
-                    {/* Tipe */}
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Tipe Lapangan</label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {COURT_TYPES.map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setEditState({ ...editState, type: t })}
-                            className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer text-center ${
-                              editState.type === t
-                                ? 'bg-[#b92b10] text-white shadow-xs'
-                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
                     </div>
 
                     {/* Harga */}
@@ -308,18 +272,6 @@ export default function SettingLapanganPage() {
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    {/* Deskripsi */}
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Deskripsi (Opsional)</label>
-                      <input
-                        type="text"
-                        value={editState.description}
-                        onChange={(e) => setEditState({ ...editState, description: e.target.value })}
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white transition-all"
-                        placeholder="Contoh: Karpet BWF Hijau, LED 1000 Lux"
-                      />
                     </div>
 
                     {/* Status Toggle */}

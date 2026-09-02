@@ -364,11 +364,7 @@ export default function HistoryBookingPage() {
 
                   <div className="min-w-0 space-y-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`font-mono text-[11px] font-bold ${
-                        isCancelled ? 'line-through text-slate-400' : 'text-slate-500'
-                      }`}>
-                        {bkg.bookingCode}
-                      </span>
+
                       {isCancelled ? (
                         <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-red-100 text-red-600">
                           VOID
@@ -509,7 +505,7 @@ export default function HistoryBookingPage() {
                 Kelola Pembatalan / Hapus
               </h3>
               <p className="text-xs text-slate-500">
-                Pilih tindakan untuk booking <strong className="text-slate-800">{deletingBooking.bookingCode}</strong> ({deletingBooking.customerName}):
+                Pilih tindakan untuk booking <strong className="text-slate-800">{deletingBooking.customerName}</strong>:
               </p>
             </div>
 

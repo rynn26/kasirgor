@@ -91,8 +91,8 @@ export const CourtScheduleGrid: React.FC<CourtScheduleGridProps> = ({
                 key={court.id}
                 className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-center"
               >
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 block w-fit mx-auto">
-                  {court.type}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-emerald-700 block w-fit mx-auto">
+                  Karpet
                 </span>
                 <h4 className="font-black text-xs text-slate-900 mt-1 line-clamp-1">
                   {court.name}
