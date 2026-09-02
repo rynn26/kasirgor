@@ -9,20 +9,20 @@ import {
 } from '@/lib/db/courtPricing';
 
 export interface TimeSlotPricing {
-  // Siang
+  // Pagi-Sore
   dayPrice: number;
   dayStart: string; // default "07:00"
-  dayEnd: string;   // default "15:00"
+  dayEnd: string;   // default "18:00"
 
-  // Sore
-  afternoonPrice: number;
-  afternoonStart: string; // default "15:00"
-  afternoonEnd: string;   // default "18:00"
-
-  // Malam
+  // Sore-Malam
   nightPrice: number;
   nightStart: string; // default "18:00"
   nightEnd: string;   // default "24:00"
+
+  // Legacy fields — kept for DB compatibility, always synced to nightPrice
+  afternoonPrice: number;
+  afternoonStart: string;
+  afternoonEnd: string;
 }
 
 export interface PricingRule {
@@ -32,17 +32,20 @@ export interface PricingRule {
 }
 
 export const DEFAULT_PRICING: TimeSlotPricing = {
+  // Slot 1: Pagi-Sore
   dayPrice: 60000,
   dayStart: '07:00',
-  dayEnd: '15:00',
+  dayEnd: '18:00',
 
-  afternoonPrice: 75000,
-  afternoonStart: '15:00',
-  afternoonEnd: '18:00',
-
+  // Slot 2: Sore-Malam
   nightPrice: 85000,
   nightStart: '18:00',
   nightEnd: '24:00',
+
+  // Legacy (DB compat) — mirrors nightPrice
+  afternoonPrice: 85000,
+  afternoonStart: '18:00',
+  afternoonEnd: '24:00',
 };
 
 interface CourtPricingState {
@@ -61,7 +64,7 @@ interface CourtPricingState {
     dateStr: string,
     timeStr: string,
     fallbackPrice?: number
-  ) => { price: number; period: 'Siang' | 'Sore' | 'Malam'; timeRange: string };
+  ) => { price: number; period: 'Pagi' | 'Malam'; timeRange: string };
   calculateBookingFee: (
     courtId: string,
     dateStr: string,
@@ -69,7 +72,7 @@ interface CourtPricingState {
     durationHours: number,
     courtCount?: number,
     fallbackPrice?: number
-  ) => { totalFee: number; ratePerHour: number; breakdown: Array<{ hour: string; price: number; period: 'Siang' | 'Sore' | 'Malam' }> };
+  ) => { totalFee: number; ratePerHour: number; breakdown: Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }> };
   deleteMonthRule: (monthKey: string) => Promise<void>;
 }
 
@@ -168,21 +171,13 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         const pricing = get().getPricing(courtId, monthKey);
 
         const hour = parseInt(timeStr.split(':')[0], 10);
-
-        const dayEndHour = parseInt(pricing.dayEnd.split(':')[0], 10);
-        const afternoonEndHour = parseInt(pricing.afternoonEnd.split(':')[0], 10);
+        const dayEndHour = parseInt(pricing.dayEnd.split(':')[0], 10); // batas Pagi-Sore
 
         if (hour < dayEndHour) {
           return {
             price: pricing.dayPrice || fallbackPrice || 60000,
-            period: 'Siang',
+            period: 'Pagi',
             timeRange: `${pricing.dayStart} - ${pricing.dayEnd}`,
-          };
-        } else if (hour < afternoonEndHour) {
-          return {
-            price: pricing.afternoonPrice || fallbackPrice || 75000,
-            period: 'Sore',
-            timeRange: `${pricing.afternoonStart} - ${pricing.afternoonEnd}`,
           };
         } else {
           return {
@@ -202,7 +197,7 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         fallbackPrice?: number
       ) => {
         const startHour = parseInt(startTime.split(':')[0], 10);
-        const breakdown: Array<{ hour: string; price: number; period: 'Siang' | 'Sore' | 'Malam' }> = [];
+        const breakdown: Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }> = [];
         let totalSingleCourtFee = 0;
 
         for (let i = 0; i < durationHours; i++) {

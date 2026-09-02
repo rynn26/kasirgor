@@ -20,10 +20,8 @@ import {
   Calendar,
   Clock,
   Sun,
-  Sunset,
   Moon,
   Sparkles,
-  Sliders,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -33,9 +31,6 @@ interface EditState {
   dayPrice: number;
   dayStart: string;
   dayEnd: string;
-  afternoonPrice: number;
-  afternoonStart: string;
-  afternoonEnd: string;
   nightPrice: number;
   nightStart: string;
   nightEnd: string;
@@ -88,9 +83,6 @@ export default function SettingLapanganPage() {
       dayPrice: currentPricing.dayPrice,
       dayStart: currentPricing.dayStart,
       dayEnd: currentPricing.dayEnd,
-      afternoonPrice: currentPricing.afternoonPrice,
-      afternoonStart: currentPricing.afternoonStart,
-      afternoonEnd: currentPricing.afternoonEnd,
       nightPrice: currentPricing.nightPrice,
       nightStart: currentPricing.nightStart,
       nightEnd: currentPricing.nightEnd,
@@ -108,32 +100,33 @@ export default function SettingLapanganPage() {
       showToast('Nama lapangan tidak boleh kosong');
       return;
     }
-    if (editState.dayPrice <= 0 || editState.afternoonPrice <= 0 || editState.nightPrice <= 0) {
+    if (editState.dayPrice <= 0 || editState.nightPrice <= 0) {
       showToast('Harga sewa harus lebih dari Rp 0');
       return;
     }
 
     setSaving(true);
     try {
-      // 1. Save detailed time pricing (Siang, Sore, Malam) to Pricing Store
+      // 1. Save time pricing (Pagi-Sore, Sore-Malam) to Pricing Store
       setCourtPricing(courtId, selectedMonthKey, {
         dayPrice: editState.dayPrice,
         dayStart: editState.dayStart,
         dayEnd: editState.dayEnd,
-        afternoonPrice: editState.afternoonPrice,
-        afternoonStart: editState.afternoonStart,
-        afternoonEnd: editState.afternoonEnd,
+        // Sync afternoon (legacy DB fields) to night values
+        afternoonPrice: editState.nightPrice,
+        afternoonStart: editState.nightStart,
+        afternoonEnd: editState.nightEnd,
         nightPrice: editState.nightPrice,
         nightStart: editState.nightStart,
         nightEnd: editState.nightEnd,
       });
 
-      // 2. Sync court base price (use afternoon/average rate) to Supabase / store
-      const avgRate = Math.round((editState.dayPrice + editState.afternoonPrice + editState.nightPrice) / 3);
+      // 2. Sync court base price to Supabase / store
+      const avgRate = Math.round((editState.dayPrice + editState.nightPrice) / 2);
       await updateCourt(courtId, {
         name: editState.name.trim(),
         type: 'Karpet',
-        pricePerHour: editState.afternoonPrice || avgRate,
+        pricePerHour: editState.nightPrice || avgRate,
         isAvailable: editState.isAvailable,
       });
 
@@ -187,7 +180,7 @@ export default function SettingLapanganPage() {
               </h1>
             </div>
             <p className="text-[11px] text-slate-500 font-medium">
-              Atur harga per waktu (Siang, Sore, Malam) & per bulan
+              Atur harga per waktu (Pagi-Sore &amp; Sore-Malam) &amp; per bulan
             </p>
           </div>
         </div>
@@ -291,7 +284,7 @@ export default function SettingLapanganPage() {
                 Terapkan ke Semua Lapangan
               </h2>
               <p className="text-[10px] text-slate-500">
-                Ubah harga Siang, Sore, Malam untuk seluruh lapangan sekaligus
+                Ubah harga Pagi-Sore dan Sore-Malam untuk seluruh lapangan sekaligus
               </p>
             </div>
           </div>
@@ -310,12 +303,12 @@ export default function SettingLapanganPage() {
               Masukkan harga sewa serentak ({formatMonthDisplay(selectedMonthKey)}):
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* Siang */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {/* Pagi-Sore */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
                 <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600">
                   <Sun className="w-3.5 h-3.5" />
-                  <span>Siang (07:00-15:00)</span>
+                  <span>Pagi-Sore (07:00-18:00)</span>
                 </div>
                 <div className="relative">
                   <span className="absolute left-2 top-2 text-[10px] font-bold text-slate-400">Rp</span>
@@ -329,29 +322,11 @@ export default function SettingLapanganPage() {
                 </div>
               </div>
 
-              {/* Sore */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="flex items-center gap-1 text-[11px] font-bold text-orange-600">
-                  <Sunset className="w-3.5 h-3.5" />
-                  <span>Sore (15:00-18:00)</span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-2 top-2 text-[10px] font-bold text-slate-400">Rp</span>
-                  <input
-                    type="number"
-                    step={1000}
-                    value={quickPricing.afternoonPrice}
-                    onChange={(e) => setQuickPricing({ ...quickPricing, afternoonPrice: Number(e.target.value) })}
-                    className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Malam */}
+              {/* Sore-Malam */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
                 <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-600">
                   <Moon className="w-3.5 h-3.5" />
-                  <span>Malam (18:00-24:00)</span>
+                  <span>Sore-Malam (18:00-24:00)</span>
                 </div>
                 <div className="relative">
                   <span className="absolute left-2 top-2 text-[10px] font-bold text-slate-400">Rp</span>
@@ -382,7 +357,7 @@ export default function SettingLapanganPage() {
       <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100 flex items-start gap-2.5 text-xs text-blue-800">
         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
         <span>
-          Tarif waktu (Siang, Sore, Malam) akan otomatis diterapkan saat kasir memilih jam booking di jadwal.
+          Tarif waktu (Pagi-Sore &amp; Sore-Malam) akan otomatis diterapkan saat kasir memilih jam booking di jadwal.
         </span>
       </div>
 
@@ -433,39 +408,28 @@ export default function SettingLapanganPage() {
                         </span>
                       </div>
 
-                      {/* 3 Price Badges (Siang, Sore, Malam) */}
-                      <div className="grid grid-cols-3 gap-1.5 mt-2">
+                      {/* 2 Price Badges (Pagi-Sore & Sore-Malam) */}
+                      <div className="grid grid-cols-2 gap-1.5 mt-2">
                         <div className="p-1.5 rounded-xl bg-amber-50 border border-amber-100 text-left">
                           <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
                             <Sun className="w-2.5 h-2.5" />
-                            <span>Siang</span>
+                            <span>Pagi-Sore</span>
                           </div>
                           <p className="text-[11px] font-black text-slate-900 leading-tight">
                             {formatRupiah(courtPricing.dayPrice)}
                           </p>
-                          <span className="text-[8px] text-slate-400">07:00-15:00</span>
-                        </div>
-
-                        <div className="p-1.5 rounded-xl bg-orange-50 border border-orange-100 text-left">
-                          <div className="flex items-center gap-1 text-[9px] font-bold text-orange-700">
-                            <Sunset className="w-2.5 h-2.5" />
-                            <span>Sore</span>
-                          </div>
-                          <p className="text-[11px] font-black text-slate-900 leading-tight">
-                            {formatRupiah(courtPricing.afternoonPrice)}
-                          </p>
-                          <span className="text-[8px] text-slate-400">15:00-18:00</span>
+                          <span className="text-[8px] text-slate-400">{courtPricing.dayStart}-{courtPricing.dayEnd}</span>
                         </div>
 
                         <div className="p-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-left">
                           <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-700">
                             <Moon className="w-2.5 h-2.5" />
-                            <span>Malam</span>
+                            <span>Sore-Malam</span>
                           </div>
                           <p className="text-[11px] font-black text-slate-900 leading-tight">
                             {formatRupiah(courtPricing.nightPrice)}
                           </p>
-                          <span className="text-[8px] text-slate-400">18:00-24:00</span>
+                          <span className="text-[8px] text-slate-400">{courtPricing.nightStart}-{courtPricing.nightEnd}</span>
                         </div>
                       </div>
                     </div>
@@ -531,16 +495,16 @@ export default function SettingLapanganPage() {
                       />
                     </div>
 
-                    {/* 3 Time Price Inputs */}
+                    {/* 2 Time Price Inputs */}
                     <div className="space-y-2.5">
-                      {/* 1. Tarif Siang */}
+                      {/* 1. Tarif Pagi-Sore */}
                       <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
                             <Sun className="w-3.5 h-3.5 text-amber-500" />
-                            <span>1. Tarif Siang ({editState.dayStart} - {editState.dayEnd})</span>
+                            <span>1. Tarif Pagi-Sore ({editState.dayStart} – {editState.dayEnd})</span>
                           </label>
-                          <span className="text-[10px] text-slate-400">Pagi / Siang</span>
+                          <span className="text-[10px] text-slate-400">07:00 – 18:00</span>
                         </div>
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
@@ -570,51 +534,14 @@ export default function SettingLapanganPage() {
                         </div>
                       </div>
 
-                      {/* 2. Tarif Sore */}
-                      <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-orange-700 flex items-center gap-1.5">
-                            <Sunset className="w-3.5 h-3.5 text-orange-500" />
-                            <span>2. Tarif Sore ({editState.afternoonStart} - {editState.afternoonEnd})</span>
-                          </label>
-                          <span className="text-[10px] text-slate-400">Sore Hari</span>
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
-                          <input
-                            type="number"
-                            step={1000}
-                            value={editState.afternoonPrice || ''}
-                            onChange={(e) => setEditState({ ...editState, afternoonPrice: Number(e.target.value) })}
-                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                          />
-                        </div>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[65000, 75000, 80000, 85000].map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setEditState({ ...editState, afternoonPrice: p })}
-                              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                                editState.afternoonPrice === p
-                                  ? 'bg-orange-600 text-white border-orange-600'
-                                  : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                              }`}
-                            >
-                              {formatRupiah(p)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 3. Tarif Malam */}
+                      {/* 2. Tarif Sore-Malam */}
                       <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
                             <Moon className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>3. Tarif Malam ({editState.nightStart} - {editState.nightEnd})</span>
+                            <span>2. Tarif Sore-Malam ({editState.nightStart} – {editState.nightEnd})</span>
                           </label>
-                          <span className="text-[10px] text-slate-400">Prime Time</span>
+                          <span className="text-[10px] text-slate-400">18:00 – 24:00</span>
                         </div>
                         <div className="relative">
                           <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
