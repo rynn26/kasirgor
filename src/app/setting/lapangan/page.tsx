@@ -36,8 +36,11 @@ interface EditState {
   nightEnd: string;
   memberDayPrice: number;
   memberNightPrice: number;
-  pickleballDayPrice: number;
-  pickleballNightPrice: number;
+}
+
+interface PickleballEditState {
+  dayPrice: number;
+  nightPrice: number;
 }
 
 export default function SettingLapanganPage() {
@@ -57,6 +60,11 @@ export default function SettingLapanganPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Pickleball separate edit state
+  const [pbEditingId, setPbEditingId] = useState<string | null>(null);
+  const [pbEditState, setPbEditState] = useState<PickleballEditState | null>(null);
+  const [pbSaving, setPbSaving] = useState(false);
 
   // Quick Global Apply State
   const [isQuickApplyOpen, setIsQuickApplyOpen] = useState(false);
@@ -92,8 +100,15 @@ export default function SettingLapanganPage() {
       nightEnd: currentPricing.nightEnd,
       memberDayPrice: currentPricing.memberDayPrice ?? currentPricing.dayPrice,
       memberNightPrice: currentPricing.memberNightPrice ?? currentPricing.nightPrice,
-      pickleballDayPrice: currentPricing.pickleballDayPrice ?? currentPricing.dayPrice,
-      pickleballNightPrice: currentPricing.pickleballNightPrice ?? currentPricing.nightPrice,
+    });
+  };
+
+  const handleStartPickleballEdit = (courtId: string) => {
+    const currentPricing = getPricing(courtId, selectedMonthKey);
+    setPbEditingId(courtId);
+    setPbEditState({
+      dayPrice: currentPricing.pickleballDayPrice ?? currentPricing.dayPrice,
+      nightPrice: currentPricing.pickleballNightPrice ?? currentPricing.nightPrice,
     });
   };
 
@@ -102,25 +117,30 @@ export default function SettingLapanganPage() {
     setEditState(null);
   };
 
+  const handleCancelPickleball = () => {
+    setPbEditingId(null);
+    setPbEditState(null);
+  };
+
   const handleSave = async (courtId: string) => {
     if (!editState) return;
     if (!editState.name.trim()) {
       showToast('Nama lapangan tidak boleh kosong');
       return;
     }
-    if (editState.dayPrice <= 0 || editState.nightPrice <= 0 || editState.memberDayPrice <= 0 || editState.memberNightPrice <= 0 || editState.pickleballDayPrice <= 0 || editState.pickleballNightPrice <= 0) {
+    if (editState.dayPrice <= 0 || editState.nightPrice <= 0 || editState.memberDayPrice <= 0 || editState.memberNightPrice <= 0) {
       showToast('Harga sewa harus lebih dari Rp 0');
       return;
     }
 
     setSaving(true);
     try {
-      // 1. Save time pricing to Pricing Store
+      // 1. Save pricing (Badminton only — Pickleball handled separately)
+      const currentPricing = getPricing(courtId, selectedMonthKey);
       setCourtPricing(courtId, selectedMonthKey, {
         dayPrice: editState.dayPrice,
         dayStart: editState.dayStart,
         dayEnd: editState.dayEnd,
-        // Sync afternoon (legacy DB fields) to night values
         afternoonPrice: editState.nightPrice,
         afternoonStart: editState.nightStart,
         afternoonEnd: editState.nightEnd,
@@ -129,11 +149,12 @@ export default function SettingLapanganPage() {
         nightEnd: editState.nightEnd,
         memberDayPrice: editState.memberDayPrice,
         memberNightPrice: editState.memberNightPrice,
-        pickleballDayPrice: editState.pickleballDayPrice,
-        pickleballNightPrice: editState.pickleballNightPrice,
+        // Preserve pickleball pricing unchanged
+        pickleballDayPrice: currentPricing.pickleballDayPrice,
+        pickleballNightPrice: currentPricing.pickleballNightPrice,
       });
 
-      // 2. Sync court base price to Supabase / store
+      // 2. Sync court base price
       const avgRate = Math.round((editState.dayPrice + editState.nightPrice) / 2);
       await updateCourt(courtId, {
         name: editState.name.trim(),
@@ -153,6 +174,57 @@ export default function SettingLapanganPage() {
       setSaving(false);
     }
   };
+
+  const handleSavePickleball = async (courtId: string, label: string, altCourtId?: string) => {
+    if (!pbEditState) return;
+    if (pbEditState.dayPrice <= 0 || pbEditState.nightPrice <= 0) {
+      showToast('Harga sewa harus lebih dari Rp 0');
+      return;
+    }
+    setPbSaving(true);
+    try {
+      const currentPricing = getPricing(courtId, selectedMonthKey);
+      await setCourtPricing(courtId, selectedMonthKey, {
+        ...currentPricing,
+        pickleballDayPrice: pbEditState.dayPrice,
+        pickleballNightPrice: pbEditState.nightPrice,
+      });
+      if (altCourtId && altCourtId !== courtId) {
+        const altPricing = getPricing(altCourtId, selectedMonthKey);
+        await setCourtPricing(altCourtId, selectedMonthKey, {
+          ...altPricing,
+          pickleballDayPrice: pbEditState.dayPrice,
+          pickleballNightPrice: pbEditState.nightPrice,
+        });
+      }
+      showToast(`Harga Pickleball ${label} berhasil disimpan!`);
+      setPbEditingId(null);
+      setPbEditState(null);
+    } catch {
+      showToast('Gagal menyimpan tarif Pickleball.');
+      setPbEditingId(null);
+      setPbEditState(null);
+    } finally {
+      setPbSaving(false);
+    }
+  };
+
+  const pickleballCourts = [
+    {
+      id: courts[0]?.id || 'PICKLEBALL_A',
+      altId: 'PICKLEBALL_A',
+      code: 'A',
+      name: 'Lapangan A',
+      subName: courts[0]?.name ? `Menggunakan area ${courts[0].name}` : 'Area Pickleball A',
+    },
+    {
+      id: courts[1]?.id || 'PICKLEBALL_B',
+      altId: 'PICKLEBALL_B',
+      code: 'B',
+      name: 'Lapangan B',
+      subName: courts[1]?.name ? `Menggunakan area ${courts[1].name}` : 'Area Pickleball B',
+    },
+  ];
 
   const handleApplyToAll = () => {
     if (courts.length === 0) return;
@@ -423,6 +495,26 @@ export default function SettingLapanganPage() {
         </span>
       </div>
 
+      {/* Header Seksi Badminton */}
+      <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-xl bg-[#b92b10] text-white flex items-center justify-center text-xs shadow-xs">
+            🏸
+          </div>
+          <div>
+            <h2 className="font-black text-sm text-slate-900 leading-tight">
+              Lapangan Badminton
+            </h2>
+            <p className="text-[10px] text-slate-500">
+              Tarif Insidentil &amp; Member (Lapangan 1 - {courts.length || 4})
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-[#b92b10]">
+          {courts.length} Lapangan
+        </span>
+      </div>
+
       {/* Court Cards List */}
       <div className="space-y-3">
         {isLoading && courts.length === 0 ? (
@@ -516,28 +608,6 @@ export default function SettingLapanganPage() {
                             </div>
                             <p className="text-[11px] font-black text-slate-900 leading-tight">
                               {formatRupiah(courtPricing.memberNightPrice)}
-                            </p>
-                          </div>
-                        </div>
-                        {/* Pickleball row */}
-                        <div className="text-[9px] font-black text-emerald-600 uppercase tracking-wider pl-0.5 pt-0.5">🏓 Pickleball</div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <div className="p-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-left">
-                            <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
-                              <Sun className="w-2.5 h-2.5" />
-                              <span>Pagi-Sore</span>
-                            </div>
-                            <p className="text-[11px] font-black text-slate-900 leading-tight">
-                              {formatRupiah(courtPricing.pickleballDayPrice)}
-                            </p>
-                          </div>
-                          <div className="p-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-left">
-                            <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-700">
-                              <Moon className="w-2.5 h-2.5" />
-                              <span>Sore-Malam</span>
-                            </div>
-                            <p className="text-[11px] font-black text-slate-900 leading-tight">
-                              {formatRupiah(courtPricing.pickleballNightPrice)}
                             </p>
                           </div>
                         </div>
@@ -690,47 +760,6 @@ export default function SettingLapanganPage() {
                         </div>
                       </div>
 
-                      {/* === PICKLEBALL === */}
-                      <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-2">
-                        <div className="text-[10px] font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1">
-                          <span>🏓 Pickleball (Insidentil)</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {/* Pagi-Sore Pickleball */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-amber-700 flex items-center gap-1">
-                              <Sun className="w-3 h-3" /> Pagi-Sore
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={editState.pickleballDayPrice ? formatNumber(editState.pickleballDayPrice) : ''}
-                                onChange={(e) => setEditState({ ...editState, pickleballDayPrice: parseNumberInput(e.target.value) })}
-                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
-                              />
-                            </div>
-                          </div>
-                          {/* Sore-Malam Pickleball */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
-                              <Moon className="w-3 h-3" /> Sore-Malam
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={editState.pickleballNightPrice ? formatNumber(editState.pickleballNightPrice) : ''}
-                                onChange={(e) => setEditState({ ...editState, pickleballNightPrice: parseNumberInput(e.target.value) })}
-                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
                     </div>
 
                     {/* Status Lapangan */}
@@ -779,6 +808,189 @@ export default function SettingLapanganPage() {
             );
           })
         )}
+      </div>
+
+      {/* Seksi Khusus: Lapangan Pickleball (Lapangan A & Lapangan B) */}
+      <div className="space-y-3 pt-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-xs shadow-xs">
+              🏓
+            </div>
+            <div>
+              <h2 className="font-black text-sm text-slate-900 leading-tight">
+                Lapangan Pickleball
+              </h2>
+              <p className="text-[10px] text-slate-500">
+                Tarif khusus sewa lapangan Pickleball (Lapangan A &amp; Lapangan B)
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+            2 Lapangan
+          </span>
+        </div>
+
+        {/* Pickleball Cards: Lapangan A & Lapangan B */}
+        <div className="space-y-3">
+          {pickleballCourts.map((pb) => {
+            const isEditing = pbEditingId === pb.id;
+            const pbPricing = getPricing(pb.id, selectedMonthKey);
+            const dayPrice = pbPricing.pickleballDayPrice || pbPricing.dayPrice || 60000;
+            const nightPrice = pbPricing.pickleballNightPrice || pbPricing.nightPrice || 85000;
+
+            return (
+              <div
+                key={pb.id}
+                className={`bg-white rounded-3xl border transition-all duration-200 overflow-hidden ${
+                  isEditing
+                    ? 'border-emerald-600 shadow-md shadow-emerald-600/10'
+                    : 'border-slate-200 shadow-xs'
+                }`}
+              >
+                {/* Pickleball Card Header Summary */}
+                <div className="p-4 flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center font-black text-lg shadow-xs bg-gradient-to-br from-emerald-600 to-teal-600 text-white">
+                      {pb.code}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="font-black text-sm text-slate-900 truncate">
+                          {pb.name}
+                        </h2>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          Pickleball
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{pb.subName}</p>
+
+                      {/* Pickleball Price Badges (Pagi-Sore & Sore-Malam) */}
+                      <div className="grid grid-cols-2 gap-1.5 mt-2">
+                        <div className="p-1.5 rounded-xl bg-amber-50 border border-amber-100 text-left">
+                          <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
+                            <Sun className="w-2.5 h-2.5" />
+                            <span>Pagi-Sore</span>
+                          </div>
+                          <p className="text-[11px] font-black text-slate-900 leading-tight">
+                            {formatRupiah(dayPrice)}
+                          </p>
+                          <span className="text-[8px] text-slate-400">07:00 - 18:00</span>
+                        </div>
+
+                        <div className="p-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-left">
+                          <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-700">
+                            <Moon className="w-2.5 h-2.5" />
+                            <span>Sore-Malam</span>
+                          </div>
+                          <p className="text-[11px] font-black text-slate-900 leading-tight">
+                            {formatRupiah(nightPrice)}
+                          </p>
+                          <span className="text-[8px] text-slate-400">18:00 - 24:00</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {isEditing ? (
+                      <button
+                        type="button"
+                        onClick={handleCancelPickleball}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartPickleballEdit(pb.id)}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 transition-colors cursor-pointer"
+                        title={`Edit Tarif ${pb.name}`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Pickleball Edit Form Panel */}
+                {isEditing && pbEditState && (
+                  <div className="px-4 pb-4 border-t border-slate-100 space-y-3.5 pt-3 bg-slate-50/50">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        Edit Tarif {pb.name} ({formatMonthDisplay(selectedMonthKey)})
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-2">
+                      <div className="text-[10px] font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                        <span>⚡ Tarif Insidentil Pickleball</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Pagi-Sore Pickleball */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-amber-700 flex items-center gap-1">
+                            <Sun className="w-3 h-3" /> Pagi-Sore (07:00 - 18:00)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={pbEditState.dayPrice ? formatNumber(pbEditState.dayPrice) : ''}
+                              onChange={(e) => setPbEditState({ ...pbEditState, dayPrice: parseNumberInput(e.target.value) })}
+                              className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Sore-Malam Pickleball */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
+                            <Moon className="w-3 h-3" /> Sore-Malam (18:00 - 24:00)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={pbEditState.nightPrice ? formatNumber(pbEditState.nightPrice) : ''}
+                              onChange={(e) => setPbEditState({ ...pbEditState, nightPrice: parseNumberInput(e.target.value) })}
+                              className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCancelPickleball}
+                        className="flex-1 py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSavePickleball(pb.id, pb.name, pb.altId)}
+                        disabled={pbSaving}
+                        className="flex-[2] py-2.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70"
+                      >
+                        {pbSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        <span>{pbSaving ? 'Menyimpan...' : 'Simpan Tarif'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Summary Box */}
