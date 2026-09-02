@@ -36,6 +36,8 @@ interface EditState {
   nightEnd: string;
   memberDayPrice: number;
   memberNightPrice: number;
+  pickleballDayPrice: number;
+  pickleballNightPrice: number;
 }
 
 export default function SettingLapanganPage() {
@@ -90,6 +92,8 @@ export default function SettingLapanganPage() {
       nightEnd: currentPricing.nightEnd,
       memberDayPrice: currentPricing.memberDayPrice ?? currentPricing.dayPrice,
       memberNightPrice: currentPricing.memberNightPrice ?? currentPricing.nightPrice,
+      pickleballDayPrice: currentPricing.pickleballDayPrice ?? currentPricing.dayPrice,
+      pickleballNightPrice: currentPricing.pickleballNightPrice ?? currentPricing.nightPrice,
     });
   };
 
@@ -104,7 +108,7 @@ export default function SettingLapanganPage() {
       showToast('Nama lapangan tidak boleh kosong');
       return;
     }
-    if (editState.dayPrice <= 0 || editState.nightPrice <= 0 || editState.memberDayPrice <= 0 || editState.memberNightPrice <= 0) {
+    if (editState.dayPrice <= 0 || editState.nightPrice <= 0 || editState.memberDayPrice <= 0 || editState.memberNightPrice <= 0 || editState.pickleballDayPrice <= 0 || editState.pickleballNightPrice <= 0) {
       showToast('Harga sewa harus lebih dari Rp 0');
       return;
     }
@@ -125,6 +129,8 @@ export default function SettingLapanganPage() {
         nightEnd: editState.nightEnd,
         memberDayPrice: editState.memberDayPrice,
         memberNightPrice: editState.memberNightPrice,
+        pickleballDayPrice: editState.pickleballDayPrice,
+        pickleballNightPrice: editState.pickleballNightPrice,
       });
 
       // 2. Sync court base price to Supabase / store
@@ -367,6 +373,34 @@ export default function SettingLapanganPage() {
                   </div>
                 </div>
               </div>
+              {/* Pickleball */}
+              <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200 space-y-1.5">
+                <div className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">🏓 Pickleball</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                      <Sun className="w-3 h-3" /><span>Pagi-Sore</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                      <input type="number" step={1000} value={quickPricing.pickleballDayPrice}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, pickleballDayPrice: Number(e.target.value) })}
+                        className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-slate-800" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-600">
+                      <Moon className="w-3 h-3" /><span>Sore-Malam</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                      <input type="number" step={1000} value={quickPricing.pickleballNightPrice}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, pickleballNightPrice: Number(e.target.value) })}
+                        className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-slate-800" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <button
@@ -436,7 +470,7 @@ export default function SettingLapanganPage() {
                         </span>
                       </div>
 
-                      {/* 4 Price Badges: 2 Insidentil + 2 Member */}
+                      {/* 4 Price Badges: Insidentil + Member */}
                       <div className="mt-2 space-y-1.5">
                         {/* Header row */}
                         <div className="grid grid-cols-2 gap-1.5">
@@ -482,6 +516,28 @@ export default function SettingLapanganPage() {
                             </div>
                             <p className="text-[11px] font-black text-slate-900 leading-tight">
                               {formatRupiah(courtPricing.memberNightPrice)}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Pickleball row */}
+                        <div className="text-[9px] font-black text-emerald-600 uppercase tracking-wider pl-0.5 pt-0.5">🏓 Pickleball</div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="p-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-left">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
+                              <Sun className="w-2.5 h-2.5" />
+                              <span>Pagi-Sore</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-900 leading-tight">
+                              {formatRupiah(courtPricing.pickleballDayPrice)}
+                            </p>
+                          </div>
+                          <div className="p-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-left">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-700">
+                              <Moon className="w-2.5 h-2.5" />
+                              <span>Sore-Malam</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-900 leading-tight">
+                              {formatRupiah(courtPricing.pickleballNightPrice)}
                             </p>
                           </div>
                         </div>
@@ -628,6 +684,47 @@ export default function SettingLapanganPage() {
                                 value={editState.memberNightPrice || ''}
                                 onChange={(e) => setEditState({ ...editState, memberNightPrice: Number(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* === PICKLEBALL === */}
+                      <div className="p-3 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-2">
+                        <div className="text-[10px] font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                          <span>🏓 Pickleball (Insidentil)</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Pagi-Sore Pickleball */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-amber-700 flex items-center gap-1">
+                              <Sun className="w-3 h-3" /> Pagi-Sore
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                              <input
+                                type="number"
+                                step={1000}
+                                value={editState.pickleballDayPrice || ''}
+                                onChange={(e) => setEditState({ ...editState, pickleballDayPrice: Number(e.target.value) })}
+                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </div>
+                          {/* Sore-Malam Pickleball */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
+                              <Moon className="w-3 h-3" /> Sore-Malam
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                              <input
+                                type="number"
+                                step={1000}
+                                value={editState.pickleballNightPrice || ''}
+                                onChange={(e) => setEditState({ ...editState, pickleballNightPrice: Number(e.target.value) })}
+                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
                               />
                             </div>
                           </div>

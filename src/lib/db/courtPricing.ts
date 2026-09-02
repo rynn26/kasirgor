@@ -16,6 +16,8 @@ export interface DbCourtPricingRule {
   night_end: string;
   member_day_price: number;
   member_night_price: number;
+  pickleball_day_price: number;
+  pickleball_night_price: number;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +38,8 @@ function mapDbToRule(row: DbCourtPricingRule): PricingRule {
       nightEnd: row.night_end,
       memberDayPrice: Number(row.member_day_price ?? row.day_price),
       memberNightPrice: Number(row.member_night_price ?? row.night_price),
+      pickleballDayPrice: Number(row.pickleball_day_price ?? row.day_price),
+      pickleballNightPrice: Number(row.pickleball_night_price ?? row.night_price),
     },
   };
 }
@@ -56,6 +60,8 @@ function mapRuleToDb(rule: PricingRule): Omit<DbCourtPricingRule, 'id' | 'create
     night_end: p.nightEnd,
     member_day_price: p.memberDayPrice,
     member_night_price: p.memberNightPrice,
+    pickleball_day_price: p.pickleballDayPrice,
+    pickleball_night_price: p.pickleballNightPrice,
   };
 }
 
