@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useCourtPricingStore, TimeSlotPricing, DEFAULT_PRICING } from '@/lib/store/useCourtPricingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { Court } from '@/types/booking';
 import {
   ArrowLeft,
@@ -327,8 +327,8 @@ export default function SettingLapanganPage() {
                     </div>
                     <div className="relative">
                       <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                      <input type="number" step={1000} value={quickPricing.dayPrice}
-                        onChange={(e) => setQuickPricing({ ...quickPricing, dayPrice: Number(e.target.value) })}
+                      <input type="text" inputMode="numeric" value={quickPricing.dayPrice ? formatNumber(quickPricing.dayPrice) : ''}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, dayPrice: parseNumberInput(e.target.value) })}
                         className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800" />
                     </div>
                   </div>
@@ -338,8 +338,8 @@ export default function SettingLapanganPage() {
                     </div>
                     <div className="relative">
                       <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                      <input type="number" step={1000} value={quickPricing.nightPrice}
-                        onChange={(e) => setQuickPricing({ ...quickPricing, nightPrice: Number(e.target.value) })}
+                      <input type="text" inputMode="numeric" value={quickPricing.nightPrice ? formatNumber(quickPricing.nightPrice) : ''}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, nightPrice: parseNumberInput(e.target.value) })}
                         className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800" />
                     </div>
                   </div>
@@ -355,8 +355,8 @@ export default function SettingLapanganPage() {
                     </div>
                     <div className="relative">
                       <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                      <input type="number" step={1000} value={quickPricing.memberDayPrice}
-                        onChange={(e) => setQuickPricing({ ...quickPricing, memberDayPrice: Number(e.target.value) })}
+                      <input type="text" inputMode="numeric" value={quickPricing.memberDayPrice ? formatNumber(quickPricing.memberDayPrice) : ''}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, memberDayPrice: parseNumberInput(e.target.value) })}
                         className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-black text-slate-800" />
                     </div>
                   </div>
@@ -366,8 +366,8 @@ export default function SettingLapanganPage() {
                     </div>
                     <div className="relative">
                       <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                      <input type="number" step={1000} value={quickPricing.memberNightPrice}
-                        onChange={(e) => setQuickPricing({ ...quickPricing, memberNightPrice: Number(e.target.value) })}
+                      <input type="text" inputMode="numeric" value={quickPricing.memberNightPrice ? formatNumber(quickPricing.memberNightPrice) : ''}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, memberNightPrice: parseNumberInput(e.target.value) })}
                         className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-black text-slate-800" />
                     </div>
                   </div>
@@ -383,8 +383,8 @@ export default function SettingLapanganPage() {
                     </div>
                     <div className="relative">
                       <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                      <input type="number" step={1000} value={quickPricing.pickleballDayPrice}
-                        onChange={(e) => setQuickPricing({ ...quickPricing, pickleballDayPrice: Number(e.target.value) })}
+                      <input type="text" inputMode="numeric" value={quickPricing.pickleballDayPrice ? formatNumber(quickPricing.pickleballDayPrice) : ''}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, pickleballDayPrice: parseNumberInput(e.target.value) })}
                         className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-slate-800" />
                     </div>
                   </div>
@@ -394,8 +394,8 @@ export default function SettingLapanganPage() {
                     </div>
                     <div className="relative">
                       <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
-                      <input type="number" step={1000} value={quickPricing.pickleballNightPrice}
-                        onChange={(e) => setQuickPricing({ ...quickPricing, pickleballNightPrice: Number(e.target.value) })}
+                      <input type="text" inputMode="numeric" value={quickPricing.pickleballNightPrice ? formatNumber(quickPricing.pickleballNightPrice) : ''}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, pickleballNightPrice: parseNumberInput(e.target.value) })}
                         className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-slate-800" />
                     </div>
                   </div>
@@ -622,10 +622,10 @@ export default function SettingLapanganPage() {
                             <div className="relative">
                               <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
                               <input
-                                type="number"
-                                step={1000}
-                                value={editState.dayPrice || ''}
-                                onChange={(e) => setEditState({ ...editState, dayPrice: Number(e.target.value) })}
+                                type="text"
+                                inputMode="numeric"
+                                value={editState.dayPrice ? formatNumber(editState.dayPrice) : ''}
+                                onChange={(e) => setEditState({ ...editState, dayPrice: parseNumberInput(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                               />
                             </div>
@@ -638,10 +638,10 @@ export default function SettingLapanganPage() {
                             <div className="relative">
                               <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
                               <input
-                                type="number"
-                                step={1000}
-                                value={editState.nightPrice || ''}
-                                onChange={(e) => setEditState({ ...editState, nightPrice: Number(e.target.value) })}
+                                type="text"
+                                inputMode="numeric"
+                                value={editState.nightPrice ? formatNumber(editState.nightPrice) : ''}
+                                onChange={(e) => setEditState({ ...editState, nightPrice: parseNumberInput(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                               />
                             </div>
@@ -663,10 +663,10 @@ export default function SettingLapanganPage() {
                             <div className="relative">
                               <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
                               <input
-                                type="number"
-                                step={1000}
-                                value={editState.memberDayPrice || ''}
-                                onChange={(e) => setEditState({ ...editState, memberDayPrice: Number(e.target.value) })}
+                                type="text"
+                                inputMode="numeric"
+                                value={editState.memberDayPrice ? formatNumber(editState.memberDayPrice) : ''}
+                                onChange={(e) => setEditState({ ...editState, memberDayPrice: parseNumberInput(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
                               />
                             </div>
@@ -679,10 +679,10 @@ export default function SettingLapanganPage() {
                             <div className="relative">
                               <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
                               <input
-                                type="number"
-                                step={1000}
-                                value={editState.memberNightPrice || ''}
-                                onChange={(e) => setEditState({ ...editState, memberNightPrice: Number(e.target.value) })}
+                                type="text"
+                                inputMode="numeric"
+                                value={editState.memberNightPrice ? formatNumber(editState.memberNightPrice) : ''}
+                                onChange={(e) => setEditState({ ...editState, memberNightPrice: parseNumberInput(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
                               />
                             </div>
@@ -704,10 +704,10 @@ export default function SettingLapanganPage() {
                             <div className="relative">
                               <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
                               <input
-                                type="number"
-                                step={1000}
-                                value={editState.pickleballDayPrice || ''}
-                                onChange={(e) => setEditState({ ...editState, pickleballDayPrice: Number(e.target.value) })}
+                                type="text"
+                                inputMode="numeric"
+                                value={editState.pickleballDayPrice ? formatNumber(editState.pickleballDayPrice) : ''}
+                                onChange={(e) => setEditState({ ...editState, pickleballDayPrice: parseNumberInput(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
                               />
                             </div>
@@ -720,10 +720,10 @@ export default function SettingLapanganPage() {
                             <div className="relative">
                               <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
                               <input
-                                type="number"
-                                step={1000}
-                                value={editState.pickleballNightPrice || ''}
-                                onChange={(e) => setEditState({ ...editState, pickleballNightPrice: Number(e.target.value) })}
+                                type="text"
+                                inputMode="numeric"
+                                value={editState.pickleballNightPrice ? formatNumber(editState.pickleballNightPrice) : ''}
+                                onChange={(e) => setEditState({ ...editState, pickleballNightPrice: parseNumberInput(e.target.value) })}
                                 className="w-full pl-7 pr-2 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-emerald-500"
                               />
                             </div>
