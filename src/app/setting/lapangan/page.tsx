@@ -34,6 +34,8 @@ interface EditState {
   nightPrice: number;
   nightStart: string;
   nightEnd: string;
+  memberDayPrice: number;
+  memberNightPrice: number;
 }
 
 export default function SettingLapanganPage() {
@@ -86,6 +88,8 @@ export default function SettingLapanganPage() {
       nightPrice: currentPricing.nightPrice,
       nightStart: currentPricing.nightStart,
       nightEnd: currentPricing.nightEnd,
+      memberDayPrice: currentPricing.memberDayPrice ?? currentPricing.dayPrice,
+      memberNightPrice: currentPricing.memberNightPrice ?? currentPricing.nightPrice,
     });
   };
 
@@ -100,14 +104,14 @@ export default function SettingLapanganPage() {
       showToast('Nama lapangan tidak boleh kosong');
       return;
     }
-    if (editState.dayPrice <= 0 || editState.nightPrice <= 0) {
+    if (editState.dayPrice <= 0 || editState.nightPrice <= 0 || editState.memberDayPrice <= 0 || editState.memberNightPrice <= 0) {
       showToast('Harga sewa harus lebih dari Rp 0');
       return;
     }
 
     setSaving(true);
     try {
-      // 1. Save time pricing (Pagi-Sore, Sore-Malam) to Pricing Store
+      // 1. Save time pricing to Pricing Store
       setCourtPricing(courtId, selectedMonthKey, {
         dayPrice: editState.dayPrice,
         dayStart: editState.dayStart,
@@ -119,6 +123,8 @@ export default function SettingLapanganPage() {
         nightPrice: editState.nightPrice,
         nightStart: editState.nightStart,
         nightEnd: editState.nightEnd,
+        memberDayPrice: editState.memberDayPrice,
+        memberNightPrice: editState.memberNightPrice,
       });
 
       // 2. Sync court base price to Supabase / store
@@ -303,40 +309,62 @@ export default function SettingLapanganPage() {
               Masukkan harga sewa serentak ({formatMonthDisplay(selectedMonthKey)}):
             </p>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              {/* Pagi-Sore */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600">
-                  <Sun className="w-3.5 h-3.5" />
-                  <span>Pagi-Sore (07:00-18:00)</span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-2 top-2 text-[10px] font-bold text-slate-400">Rp</span>
-                  <input
-                    type="number"
-                    step={1000}
-                    value={quickPricing.dayPrice}
-                    onChange={(e) => setQuickPricing({ ...quickPricing, dayPrice: Number(e.target.value) })}
-                    className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800"
-                  />
+            {/* Quick Apply: 4 inputs in 2 sections */}
+            <div className="space-y-2.5">
+              {/* Insidentil */}
+              <div className="p-2.5 rounded-xl bg-orange-50/60 border border-orange-200 space-y-1.5">
+                <div className="text-[10px] font-black text-orange-700 uppercase tracking-wider">⚡ Insidentil</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                      <Sun className="w-3 h-3" /><span>Pagi-Sore</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                      <input type="number" step={1000} value={quickPricing.dayPrice}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, dayPrice: Number(e.target.value) })}
+                        className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-600">
+                      <Moon className="w-3 h-3" /><span>Sore-Malam</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                      <input type="number" step={1000} value={quickPricing.nightPrice}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, nightPrice: Number(e.target.value) })}
+                        className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800" />
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Sore-Malam */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-600">
-                  <Moon className="w-3.5 h-3.5" />
-                  <span>Sore-Malam (18:00-24:00)</span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-2 top-2 text-[10px] font-bold text-slate-400">Rp</span>
-                  <input
-                    type="number"
-                    step={1000}
-                    value={quickPricing.nightPrice}
-                    onChange={(e) => setQuickPricing({ ...quickPricing, nightPrice: Number(e.target.value) })}
-                    className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-800"
-                  />
+              {/* Member */}
+              <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200 space-y-1.5">
+                <div className="text-[10px] font-black text-blue-700 uppercase tracking-wider">👤 Member</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                      <Sun className="w-3 h-3" /><span>Pagi-Sore</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                      <input type="number" step={1000} value={quickPricing.memberDayPrice}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, memberDayPrice: Number(e.target.value) })}
+                        className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-black text-slate-800" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-600">
+                      <Moon className="w-3 h-3" /><span>Sore-Malam</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                      <input type="number" step={1000} value={quickPricing.memberNightPrice}
+                        onChange={(e) => setQuickPricing({ ...quickPricing, memberNightPrice: Number(e.target.value) })}
+                        className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-lg text-xs font-black text-slate-800" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -408,28 +436,54 @@ export default function SettingLapanganPage() {
                         </span>
                       </div>
 
-                      {/* 2 Price Badges (Pagi-Sore & Sore-Malam) */}
-                      <div className="grid grid-cols-2 gap-1.5 mt-2">
-                        <div className="p-1.5 rounded-xl bg-amber-50 border border-amber-100 text-left">
-                          <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
-                            <Sun className="w-2.5 h-2.5" />
-                            <span>Pagi-Sore</span>
-                          </div>
-                          <p className="text-[11px] font-black text-slate-900 leading-tight">
-                            {formatRupiah(courtPricing.dayPrice)}
-                          </p>
-                          <span className="text-[8px] text-slate-400">{courtPricing.dayStart}-{courtPricing.dayEnd}</span>
+                      {/* 4 Price Badges: 2 Insidentil + 2 Member */}
+                      <div className="mt-2 space-y-1.5">
+                        {/* Header row */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="text-[9px] font-black text-slate-500 uppercase tracking-wider pl-0.5">⚡ Insidentil</div>
+                          <div className="text-[9px] font-black text-blue-500 uppercase tracking-wider pl-0.5">👤 Member</div>
                         </div>
-
-                        <div className="p-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-left">
-                          <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-700">
-                            <Moon className="w-2.5 h-2.5" />
-                            <span>Sore-Malam</span>
+                        {/* Pagi-Sore row */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="p-1.5 rounded-xl bg-amber-50 border border-amber-100 text-left">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-amber-700">
+                              <Sun className="w-2.5 h-2.5" />
+                              <span>Pagi-Sore</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-900 leading-tight">
+                              {formatRupiah(courtPricing.dayPrice)}
+                            </p>
                           </div>
-                          <p className="text-[11px] font-black text-slate-900 leading-tight">
-                            {formatRupiah(courtPricing.nightPrice)}
-                          </p>
-                          <span className="text-[8px] text-slate-400">{courtPricing.nightStart}-{courtPricing.nightEnd}</span>
+                          <div className="p-1.5 rounded-xl bg-blue-50 border border-blue-100 text-left">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-blue-700">
+                              <Sun className="w-2.5 h-2.5" />
+                              <span>Pagi-Sore</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-900 leading-tight">
+                              {formatRupiah(courtPricing.memberDayPrice)}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Sore-Malam row */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div className="p-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-left">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-700">
+                              <Moon className="w-2.5 h-2.5" />
+                              <span>Sore-Malam</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-900 leading-tight">
+                              {formatRupiah(courtPricing.nightPrice)}
+                            </p>
+                          </div>
+                          <div className="p-1.5 rounded-xl bg-blue-50 border border-blue-100 text-left">
+                            <div className="flex items-center gap-1 text-[9px] font-bold text-blue-700">
+                              <Moon className="w-2.5 h-2.5" />
+                              <span>Sore-Malam</span>
+                            </div>
+                            <p className="text-[11px] font-black text-slate-900 leading-tight">
+                              {formatRupiah(courtPricing.memberNightPrice)}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -495,81 +549,123 @@ export default function SettingLapanganPage() {
                       />
                     </div>
 
-                    {/* 2 Time Price Inputs */}
+                    {/* 4 Price Inputs: Insidentil & Member */}
                     <div className="space-y-2.5">
-                      {/* 1. Tarif Pagi-Sore */}
-                      <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
-                            <Sun className="w-3.5 h-3.5 text-amber-500" />
-                            <span>1. Tarif Pagi-Sore ({editState.dayStart} – {editState.dayEnd})</span>
-                          </label>
-                          <span className="text-[10px] text-slate-400">07:00 – 18:00</span>
+
+                      {/* === INSIDENTIL === */}
+                      <div className="p-3 bg-orange-50/50 rounded-2xl border border-orange-200 space-y-2">
+                        <div className="text-[10px] font-black text-orange-700 uppercase tracking-wider flex items-center gap-1">
+                          <span>⚡ Insidentil</span>
                         </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
-                          <input
-                            type="number"
-                            step={1000}
-                            value={editState.dayPrice || ''}
-                            onChange={(e) => setEditState({ ...editState, dayPrice: Number(e.target.value) })}
-                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                          />
-                        </div>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[50000, 60000, 70000, 75000].map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setEditState({ ...editState, dayPrice: p })}
-                              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                                editState.dayPrice === p
-                                  ? 'bg-amber-600 text-white border-amber-600'
-                                  : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                              }`}
-                            >
-                              {formatRupiah(p)}
-                            </button>
-                          ))}
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Pagi-Sore Insidentil */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-amber-700 flex items-center gap-1">
+                              <Sun className="w-3 h-3" /> Pagi-Sore
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                              <input
+                                type="number"
+                                step={1000}
+                                value={editState.dayPrice || ''}
+                                onChange={(e) => setEditState({ ...editState, dayPrice: Number(e.target.value) })}
+                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
+                              />
+                            </div>
+                            <div className="flex gap-1 flex-wrap">
+                              {[50000, 60000, 70000].map((p) => (
+                                <button key={p} type="button" onClick={() => setEditState({ ...editState, dayPrice: p })}
+                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.dayPrice === p ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-600 border-slate-200' }`}>
+                                  {formatRupiah(p)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Sore-Malam Insidentil */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
+                              <Moon className="w-3 h-3" /> Sore-Malam
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                              <input
+                                type="number"
+                                step={1000}
+                                value={editState.nightPrice || ''}
+                                onChange={(e) => setEditState({ ...editState, nightPrice: Number(e.target.value) })}
+                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
+                              />
+                            </div>
+                            <div className="flex gap-1 flex-wrap">
+                              {[75000, 85000, 100000].map((p) => (
+                                <button key={p} type="button" onClick={() => setEditState({ ...editState, nightPrice: p })}
+                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.nightPrice === p ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200' }`}>
+                                  {formatRupiah(p)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      {/* 2. Tarif Sore-Malam */}
-                      <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-indigo-700 flex items-center gap-1.5">
-                            <Moon className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>2. Tarif Sore-Malam ({editState.nightStart} – {editState.nightEnd})</span>
-                          </label>
-                          <span className="text-[10px] text-slate-400">18:00 – 24:00</span>
+                      {/* === MEMBER === */}
+                      <div className="p-3 bg-blue-50/50 rounded-2xl border border-blue-200 space-y-2">
+                        <div className="text-[10px] font-black text-blue-700 uppercase tracking-wider flex items-center gap-1">
+                          <span>👤 Member</span>
                         </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
-                          <input
-                            type="number"
-                            step={1000}
-                            value={editState.nightPrice || ''}
-                            onChange={(e) => setEditState({ ...editState, nightPrice: Number(e.target.value) })}
-                            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                          />
-                        </div>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[75000, 85000, 100000, 120000].map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setEditState({ ...editState, nightPrice: p })}
-                              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer ${
-                                editState.nightPrice === p
-                                  ? 'bg-indigo-600 text-white border-indigo-600'
-                                  : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                              }`}
-                            >
-                              {formatRupiah(p)}
-                            </button>
-                          ))}
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Pagi-Sore Member */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-amber-700 flex items-center gap-1">
+                              <Sun className="w-3 h-3" /> Pagi-Sore
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                              <input
+                                type="number"
+                                step={1000}
+                                value={editState.memberDayPrice || ''}
+                                onChange={(e) => setEditState({ ...editState, memberDayPrice: Number(e.target.value) })}
+                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div className="flex gap-1 flex-wrap">
+                              {[50000, 60000, 70000].map((p) => (
+                                <button key={p} type="button" onClick={() => setEditState({ ...editState, memberDayPrice: p })}
+                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.memberDayPrice === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200' }`}>
+                                  {formatRupiah(p)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {/* Sore-Malam Member */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-indigo-700 flex items-center gap-1">
+                              <Moon className="w-3 h-3" /> Sore-Malam
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1.5 text-[10px] font-bold text-slate-400">Rp</span>
+                              <input
+                                type="number"
+                                step={1000}
+                                value={editState.memberNightPrice || ''}
+                                onChange={(e) => setEditState({ ...editState, memberNightPrice: Number(e.target.value) })}
+                                className="w-full pl-7 pr-2 py-1.5 bg-white border border-blue-200 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                            <div className="flex gap-1 flex-wrap">
+                              {[75000, 85000, 100000].map((p) => (
+                                <button key={p} type="button" onClick={() => setEditState({ ...editState, memberNightPrice: p })}
+                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold border cursor-pointer ${ editState.memberNightPrice === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200' }`}>
+                                  {formatRupiah(p)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
+
                     </div>
 
                     {/* Status Lapangan */}

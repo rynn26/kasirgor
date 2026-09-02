@@ -14,6 +14,8 @@ export interface DbCourtPricingRule {
   night_price: number;
   night_start: string;
   night_end: string;
+  member_day_price: number;
+  member_night_price: number;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +34,8 @@ function mapDbToRule(row: DbCourtPricingRule): PricingRule {
       nightPrice: Number(row.night_price),
       nightStart: row.night_start,
       nightEnd: row.night_end,
+      memberDayPrice: Number(row.member_day_price ?? row.day_price),
+      memberNightPrice: Number(row.member_night_price ?? row.night_price),
     },
   };
 }
@@ -50,6 +54,8 @@ function mapRuleToDb(rule: PricingRule): Omit<DbCourtPricingRule, 'id' | 'create
     night_price: p.nightPrice,
     night_start: p.nightStart,
     night_end: p.nightEnd,
+    member_day_price: p.memberDayPrice,
+    member_night_price: p.memberNightPrice,
   };
 }
 

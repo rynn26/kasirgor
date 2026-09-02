@@ -9,15 +9,19 @@ import {
 } from '@/lib/db/courtPricing';
 
 export interface TimeSlotPricing {
-  // Pagi-Sore
+  // Pagi-Sore (Insidentil)
   dayPrice: number;
   dayStart: string; // default "07:00"
   dayEnd: string;   // default "18:00"
 
-  // Sore-Malam
+  // Sore-Malam (Insidentil)
   nightPrice: number;
   nightStart: string; // default "18:00"
   nightEnd: string;   // default "24:00"
+
+  // Member pricing
+  memberDayPrice: number;   // default sama dengan dayPrice
+  memberNightPrice: number; // default sama dengan nightPrice
 
   // Legacy fields — kept for DB compatibility, always synced to nightPrice
   afternoonPrice: number;
@@ -32,15 +36,19 @@ export interface PricingRule {
 }
 
 export const DEFAULT_PRICING: TimeSlotPricing = {
-  // Slot 1: Pagi-Sore
+  // Slot 1: Pagi-Sore (Insidentil)
   dayPrice: 60000,
   dayStart: '07:00',
   dayEnd: '18:00',
 
-  // Slot 2: Sore-Malam
+  // Slot 2: Sore-Malam (Insidentil)
   nightPrice: 85000,
   nightStart: '18:00',
   nightEnd: '24:00',
+
+  // Member (default sama dengan insidentil)
+  memberDayPrice: 60000,
+  memberNightPrice: 85000,
 
   // Legacy (DB compat) — mirrors nightPrice
   afternoonPrice: 85000,
@@ -63,7 +71,8 @@ interface CourtPricingState {
     courtId: string,
     dateStr: string,
     timeStr: string,
-    fallbackPrice?: number
+    fallbackPrice?: number,
+    customerType?: 'insidentil' | 'member'
   ) => { price: number; period: 'Pagi' | 'Malam'; timeRange: string };
   calculateBookingFee: (
     courtId: string,
@@ -71,7 +80,8 @@ interface CourtPricingState {
     startTime: string,
     durationHours: number,
     courtCount?: number,
-    fallbackPrice?: number
+    fallbackPrice?: number,
+    customerType?: 'insidentil' | 'member'
   ) => { totalFee: number; ratePerHour: number; breakdown: Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }> };
   deleteMonthRule: (monthKey: string) => Promise<void>;
 }
@@ -166,22 +176,24 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         return DEFAULT_PRICING;
       },
 
-      getPriceForSlot: (courtId: string, dateStr: string, timeStr: string, fallbackPrice?: number) => {
+      getPriceForSlot: (courtId: string, dateStr: string, timeStr: string, fallbackPrice?: number, customerType: 'insidentil' | 'member' = 'insidentil') => {
         const monthKey = dateStr ? dateStr.slice(0, 7) : 'ALL'; // YYYY-MM
         const pricing = get().getPricing(courtId, monthKey);
 
         const hour = parseInt(timeStr.split(':')[0], 10);
         const dayEndHour = parseInt(pricing.dayEnd.split(':')[0], 10); // batas Pagi-Sore
 
+        const isMember = customerType === 'member';
+
         if (hour < dayEndHour) {
           return {
-            price: pricing.dayPrice || fallbackPrice || 60000,
+            price: (isMember ? pricing.memberDayPrice : pricing.dayPrice) || fallbackPrice || 60000,
             period: 'Pagi',
             timeRange: `${pricing.dayStart} - ${pricing.dayEnd}`,
           };
         } else {
           return {
-            price: pricing.nightPrice || fallbackPrice || 85000,
+            price: (isMember ? pricing.memberNightPrice : pricing.nightPrice) || fallbackPrice || 85000,
             period: 'Malam',
             timeRange: `${pricing.nightStart} - ${pricing.nightEnd}`,
           };
@@ -194,7 +206,8 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         startTime: string,
         durationHours: number,
         courtCount = 1,
-        fallbackPrice?: number
+        fallbackPrice?: number,
+        customerType: 'insidentil' | 'member' = 'insidentil'
       ) => {
         const startHour = parseInt(startTime.split(':')[0], 10);
         const breakdown: Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }> = [];
@@ -203,7 +216,7 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         for (let i = 0; i < durationHours; i++) {
           const currentH = startHour + i;
           const timeSlotStr = `${currentH < 10 ? '0' : ''}${currentH}:00`;
-          const slot = get().getPriceForSlot(courtId, dateStr, timeSlotStr, fallbackPrice);
+          const slot = get().getPriceForSlot(courtId, dateStr, timeSlotStr, fallbackPrice, customerType);
           breakdown.push({
             hour: `${timeSlotStr} - ${currentH + 1 < 10 ? '0' : ''}${currentH + 1}:00`,
             price: slot.price,
