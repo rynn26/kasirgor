@@ -51,6 +51,7 @@ export default function SettingLapanganPage() {
     applyToAllCourts,
     getPricing,
     deleteMonthRule,
+    loadFromDb,
   } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
@@ -67,6 +68,7 @@ export default function SettingLapanganPage() {
 
   useEffect(() => {
     loadCourts();
+    loadFromDb(); // Fetch pricing rules from Supabase
   }, []);
 
   // Format month key for display

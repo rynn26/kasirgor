@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  fetchAllPricingRules,
+  upsertPricingRule,
+  upsertManyPricingRules,
+  deletePricingRulesByMonth,
+  ensureDefaultPricingRule,
+} from '@/lib/db/courtPricing';
 
 export interface TimeSlotPricing {
   // Siang
@@ -41,11 +48,13 @@ export const DEFAULT_PRICING: TimeSlotPricing = {
 interface CourtPricingState {
   rules: PricingRule[];
   selectedMonthKey: string; // 'ALL' or 'YYYY-MM'
-  
+  isLoading: boolean;
+
   // Actions
+  loadFromDb: () => Promise<void>;
   setSelectedMonthKey: (monthKey: string) => void;
-  setCourtPricing: (courtId: string, monthKey: string, pricing: Partial<TimeSlotPricing>) => void;
-  applyToAllCourts: (monthKey: string, pricing: TimeSlotPricing, courtIds: string[]) => void;
+  setCourtPricing: (courtId: string, monthKey: string, pricing: Partial<TimeSlotPricing>) => Promise<void>;
+  applyToAllCourts: (monthKey: string, pricing: TimeSlotPricing, courtIds: string[]) => Promise<void>;
   getPricing: (courtId: string, monthKey?: string) => TimeSlotPricing;
   getPriceForSlot: (
     courtId: string,
@@ -61,7 +70,7 @@ interface CourtPricingState {
     courtCount?: number,
     fallbackPrice?: number
   ) => { totalFee: number; ratePerHour: number; breakdown: Array<{ hour: string; price: number; period: 'Siang' | 'Sore' | 'Malam' }> };
-  deleteMonthRule: (monthKey: string) => void;
+  deleteMonthRule: (monthKey: string) => Promise<void>;
 }
 
 export const useCourtPricingStore = create<CourtPricingState>()(
@@ -75,35 +84,58 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         },
       ],
       selectedMonthKey: 'ALL',
+      isLoading: false,
+
+      loadFromDb: async () => {
+        set({ isLoading: true });
+        try {
+          await ensureDefaultPricingRule();
+          const dbRules = await fetchAllPricingRules();
+          if (dbRules.length > 0) {
+            set({ rules: dbRules });
+          }
+        } catch (e) {
+          console.error('[courtPricing] loadFromDb error:', e);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
 
       setSelectedMonthKey: (monthKey: string) => set({ selectedMonthKey: monthKey }),
 
-      setCourtPricing: (courtId: string, monthKey: string, partialPricing: Partial<TimeSlotPricing>) => {
-        set((state) => {
-          const current = state.rules.find((r) => r.courtId === courtId && r.monthKey === monthKey);
-          const base = current ? current.pricing : state.rules.find((r) => r.courtId === 'ALL' && r.monthKey === 'ALL')?.pricing || DEFAULT_PRICING;
-          const merged: TimeSlotPricing = { ...base, ...partialPricing };
+      setCourtPricing: async (courtId: string, monthKey: string, partialPricing: Partial<TimeSlotPricing>) => {
+        const state = get();
+        const current = state.rules.find((r) => r.courtId === courtId && r.monthKey === monthKey);
+        const base = current
+          ? current.pricing
+          : state.rules.find((r) => r.courtId === 'ALL' && r.monthKey === 'ALL')?.pricing || DEFAULT_PRICING;
+        const merged: TimeSlotPricing = { ...base, ...partialPricing };
+        const newRule: PricingRule = { courtId, monthKey, pricing: merged };
 
-          const filtered = state.rules.filter((r) => !(r.courtId === courtId && r.monthKey === monthKey));
-          return {
-            rules: [...filtered, { courtId, monthKey, pricing: merged }],
-          };
-        });
+        // Optimistic update local state
+        const filtered = state.rules.filter((r) => !(r.courtId === courtId && r.monthKey === monthKey));
+        set({ rules: [...filtered, newRule] });
+
+        // Sync to Supabase
+        await upsertPricingRule(newRule);
       },
 
-      applyToAllCourts: (monthKey: string, pricing: TimeSlotPricing, courtIds: string[]) => {
-        set((state) => {
-          // Set global rule for this month
-          let newRules = state.rules.filter((r) => r.monthKey !== monthKey);
-          newRules.push({ courtId: 'ALL', monthKey, pricing: { ...pricing } });
+      applyToAllCourts: async (monthKey: string, pricing: TimeSlotPricing, courtIds: string[]) => {
+        const state = get();
 
-          // Also apply to each specified court
-          courtIds.forEach((cid) => {
-            newRules.push({ courtId: cid, monthKey, pricing: { ...pricing } });
-          });
+        // Build new rules
+        let newRules = state.rules.filter((r) => r.monthKey !== monthKey);
+        const batchRules: PricingRule[] = [
+          { courtId: 'ALL', monthKey, pricing: { ...pricing } },
+          ...courtIds.map((cid) => ({ courtId: cid, monthKey, pricing: { ...pricing } })),
+        ];
+        newRules = [...newRules, ...batchRules];
 
-          return { rules: newRules };
-        });
+        // Optimistic update
+        set({ rules: newRules });
+
+        // Sync to Supabase
+        await upsertManyPricingRules(batchRules);
       },
 
       getPricing: (courtId: string, monthKey?: string): TimeSlotPricing => {
@@ -195,16 +227,22 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         };
       },
 
-      deleteMonthRule: (monthKey: string) => {
+      deleteMonthRule: async (monthKey: string) => {
         if (monthKey === 'ALL') return;
+
+        // Optimistic update
         set((state) => ({
           rules: state.rules.filter((r) => r.monthKey !== monthKey),
           selectedMonthKey: state.selectedMonthKey === monthKey ? 'ALL' : state.selectedMonthKey,
         }));
+
+        // Sync to Supabase
+        await deletePricingRulesByMonth(monthKey);
       },
     }),
     {
-      name: 'kasir_court_pricing_rules',
+      name: 'kasir_court_pricing_rules', // localStorage fallback / cache
     }
   )
 );
+
