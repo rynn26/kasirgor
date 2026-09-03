@@ -76,8 +76,21 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
     }
   }, [isOpen, courts, courtId]);
 
+  const handleSelectSport = (sport: 'Badminton' | 'Pickleball') => {
+    setSelectedSport(sport);
+    if (sport === 'Pickleball') {
+      setMemberType('INSIDENTIL');
+      const pbCourt = courts.find((c, idx) => idx < 2 || c.name.includes('1') || c.name.includes('2'));
+      if (pbCourt) setCourtId(pbCourt.id);
+    }
+  };
+
+  const availableCourts = selectedSport === 'Pickleball'
+    ? courts.filter((c, idx) => idx < 2 || c.name.includes('1') || c.name.includes('2') || c.name.toLowerCase().includes('pickleball'))
+    : courts;
+
   // Recalculate default fee when court, duration, sport, or time changes
-  const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
+  const selectedCourt = courts.find((c) => c.id === courtId) || availableCourts[0] || courts[0];
 
   useEffect(() => {
     if (selectedCourt) {
@@ -215,7 +228,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
             <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
               <button
                 type="button"
-                onClick={() => setSelectedSport('Badminton')}
+                onClick={() => handleSelectSport('Badminton')}
                 className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   selectedSport === 'Badminton'
                     ? 'bg-emerald-700 text-white shadow-xs'
@@ -227,10 +240,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
 
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedSport('Pickleball');
-                  setMemberType('INSIDENTIL');
-                }}
+                onClick={() => handleSelectSport('Pickleball')}
                 className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   selectedSport === 'Pickleball'
                     ? 'bg-emerald-700 text-white shadow-xs'
@@ -241,6 +251,53 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
               </button>
             </div>
           </div>
+
+          {/* Kategori Khusus Badminton (Member vs Insidentil) */}
+          {selectedSport === 'Badminton' ? (
+            <div className="p-3 bg-blue-50/80 border border-blue-200/90 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-950 text-xs">
+                  Kategori Sewa Badminton:
+                </span>
+                <span className="text-[10px] font-bold text-blue-700">
+                  {memberType === 'MEMBER' ? 'Tarif Khusus Member' : 'Tarif Insidentil'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMemberType('MEMBER')}
+                  className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    memberType === 'MEMBER'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white border border-blue-200 text-blue-900 hover:bg-blue-50'
+                  }`}
+                >
+                  <span>👤 Member (Paket Rutin)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMemberType('INSIDENTIL')}
+                  className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    memberType === 'INSIDENTIL'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>⚡ Insidentil (Sekali Main)</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-2xl flex items-center gap-2.5 text-amber-900">
+              <span className="text-base">🏓</span>
+              <div className="text-[11px] leading-tight">
+                <strong className="block text-amber-950 font-bold">Pickleball — Insidentil (Sekali Main)</strong>
+                <span className="text-amber-700">Khusus Lapangan 1 & 2 dengan tarif khusus Pickleball (tidak ada sistem member).</span>
+              </div>
+            </div>
+          )}
 
           {/* Tanggal Booking vs Tanggal Main */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
@@ -293,9 +350,9 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
                   onChange={(e) => setCourtId(e.target.value)}
                   className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer"
                 >
-                  {courts.map((c) => (
+                  {availableCourts.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.name} {selectedSport === 'Pickleball' ? '(Pickleball Line)' : ''}
                     </option>
                   ))}
                 </select>
