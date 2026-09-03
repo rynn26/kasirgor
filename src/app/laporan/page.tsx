@@ -20,6 +20,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { InputManualSaleModal } from '@/components/laporan/InputManualSaleModal';
+import { InputManualBookingModal } from '@/components/laporan/InputManualBookingModal';
 import { formatRupiah } from '@/lib/utils';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
@@ -78,6 +79,7 @@ export default function LaporanPenjualanPage() {
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; amount: number } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isInputManualOpen, setIsInputManualOpen] = useState(false);
+  const [isInputManualBookingOpen, setIsInputManualBookingOpen] = useState(false);
 
   useEffect(() => {
     loadTransactions();
@@ -399,6 +401,18 @@ export default function LaporanPenjualanPage() {
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
                 <span>+ Input Data Kemarin</span>
+              </button>
+            )}
+
+            {isOwner && isLapangan && (
+              <button
+                type="button"
+                onClick={() => setIsInputManualBookingOpen(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
+                title="Input Sewa Lapangan Kemarin / Manual"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>+ Input Sewa Kemarin</span>
               </button>
             )}
 
@@ -793,6 +807,15 @@ export default function LaporanPenjualanPage() {
         onClose={() => setIsInputManualOpen(false)}
         onSuccess={() => {
           loadTransactions();
+        }}
+      />
+
+      {/* Modal Input Data Sewa Lapangan Kemarin (Khusus Owner) */}
+      <InputManualBookingModal
+        isOpen={isInputManualBookingOpen}
+        onClose={() => setIsInputManualBookingOpen(false)}
+        onSuccess={() => {
+          loadBookings();
         }}
       />
     </div>

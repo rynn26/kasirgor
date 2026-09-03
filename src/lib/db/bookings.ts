@@ -211,6 +211,10 @@ export async function createBooking(
       dp_cashier: booking.dpCashier || null,
       amount_paid_total: booking.amountPaidTotal,
       remaining_balance: booking.remainingBalance,
+      settlement_amount: booking.settlementAmount || (booking.status === 'SETTLED' ? booking.totalAmount : null),
+      settlement_payment_method: booking.settlementPaymentMethod || booking.dpPaymentMethod || null,
+      settlement_paid_at: booking.settlementPaidAt || (booking.status === 'SETTLED' ? (booking.dpPaidAt || new Date().toISOString()) : null),
+      settlement_cashier: booking.settlementCashier || booking.dpCashier || null,
       status: booking.status,
       notes: booking.notes || null,
     });
