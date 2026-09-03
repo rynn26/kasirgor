@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { PaymentMethodDetailModal } from '@/components/laporan/PaymentMethodDetailModal';
+import { CourtRevenueDetailModal } from '@/components/laporan/CourtRevenueDetailModal';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { ReceiptModal } from '@/components/pos/ReceiptModal';
 import { CourtBooking } from '@/types/booking';
@@ -116,6 +117,7 @@ export default function LaporanPenjualanPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [isOwnerRevenueModalOpen, setIsOwnerRevenueModalOpen] = useState(false);
   const [selectedPaymentMethodDetail, setSelectedPaymentMethodDetail] = useState<string | null>(null);
+  const [selectedCourtDetail, setSelectedCourtDetail] = useState<string | null>(null);
   const [selectedBookingForReceipt, setSelectedBookingForReceipt] = useState<CourtBooking | null>(null);
   const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<Transaction | null>(null);
   const [isInputManualOpen, setIsInputManualOpen] = useState(false);
@@ -776,12 +778,26 @@ export default function LaporanPenjualanPage() {
             <span className="text-[11px] text-slate-400">Total Jam</span>
           </div>
           {lapanganData.courtBreakdown.length > 0 ? (
-            <div className="space-y-3 pt-1">
+            <div className="space-y-2 pt-1">
               {lapanganData.courtBreakdown.map((court, idx) => (
-                <div key={idx} className="space-y-1">
+                <div
+                  key={idx}
+                  onClick={() => setSelectedCourtDetail(court.name)}
+                  className="space-y-1.5 p-2.5 -mx-2 rounded-2xl hover:bg-emerald-50/70 active:bg-emerald-100/70 transition-all cursor-pointer group border border-transparent hover:border-emerald-200/60"
+                >
                   <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-800">{court.name} ({court.hours} jam)</span>
-                    <span className="font-bold text-emerald-700">{formatRupiah(court.amount)}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-slate-800 font-bold group-hover:text-emerald-800 transition-colors truncate">
+                        {court.name} ({court.hours} jam)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-black text-emerald-700">{formatRupiah(court.amount)}</span>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full font-bold group-hover:bg-emerald-600 group-hover:text-white transition-all flex items-center gap-0.5">
+                        <span>Rincian</span>
+                        <ChevronRight className="w-2.5 h-2.5" />
+                      </span>
+                    </div>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div
@@ -950,6 +966,16 @@ export default function LaporanPenjualanPage() {
         filteredTransactions={kantinData.filteredTransactions}
         onOpenBookingReceipt={(bkg) => setSelectedBookingForReceipt(bkg)}
         onOpenKantinReceipt={(tx) => setSelectedTxForReceipt(tx)}
+      />
+
+      {/* Modal Rincian Pendapatan per Lapangan */}
+      <CourtRevenueDetailModal
+        isOpen={Boolean(selectedCourtDetail)}
+        onClose={() => setSelectedCourtDetail(null)}
+        courtName={selectedCourtDetail || ''}
+        periodLabel={current.label}
+        filteredBookings={lapanganData.filteredBookings}
+        onOpenBookingReceipt={(bkg) => setSelectedBookingForReceipt(bkg)}
       />
 
       {/* Modal Nota Booking Lapangan */}
