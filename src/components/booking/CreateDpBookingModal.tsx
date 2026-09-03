@@ -53,7 +53,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 }) => {
   const { courts, loadCourts, addBooking } = useCourtBookingStore();
   const { cashierName } = useShiftStore();
-  const { calculateBookingFee } = useCourtPricingStore();
+  const { calculateBookingFee, loadFromDb: loadPricingFromDb } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -96,12 +96,13 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
   const finalTotal = Math.max(0, courtFee - (discountAmount || 0));
 
-  // Load courts if not yet loaded
+  // Load courts + pricing rules if not yet loaded
   useEffect(() => {
     if (courts.length === 0) {
       loadCourts();
     }
-  }, [courts.length, loadCourts]);
+    loadPricingFromDb();
+  }, [courts.length, loadCourts, loadPricingFromDb]);
 
   // Sync props if modal re-opens
   useEffect(() => {
@@ -119,16 +120,25 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
   const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
 
-  // Auto calculate fee dynamically based on court, date, startTime, and duration
+  // Determine if selected court is for Pickleball (derived early for use in useEffect)
+  const isPickleball = selectedCourt
+    ? (selectedCourt.type.toLowerCase().includes('pickleball') || selectedCourt.name.toLowerCase().includes('pickleball'))
+    : false;
+
+  // Auto calculate fee dynamically based on court, date, startTime, duration, sport and memberType
   useEffect(() => {
     if (selectedCourt) {
+      const sportTypeCasted = isPickleball ? 'pickleball' : 'badminton';
+      const customerTypeCasted = (!isPickleball && memberType === 'MEMBER') ? 'member' : 'insidentil';
       const calc = calculateBookingFee(
         selectedCourt.id,
         date,
         startTime,
         durationHours,
         courtCount,
-        selectedCourt.pricePerHour
+        selectedCourt.pricePerHour,
+        customerTypeCasted,
+        sportTypeCasted
       );
       if (memberType === 'MEMBER') {
         const sessionCount = memberSchedule.sessionCount || 4;
@@ -137,13 +147,9 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         setCourtFee(calc.totalFee);
       }
     }
-  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount]);
+  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball]);
 
   if (!isOpen) return null;
-
-  const isPickleball = selectedCourt 
-    ? (selectedCourt.type.toLowerCase().includes('pickleball') || selectedCourt.name.toLowerCase().includes('pickleball'))
-    : false;
 
   // Calculate End Time
   const startHourNum = parseInt(startTime.split(':')[0], 10);

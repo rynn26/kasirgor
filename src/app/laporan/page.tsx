@@ -392,7 +392,7 @@ export default function LaporanPenjualanPage() {
             </p>
           </div>
           <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
-            {isOwner && !isLapangan && (
+            {!isLapangan && (
               <button
                 type="button"
                 onClick={() => setIsInputManualOpen(true)}
@@ -400,11 +400,11 @@ export default function LaporanPenjualanPage() {
                 title="Input Penjualan Kemarin / Manual"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>+ Input Data Kemarin</span>
+                <span>Input Data Kemarin</span>
               </button>
             )}
 
-            {isOwner && isLapangan && (
+            {isLapangan && (
               <button
                 type="button"
                 onClick={() => setIsInputManualBookingOpen(true)}
@@ -412,7 +412,7 @@ export default function LaporanPenjualanPage() {
                 title="Input Sewa Lapangan Kemarin / Manual"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>+ Input Sewa Kemarin</span>
+                <span>Input Sewa Kemarin</span>
               </button>
             )}
 

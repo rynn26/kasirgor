@@ -230,20 +230,39 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         const breakdown: Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }> = [];
         let totalSingleCourtFee = 0;
 
-        for (let i = 0; i < durationHours; i++) {
-          const currentH = startHour + i;
-          const timeSlotStr = `${currentH < 10 ? '0' : ''}${currentH}:00`;
-          const slot = get().getPriceForSlot(courtId, dateStr, timeSlotStr, fallbackPrice, customerType, sportType);
+        const isMemberSession = customerType === 'member' && sportType !== 'pickleball';
+
+        if (isMemberSession) {
+          // Member: flat fee per sesi (per kunjungan), TIDAK dikalikan durasi jam.
+          // memberDayPrice/memberNightPrice adalah harga flat 1x datang.
+          // Ambil harga berdasarkan slot jam mulai saja.
+          const startSlot = get().getPriceForSlot(courtId, dateStr, startTime, fallbackPrice, 'member', 'badminton');
+          const endHour = startHour + durationHours;
           breakdown.push({
-            hour: `${timeSlotStr} - ${currentH + 1 < 10 ? '0' : ''}${currentH + 1}:00`,
-            price: slot.price,
-            period: slot.period,
+            hour: `${startTime} - ${String(endHour).padStart(2, '0')}:00`,
+            price: startSlot.price,
+            period: startSlot.period,
           });
-          totalSingleCourtFee += slot.price;
+          totalSingleCourtFee = startSlot.price;
+        } else {
+          // Insidentil & Pickleball: per jam
+          for (let i = 0; i < durationHours; i++) {
+            const currentH = startHour + i;
+            const timeSlotStr = `${currentH < 10 ? '0' : ''}${currentH}:00`;
+            const slot = get().getPriceForSlot(courtId, dateStr, timeSlotStr, fallbackPrice, customerType, sportType);
+            breakdown.push({
+              hour: `${timeSlotStr} - ${currentH + 1 < 10 ? '0' : ''}${currentH + 1}:00`,
+              price: slot.price,
+              period: slot.period,
+            });
+            totalSingleCourtFee += slot.price;
+          }
         }
 
         const totalFee = totalSingleCourtFee * (courtCount || 1);
-        const ratePerHour = durationHours > 0 ? Math.round(totalSingleCourtFee / durationHours) : (fallbackPrice || 75000);
+        const ratePerHour = isMemberSession
+          ? totalSingleCourtFee // for member: ratePerHour = the flat session fee
+          : (durationHours > 0 ? Math.round(totalSingleCourtFee / durationHours) : (fallbackPrice || 75000));
 
         return {
           totalFee,

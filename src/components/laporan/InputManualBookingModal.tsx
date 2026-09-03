@@ -52,8 +52,20 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
   const [totalAmount, setTotalAmount] = useState<string>('160000');
   const [dpAmount, setDpAmount] = useState<string>('50000');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [cashierName, setCashierName] = useState('Owner');
+  const [cashierName, setCashierName] = useState('Kasir');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed.name) setCashierName(parsed.name);
+        } catch {}
+      }
+    }
+  }, []);
 
   useEffect(() => {
     loadFromDb();
@@ -72,6 +84,15 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
       setIsSubmitting(false);
       if (courts.length > 0 && !courtId) {
         setCourtId(courts[0].id);
+      }
+      if (typeof window !== 'undefined') {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            if (parsed.name) setCashierName(parsed.name);
+          } catch {}
+        }
       }
     }
   }, [isOpen, courts, courtId]);
@@ -199,7 +220,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase tracking-wide">
-                  Khusus Owner
+                  Input Manual / Kemarin
                 </span>
               </div>
               <h3 className="font-black text-base text-slate-900 leading-tight mt-0.5">

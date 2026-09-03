@@ -46,7 +46,7 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
 
   const [date, setDate] = useState(yesterdayStr());
   const [time, setTime] = useState('17:00');
-  const [cashierName, setCashierName] = useState('Owner Toko');
+  const [cashierName, setCashierName] = useState('Kasir');
   const [customerName, setCustomerName] = useState('Pelanggan Umum');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [inputMode, setInputMode] = useState<'REKAP' | 'DETAIL'>('REKAP');
@@ -60,6 +60,18 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed.name) setCashierName(parsed.name);
+        } catch {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (products.length === 0) {
       loadProducts();
     }
@@ -71,6 +83,15 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
       setTime('17:00');
       setSelectedItems([]);
       setIsSubmitting(false);
+      if (typeof window !== 'undefined') {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            if (parsed.name) setCashierName(parsed.name);
+          } catch {}
+        }
+      }
     }
   }, [isOpen]);
 
@@ -211,7 +232,7 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10px] uppercase tracking-wide">
-                  Khusus Owner
+                  Input Manual / Kemarin
                 </span>
               </div>
               <h3 className="font-black text-base text-slate-900 leading-tight mt-0.5">

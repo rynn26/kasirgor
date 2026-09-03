@@ -49,12 +49,13 @@ export default function InputDpBookingPage() {
   const router = useRouter();
   const { addBooking, courts, loadCourts } = useCourtBookingStore();
   const { cashierName, selectedShift } = useShiftStore();
-  const { calculateBookingFee } = useCourtPricingStore();
+  const { calculateBookingFee, loadFromDb: loadPricingFromDb } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
-  // Load courts from Supabase on mount
+  // Load courts + pricing rules from Supabase on mount
   useEffect(() => {
     loadCourts();
+    loadPricingFromDb();
   }, []);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -113,22 +114,28 @@ export default function InputDpBookingPage() {
   const [totalSewa, setTotalSewa] = useState<number>(150000);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [baseRatePerHour, setBaseRatePerHour] = useState<number>(75000);
+  const [feeBreakdown, setFeeBreakdown] = useState<Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }>>([]);
   const netTotalSewa = Math.max(0, totalSewa - (discountAmount || 0));
   const sisaPembayaran = Math.max(0, netTotalSewa - (dpAmount || 0));
 
-  // Dynamic fee calculation based on time and month
+  // Dynamic fee calculation based on time, month, sport type, and member type
   useEffect(() => {
     const firstCourt = courts.find((c) => selectedCourtIds.includes(c.id)) || courts[0];
     if (firstCourt) {
+      const sportTypeCasted = selectedSport === 'Pickleball' ? 'pickleball' : 'badminton';
+      const customerTypeCasted = (selectedSport !== 'Pickleball' && memberType === 'MEMBER') ? 'member' : 'insidentil';
       const calc = calculateBookingFee(
         firstCourt.id,
         date,
         startTime,
         calculatedDuration,
         courtCount,
-        firstCourt.pricePerHour
+        firstCourt.pricePerHour,
+        customerTypeCasted,
+        sportTypeCasted
       );
       setBaseRatePerHour(calc.ratePerHour);
+      setFeeBreakdown(calc.breakdown);
       if (memberType === 'MEMBER') {
         const sessionCount = memberSchedule.sessionCount || 4;
         setTotalSewa(calc.totalFee * sessionCount);
@@ -136,7 +143,7 @@ export default function InputDpBookingPage() {
         setTotalSewa(calc.totalFee);
       }
     }
-  }, [selectedCourtIds, date, startTime, calculatedDuration, courtCount, memberType, memberSchedule.sessionCount]);
+  }, [selectedCourtIds, date, startTime, calculatedDuration, courtCount, memberType, selectedSport, memberSchedule.sessionCount]);
 
   // Calculate max courts and available courts depending on sport
   const maxCourts = selectedSport === 'Pickleball' ? 2 : 4;
@@ -647,6 +654,52 @@ export default function InputDpBookingPage() {
             </div>
           </div>
         </div>
+
+        {/* Rincian Tarif */}
+        {feeBreakdown.length >= 1 && (
+          <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-2xl space-y-1.5">
+            <p className="text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>
+                {memberType === 'MEMBER'
+                  ? 'Tarif Member Per Sesi (Flat / Sekali Kunjungan)'
+                  : 'Rincian Tarif Per Jam (Otomatis sesuai Pricelist)'}
+              </span>
+            </p>
+            {feeBreakdown.map((slot, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px]">
+                <span className="text-blue-800 font-semibold">
+                  {memberType === 'MEMBER' ? 'Flat Fee 1x Kunjungan' : `Jam ${slot.hour}`}
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                    slot.period === 'Malam'
+                      ? 'bg-indigo-100 text-indigo-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {slot.period}
+                  </span>
+                </span>
+                <span className="font-black text-blue-950">Rp {slot.price.toLocaleString('id-ID')}</span>
+              </div>
+            ))}
+            {memberType === 'MEMBER' && memberSchedule.sessionCount > 1 && (
+              <div className="flex items-center justify-between text-[11px] text-blue-700 font-semibold">
+                <span>× {memberSchedule.sessionCount} sesi dalam bulan ini</span>
+                <span className="font-black text-blue-950">
+                  = Rp {(feeBreakdown[0]?.price * memberSchedule.sessionCount * (courtCount || 1)).toLocaleString('id-ID')}
+                </span>
+              </div>
+            )}
+            <div className="pt-1 border-t border-blue-200 flex items-center justify-between text-[11px]">
+              <span className="font-bold text-blue-900">
+                {memberType === 'MEMBER' ? 'Total Paket Bulan Ini' : 'Total Otomatis'}
+              </span>
+              <span className="font-black text-blue-950">
+                Rp {totalSewa.toLocaleString('id-ID')}
+                {courtCount > 1 && memberType !== 'MEMBER' ? ` × ${courtCount} lapangan` : ''}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Total Bersih Banner (Jika Ada Diskon) */}
         {discountAmount > 0 && (
