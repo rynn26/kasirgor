@@ -80,23 +80,31 @@ export default function BookingLapanganPage() {
 
   // Filtered bookings
   const filteredBookings = bookings.filter((b) => {
-    // Match date if specified
-    if (selectedDate && b.date !== selectedDate) return false;
-
-    // Match status tab
-    if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
-
-    // Match search query
+    // If search query is present, search across all bookings regardless of selected date
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return (
+      const matchSearch = (
         b.bookingCode.toLowerCase().includes(q) ||
         b.customerName.toLowerCase().includes(q) ||
         b.phone.toLowerCase().includes(q) ||
         b.courtName.toLowerCase().includes(q) ||
-        (b.communityName && b.communityName.toLowerCase().includes(q))
+        (b.communityName && b.communityName.toLowerCase().includes(q)) ||
+        b.date.includes(q)
       );
+      if (!matchSearch) return false;
+      if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+      return true;
     }
+
+    // Match date if specified (also match recurring member dates)
+    if (selectedDate && b.date !== selectedDate) {
+      const matchMember = Array.isArray(b.memberDates) && b.memberDates.includes(selectedDate);
+      if (!matchMember) return false;
+    }
+
+    // Match status tab
+    if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+
     return true;
   });
 
@@ -142,12 +150,29 @@ export default function BookingLapanganPage() {
 
         {/* Header Right Controls: Date Picker, History, Setting & Unit Switcher */}
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-800">
-            <Calendar className="w-3.5 h-3.5 text-slate-500 mr-2" />
+          <div
+            onClick={(e) => {
+              const input = e.currentTarget.querySelector('input');
+              if (input && e.target !== input) {
+                try {
+                  input.showPicker?.();
+                } catch {
+                  input.focus();
+                }
+              }
+            }}
+            className="flex items-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-800 transition-colors cursor-pointer"
+          >
+            <Calendar className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker?.();
+                } catch {}
+              }}
               className="bg-transparent focus:outline-none cursor-pointer"
             />
           </div>

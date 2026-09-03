@@ -55,7 +55,7 @@ export default function DashboardUnifiedPage() {
     loadTransactions();
     const today = new Date().toISOString().split('T')[0];
     loadCourts();
-    loadBookings(today);
+    loadBookings();
     setIsMounted(true);
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 11) {

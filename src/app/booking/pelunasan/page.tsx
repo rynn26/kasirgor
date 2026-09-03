@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
@@ -25,6 +25,8 @@ export default function PelunasanBookingPage() {
   const router = useRouter();
   const { bookings, loadBookings } = useCourtBookingStore();
   const { cashierName } = useShiftStore();
+
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadBookings();
@@ -56,16 +58,21 @@ export default function PelunasanBookingPage() {
     if (activeFilterTab === 'DP' && !isDP) return false;
     if (activeFilterTab === 'LUNAS' && !isLunas) return false;
 
-    // Date filter
-    if (selectedDateFilter && bkg.date !== selectedDateFilter) return false;
+    // Date filter (matches play date, booking transaction date, or recurring member dates)
+    if (selectedDateFilter) {
+      const matchPlayDate = bkg.date === selectedDateFilter;
+      const matchBookingDate = bkg.bookingDate === selectedDateFilter;
+      const matchMemberDates = Array.isArray(bkg.memberDates) && bkg.memberDates.includes(selectedDateFilter);
+      if (!matchPlayDate && !matchBookingDate && !matchMemberDates) return false;
+    }
 
-    // Search query (name, phone, bookingCode, courtName, communityName)
+    // Search query (name, phone, bookingCode, courtName, communityName, date)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = bkg.customerName.toLowerCase().includes(q);
       const matchCode = bkg.bookingCode.toLowerCase().includes(q);
       const matchPhone = bkg.phone.toLowerCase().includes(q);
-      const matchDate = bkg.date.toLowerCase().includes(q);
+      const matchDate = bkg.date.toLowerCase().includes(q) || (bkg.bookingDate ? bkg.bookingDate.toLowerCase().includes(q) : false);
       const matchCourt = bkg.courtName.toLowerCase().includes(q);
       return matchName || matchCode || matchPhone || matchDate || matchCourt;
     }
@@ -144,26 +151,32 @@ export default function PelunasanBookingPage() {
           {/* Date Picker Button / Input */}
           <div className="relative">
             <input
+              ref={dateInputRef}
               type="date"
               value={selectedDateFilter}
               onChange={(e) => setSelectedDateFilter(e.target.value)}
-              className="sr-only"
-              id="date-filter-picker"
-            />
-            <label
-              htmlFor="date-filter-picker"
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as HTMLInputElement).showPicker?.();
+                } catch {}
+              }}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
               title={selectedDateFilter ? `Filter: ${selectedDateFilter}` : 'Pilih Tanggal'}
-              className={`p-2.5 sm:px-3.5 py-2.5 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+            />
+            <div
+              className={`p-2.5 sm:px-3.5 py-2.5 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
                 selectedDateFilter
                   ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
               }`}
             >
-              <Calendar className="w-4 h-4" />
-              {selectedDateFilter && (
-                <span className="text-[11px] hidden sm:inline">{selectedDateFilter}</span>
+              <Calendar className="w-4 h-4 shrink-0" />
+              {selectedDateFilter ? (
+                <span className="text-[11px] font-semibold whitespace-nowrap">{selectedDateFilter}</span>
+              ) : (
+                <span className="text-[11px] hidden sm:inline text-slate-600 font-medium">Tanggal</span>
               )}
-            </label>
+            </div>
           </div>
 
           {selectedDateFilter && (
@@ -171,7 +184,7 @@ export default function PelunasanBookingPage() {
               type="button"
               onClick={() => setSelectedDateFilter('')}
               title="Hapus Filter Tanggal"
-              className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
+              className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

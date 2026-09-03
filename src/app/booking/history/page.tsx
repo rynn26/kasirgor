@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
@@ -31,6 +31,8 @@ import { exportCourtBookingsToExcel, printCourtBookingsPDF } from '@/lib/exportU
 export default function HistoryBookingPage() {
   const { bookings, loadBookings, deleteBooking, cancelBooking } = useCourtBookingStore();
   const { showToast } = useToastStore();
+
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadBookings();
@@ -81,8 +83,13 @@ export default function HistoryBookingPage() {
       }
     }
 
-    // Date filter
-    if (selectedDate && bkg.date !== selectedDate) return false;
+    // Date filter (matches play date, booking date, or recurring member dates)
+    if (selectedDate) {
+      const matchPlayDate = bkg.date === selectedDate;
+      const matchBookingDate = bkg.bookingDate === selectedDate;
+      const matchMemberDates = Array.isArray(bkg.memberDates) && bkg.memberDates.includes(selectedDate);
+      if (!matchPlayDate && !matchBookingDate && !matchMemberDates) return false;
+    }
 
     return true;
   });
@@ -236,24 +243,32 @@ export default function HistoryBookingPage() {
 
           <div className="relative">
             <input
+              ref={dateInputRef}
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="sr-only"
-              id="history-date-picker"
-            />
-            <label
-              htmlFor="history-date-picker"
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as HTMLInputElement).showPicker?.();
+                } catch {}
+              }}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
               title={selectedDate ? `Tanggal: ${selectedDate}` : 'Filter Tanggal'}
-              className={`p-2.5 sm:px-3 py-2.5 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+            />
+            <div
+              className={`p-2.5 sm:px-3 py-2.5 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all ${
                 selectedDate
                   ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
                   : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
               }`}
             >
-              <Calendar className="w-4 h-4" />
-              {selectedDate && <span className="text-[11px] hidden sm:inline">{selectedDate}</span>}
-            </label>
+              <Calendar className="w-4 h-4 shrink-0" />
+              {selectedDate ? (
+                <span className="text-[11px] font-semibold whitespace-nowrap">{selectedDate}</span>
+              ) : (
+                <span className="text-[11px] hidden sm:inline text-slate-600 font-medium">Tanggal</span>
+              )}
+            </div>
           </div>
 
           {selectedDate && (
@@ -261,7 +276,7 @@ export default function HistoryBookingPage() {
               type="button"
               onClick={() => setSelectedDate('')}
               title="Reset Tanggal"
-              className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
+              className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

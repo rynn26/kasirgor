@@ -57,7 +57,8 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
   loadBookings: async (date?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const bookings = await fetchBookings(date || get().selectedDate);
+      // If date is provided, fetch for that date; otherwise fetch all bookings so pelunasan, history, and schedule pages have all data
+      const bookings = await fetchBookings(date);
       set({ bookings, isLoading: false });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal memuat booking', isLoading: false });
@@ -162,6 +163,11 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
 
   getBookingsForDate: (date) => {
     const { bookings } = get();
-    return bookings.filter((b) => b.date === date && b.status !== 'CANCELLED');
+    return bookings.filter((b) => {
+      if (b.status === 'CANCELLED') return false;
+      if (b.date === date) return true;
+      if (Array.isArray(b.memberDates) && b.memberDates.includes(date)) return true;
+      return false;
+    });
   },
 }));

@@ -128,7 +128,7 @@ export async function fetchCourts(): Promise<Court[]> {
 export async function fetchBookings(date?: string): Promise<CourtBooking[]> {
   let query = supabase
     .from('court_bookings')
-    .select('*')
+    .select('*, booking_additional_items(*)')
     .order('created_at', { ascending: false });
 
   if (date) {
@@ -136,23 +136,21 @@ export async function fetchBookings(date?: string): Promise<CourtBooking[]> {
   }
 
   const { data, error } = await query;
-  if (error) throw error;
-
-  const bookings: CourtBooking[] = [];
-
-  for (const row of data as DbCourtBooking[]) {
-    const { data: items } = await supabase
-      .from('booking_additional_items')
+  if (error) {
+    let fallbackQuery = supabase
+      .from('court_bookings')
       .select('*')
-      .eq('booking_id', row.id);
-
-    const additionalItems = (items as DbAdditionalItem[] || []).map(
-      mapDbAdditionalItem
-    );
-    bookings.push(mapDbToBooking(row, additionalItems));
+      .order('created_at', { ascending: false });
+    if (date) fallbackQuery = fallbackQuery.eq('date', date);
+    const { data: fbData, error: fbError } = await fallbackQuery;
+    if (fbError) throw fbError;
+    return (fbData as DbCourtBooking[]).map((row) => mapDbToBooking(row, []));
   }
 
-  return bookings;
+  return (data || []).map((row: any) => {
+    const additionalItems = (row.booking_additional_items || []).map(mapDbAdditionalItem);
+    return mapDbToBooking(row, additionalItems);
+  });
 }
 
 export async function fetchBookingById(id: string): Promise<CourtBooking | null> {
