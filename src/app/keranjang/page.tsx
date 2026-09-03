@@ -10,6 +10,8 @@ import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { PaymentMethod, Transaction } from '@/types/pos';
 import { formatRupiah, formatNumber, parseNumberInput, generateInvoiceNumber } from '@/lib/utils';
+import { usePosDraftStore } from '@/lib/store/usePosDraftStore';
+import { PosDraftModal } from '@/components/pos/PosDraftModal';
 import { 
   PlusCircle, 
   Minus, 
@@ -23,7 +25,9 @@ import {
   ArrowRight,
   Tag,
   X,
-  Percent
+  Percent,
+  Layers,
+  BookmarkPlus
 } from 'lucide-react';
 
 export default function KeranjangPage() {
@@ -49,6 +53,8 @@ export default function KeranjangPage() {
   const { addTransaction } = useTransactionStore();
   const { showToast } = useToastStore();
 
+  const { drafts, saveDraft } = usePosDraftStore();
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
   const [activeCashier, setActiveCashier] = useState('Yuli');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -56,6 +62,23 @@ export default function KeranjangPage() {
   const [discountValueLocal, setDiscountValueLocal] = useState<number>(
     discountType === 'percent' ? discountPercent : discountAmount
   );
+
+  const handleHoldToDraft = () => {
+    if (items.length === 0) return;
+    saveDraft({
+      customerName: customerName.trim() || undefined,
+      tableOrCourtNumber: tableOrCourtNumber.trim() || undefined,
+      items: [...items],
+      discountAmount,
+      discountPercent,
+      discountType,
+      subtotal,
+      grandTotal,
+      totalItems: totalItemsCount,
+    });
+    clearCart();
+    showToast('Pesanan berhasil disimpan ke Draft!');
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -169,14 +192,45 @@ export default function KeranjangPage() {
           </div>
         </div>
 
-        {/* Cart Icon Button */}
-        <div className="p-2.5 rounded-xl bg-red-50 text-[#b92b10] border border-red-100 relative flex items-center justify-center">
-          <ShoppingCart className="w-5 h-5" />
-          {totalItemsCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#b92b10] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-              {totalItemsCount}
-            </span>
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2">
+          {/* Tombol Menu Draft */}
+          <button
+            type="button"
+            onClick={() => setIsDraftModalOpen(true)}
+            title="Daftar Draft Pesanan"
+            className="p-2.5 rounded-xl bg-slate-50 text-slate-700 hover:text-[#b92b10] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center"
+          >
+            <Layers className="w-5 h-5" />
+            {drafts.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                {drafts.length}
+              </span>
+            )}
+          </button>
+
+          {/* Tombol Simpan ke Draft jika ada item */}
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleHoldToDraft}
+              title="Simpan / Tahan Pesanan (Hold)"
+              className="px-2.5 py-2 rounded-xl text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <BookmarkPlus className="w-4 h-4 text-amber-600" />
+              <span>Hold</span>
+            </button>
           )}
+
+          {/* Cart Icon Button */}
+          <div className="p-2.5 rounded-xl bg-red-50 text-[#b92b10] border border-red-100 relative flex items-center justify-center">
+            <ShoppingCart className="w-5 h-5" />
+            {totalItemsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#b92b10] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                {totalItemsCount}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -483,6 +537,12 @@ export default function KeranjangPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Daftar Draft Pesanan Toko */}
+      <PosDraftModal
+        isOpen={isDraftModalOpen}
+        onClose={() => setIsDraftModalOpen(false)}
+      />
     </div>
   );
 }

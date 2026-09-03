@@ -28,6 +28,9 @@ import {
 import { CreateDpBookingModal } from '@/components/booking/CreateDpBookingModal';
 import { SettlementModal } from '@/components/booking/SettlementModal';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
+import { BookingDraftModal } from '@/components/booking/BookingDraftModal';
+import { useBookingDraftStore } from '@/lib/store/useBookingDraftStore';
+import { Layers } from 'lucide-react';
 
 export default function BookingLapanganPage() {
   const router = useRouter();
@@ -45,6 +48,9 @@ export default function BookingLapanganPage() {
   const [_activeTab, setActiveTab] = useState<'LIST' | 'GRID'>('LIST');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DP_PAID' | 'SETTLED' | 'IN_PLAY'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { drafts: bookingDrafts } = useBookingDraftStore();
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
 
   // Modals state
   const [isDpModalOpen, setIsDpModalOpen] = useState(false);
@@ -163,6 +169,22 @@ export default function BookingLapanganPage() {
             <HistoryIcon className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Riwayat Nota</span>
           </Link>
+
+          {/* Tombol Menu Draft Booking */}
+          <button
+            type="button"
+            onClick={() => setIsDraftModalOpen(true)}
+            title="Buka Draft Booking Tersimpan"
+            className="px-3 py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs relative"
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-700" />
+            <span className="hidden sm:inline">Draft</span>
+            {bookingDrafts.length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-black flex items-center justify-center">
+                {bookingDrafts.length}
+              </span>
+            )}
+          </button>
 
           <button
             type="button"
@@ -516,6 +538,12 @@ export default function BookingLapanganPage() {
           setIsReceiptOpen(false);
           setReceiptBooking(null);
         }}
+      />
+
+      {/* Modal 4: Daftar Draft Booking */}
+      <BookingDraftModal
+        isOpen={isDraftModalOpen}
+        onClose={() => setIsDraftModalOpen(false)}
       />
     </div>
   );

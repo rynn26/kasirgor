@@ -4,6 +4,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useCartStore } from '@/lib/store/useCartStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
+import { usePosDraftStore } from '@/lib/store/usePosDraftStore';
+import { useToastStore } from '@/lib/store/useToastStore';
+import { PosDraftModal } from '@/components/pos/PosDraftModal';
 import { 
   ShoppingCart, 
   Trash2, 
@@ -15,7 +18,9 @@ import {
   PlusCircle, 
   ArrowRight,
   RotateCcw,
-  X
+  X,
+  Layers,
+  BookmarkPlus
 } from 'lucide-react';
 
 interface CartSidebarProps {
@@ -42,6 +47,10 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
     getTotalItems,
   } = useCartStore();
 
+  const { drafts, saveDraft } = usePosDraftStore();
+  const { showToast } = useToastStore();
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+
   const [isEditingDiscount, setIsEditingDiscount] = useState(false);
   const [discountValInput, setDiscountValInput] = useState<number>(
     discountType === 'percent' ? discountPercent : discountAmount
@@ -61,33 +70,80 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
     setIsEditingDiscount(false);
   };
 
+  const handleHoldOrderToDraft = () => {
+    if (items.length === 0) return;
+    saveDraft({
+      customerName: customerName.trim() || undefined,
+      tableOrCourtNumber: tableOrCourtNumber.trim() || undefined,
+      items: [...items],
+      discountAmount,
+      discountPercent,
+      discountType,
+      subtotal,
+      grandTotal,
+      totalItems: totalItemsCount,
+    });
+    clearCart();
+    showToast('Pesanan berhasil ditahan & disimpan ke Draft!');
+  };
+
   return (
     <aside className="w-full lg:w-96 flex flex-col h-full bg-[#f8fafc] border-l border-slate-200 shadow-lg">
       {/* Top Header */}
-      <div className="p-4 border-b border-slate-200 bg-white flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-red-50 text-[#b92b10] border border-red-100 flex items-center justify-center">
+      <div className="p-4 border-b border-slate-200 bg-white flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-2 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-red-50 text-[#b92b10] border border-red-100 flex items-center justify-center shrink-0">
             <ShoppingCart className="w-4 h-4" />
           </div>
-          <div>
-            <h2 className="font-bold text-sm text-slate-900">Pesanan Saat Ini</h2>
-            <p className="text-[11px] text-slate-500">
+          <div className="min-w-0">
+            <h2 className="font-bold text-sm text-slate-900 truncate">Pesanan Kasir</h2>
+            <p className="text-[11px] text-slate-500 truncate">
               {totalItemsCount} item terpilih
             </p>
           </div>
         </div>
 
-        {items.length > 0 && (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Tombol Menu Draft */}
           <button
             type="button"
-            onClick={clearCart}
-            title="Bersihkan Keranjang"
-            className="flex items-center gap-1 px-2.5 py-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer font-bold"
+            onClick={() => setIsDraftModalOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs text-slate-700 hover:text-[#b92b10] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer font-bold relative"
+            title="Buka Daftar Draft Pesanan"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset</span>
+            <Layers className="w-3.5 h-3.5" />
+            <span>Draft</span>
+            {drafts.length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#b92b10] text-white text-[10px] font-black flex items-center justify-center -mr-1">
+                {drafts.length}
+              </span>
+            )}
           </button>
-        )}
+
+          {/* Tombol Simpan ke Draft jika ada item */}
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleHoldOrderToDraft}
+              title="Simpan / Tahan Pesanan ke Draft (Hold)"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer font-bold"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5" />
+              <span>Hold</span>
+            </button>
+          )}
+
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={clearCart}
+              title="Bersihkan Keranjang"
+              className="p-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Optional Customer / Queue Info */}
@@ -368,6 +424,12 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ onOpenPayment }) => {
           </button>
         </div>
       )}
+
+      {/* Modal Daftar Draft Pesanan Toko */}
+      <PosDraftModal
+        isOpen={isDraftModalOpen}
+        onClose={() => setIsDraftModalOpen(false)}
+      />
     </aside>
   );
 };

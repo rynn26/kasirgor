@@ -10,15 +10,19 @@ import { ReceiptModal } from '@/components/pos/ReceiptModal';
 import { CartRestoreNotice } from '@/components/common/CartRestoreNotice';
 import { useCartStore } from '@/lib/store/useCartStore';
 import { useProductStore } from '@/lib/store/useProductStore';
+import { usePosDraftStore } from '@/lib/store/usePosDraftStore';
+import { PosDraftModal } from '@/components/pos/PosDraftModal';
 import { formatRupiah } from '@/lib/utils';
 import { Transaction } from '@/types/pos';
-import { ShoppingCart, ArrowRight } from 'lucide-react';
+import { ShoppingCart, ArrowRight, Layers } from 'lucide-react';
 
 export default function KasirPage() {
   const { items, getTotalItems, getGrandTotal } = useCartStore();
   const { loadProducts } = useProductStore();
+  const { drafts } = usePosDraftStore();
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isDraftOpen, setIsDraftOpen] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
   const [cashierName, setCashierName] = useState('Yuli');
 
@@ -63,19 +67,36 @@ export default function KasirPage() {
             </div>
           </div>
 
-          {/* Cart Icon Button (Replaces Notification) */}
-          <Link
-            href="/keranjang"
-            title="Buka Keranjang"
-            className="p-2.5 rounded-xl bg-slate-50 text-slate-700 hover:text-[#b92b10] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center"
-          >
-            <ShoppingCart className="w-5 h-5" />
-            {totalItemsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#b92b10] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-                {totalItemsCount}
-              </span>
-            )}
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Drafts Button */}
+            <button
+              type="button"
+              onClick={() => setIsDraftOpen(true)}
+              title="Daftar Draft Pesanan"
+              className="p-2.5 rounded-xl bg-slate-50 text-slate-700 hover:text-[#b92b10] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center"
+            >
+              <Layers className="w-5 h-5" />
+              {drafts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                  {drafts.length}
+                </span>
+              )}
+            </button>
+
+            {/* Cart Icon Button */}
+            <Link
+              href="/keranjang"
+              title="Buka Keranjang"
+              className="p-2.5 rounded-xl bg-slate-50 text-slate-700 hover:text-[#b92b10] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {totalItemsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#b92b10] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                  {totalItemsCount}
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
 
         {/* Restore notice: muncul jika ada sisa keranjang dari sesi sebelumnya */}
@@ -144,6 +165,12 @@ export default function KasirPage() {
           setIsReceiptOpen(false);
           setLastTransaction(null);
         }}
+      />
+
+      {/* Modal Draft Pesanan Toko */}
+      <PosDraftModal
+        isOpen={isDraftOpen}
+        onClose={() => setIsDraftOpen(false)}
       />
     </div>
   );
