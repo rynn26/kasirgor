@@ -86,7 +86,14 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
             </div>
 
             <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
-              <span className="text-slate-500 font-medium">Tanggal</span>
+              <span className="text-slate-500 font-medium">Tanggal Booking</span>
+              <span className="font-bold text-slate-900">
+                {booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : booking.date)}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+              <span className="text-slate-500 font-medium">Tanggal Main</span>
               <span className="font-bold text-slate-900">{booking.date}</span>
             </div>
 

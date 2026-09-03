@@ -17,7 +17,9 @@ import {
   CalendarCheck,
   Clock,
   Layers,
+  Plus,
 } from 'lucide-react';
+import { InputManualSaleModal } from '@/components/laporan/InputManualSaleModal';
 import { formatRupiah } from '@/lib/utils';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
@@ -74,12 +76,24 @@ export default function LaporanPenjualanPage() {
   const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan'>('kantin');
   const [period, setPeriod] = useState<PeriodType>('BULAN_INI');
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; amount: number } | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [isInputManualOpen, setIsInputManualOpen] = useState(false);
 
   useEffect(() => {
     loadTransactions();
     loadBookings();
     loadCourts();
-  }, []);
+
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          setIsOwner(parsed.role === 'owner');
+        } catch {}
+      }
+    }
+  }, [loadTransactions, loadBookings, loadCourts]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -375,7 +389,19 @@ export default function LaporanPenjualanPage() {
               {isLapangan ? 'Arena Lapangan GOR' : 'Kasir Toko & F&B'}
             </p>
           </div>
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
+            {isOwner && !isLapangan && (
+              <button
+                type="button"
+                onClick={() => setIsInputManualOpen(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
+                title="Input Penjualan Kemarin / Manual"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>+ Input Data Kemarin</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleExportExcel}
@@ -760,6 +786,15 @@ export default function LaporanPenjualanPage() {
           <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-800 transition-colors" />
         </Link>
       )}
+
+      {/* Modal Input Data Penjualan Kemarin (Khusus Owner) */}
+      <InputManualSaleModal
+        isOpen={isInputManualOpen}
+        onClose={() => setIsInputManualOpen(false)}
+        onSuccess={() => {
+          loadTransactions();
+        }}
+      />
     </div>
   );
 }

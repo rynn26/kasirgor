@@ -256,8 +256,11 @@ export default function PelunasanBookingPage() {
                 </div>
 
                 {/* Details Line 2: Date & Time range */}
-                <div className="text-xs font-semibold text-slate-700">
-                  {bkg.date} · {bkg.startTime} - {bkg.endTime}
+                <div className="text-xs font-semibold text-slate-700 flex flex-wrap items-center gap-x-2">
+                  <span>Main: {bkg.date} ({bkg.startTime} - {bkg.endTime})</span>
+                  {bkg.bookingDate && bkg.bookingDate !== bkg.date && (
+                    <span className="text-[11px] font-normal text-slate-500">· Booking: {bkg.bookingDate}</span>
+                  )}
                 </div>
 
                 {/* Details Line 3: Total & DP breakdown */}

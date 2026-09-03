@@ -334,7 +334,8 @@ export function exportCourtBookingsToExcel(
     [
       'No.',
       'Kode Booking',
-      'Tanggal',
+      'Tgl Booking',
+      'Tgl Main',
       'Nama Pemesan',
       'No. WhatsApp',
       'Kategori',
@@ -350,7 +351,7 @@ export function exportCourtBookingsToExcel(
   ];
 
   if (activeBookings.length === 0) {
-    data.push(['-', 'Belum ada data sewa lapangan pada periode ini', '-', '-', '-', '-', '-', '-', 0, 0, 0, 0, '-', '-']);
+    data.push(['-', 'Belum ada data sewa lapangan pada periode ini', '-', '-', '-', '-', '-', '-', '-', 0, 0, 0, 0, '-', '-']);
   } else {
     activeBookings.forEach((b, idx) => {
       const isMember = b.memberType === 'MEMBER' || b.communityName?.includes('Member');
@@ -361,6 +362,7 @@ export function exportCourtBookingsToExcel(
       data.push([
         idx + 1,
         b.bookingCode,
+        b.bookingDate || b.date,
         b.date,
         b.customerName,
         b.phone,
@@ -445,7 +447,10 @@ export function printCourtBookingsPDF(
         <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; font-size: 11px;">
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${escapeHtml(b.bookingCode)}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${b.date}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">
+            <div style="font-weight: bold;">${b.date}</div>
+            ${b.bookingDate && b.bookingDate !== b.date ? `<div style="font-size: 9px; color: #64748b;">Pesan: ${b.bookingDate}</div>` : ''}
+          </td>
           <td style="border: 1px solid #cbd5e1; padding: 6px 8px; font-weight: bold; color: #0f172a;">${escapeHtml(b.customerName)}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">
             <span style="display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; ${isMember ? 'background: #dbeafe; color: #1e40af;' : 'background: #f1f5f9; color: #475569;'}">

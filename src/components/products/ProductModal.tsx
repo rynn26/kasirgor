@@ -12,12 +12,9 @@ interface ProductModalProps {
 }
 
 const CATEGORIES: ProductCategory[] = [
-  'Peralatan & Raket',
-  'Aksesoris & Grip',
-  'Pakaian & Kaos Kaki',
+  'Makanan & Snack',
   'Minuman Dingin',
-  'Makanan',
-  'Snack & Cemilan',
+  'Perlengkapan Olahraga',
 ];
 
 export const ProductModal: React.FC<ProductModalProps> = ({
@@ -29,7 +26,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
-  const [category, setCategory] = useState<ProductCategory>('Peralatan & Raket');
+  const [category, setCategory] = useState<ProductCategory>('Makanan & Snack');
   const [price, setPrice] = useState<string>('');
   const [costPrice, setCostPrice] = useState<string>('');
   const [stock, setStock] = useState<string>('50');
@@ -41,7 +38,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     if (productToEdit) {
       setName(productToEdit.name);
       setSku(productToEdit.sku);
-      setCategory(productToEdit.category);
+      let cat = productToEdit.category;
+      if (cat === 'Makanan' || cat === 'Snack & Cemilan') cat = 'Makanan & Snack';
+      if (cat === 'Peralatan & Raket' || cat === 'Aksesoris & Grip' || cat === 'Pakaian & Kaos Kaki') cat = 'Perlengkapan Olahraga';
+      setCategory(cat);
       setPrice(productToEdit.price.toString());
       setCostPrice(productToEdit.costPrice?.toString() || '');
       setStock(productToEdit.stock.toString());
@@ -52,7 +52,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       // New product defaults
       setName('');
       setSku(`SKU-${Math.floor(100 + Math.random() * 900)}`);
-      setCategory('Peralatan & Raket');
+      setCategory('Makanan & Snack');
       setPrice('');
       setCostPrice('');
       setStock('50');

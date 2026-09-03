@@ -41,20 +41,13 @@ export default function ProdukPage() {
           </div>
         </div>
 
-        {/* Action Button: Only visible to Owner */}
-        {isOwner ? (
-          <Link
-            href="/produk/tambah"
-            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-[#eb4b2b] hover:bg-[#d43a1c] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-[#eb4b2b]/25 transition-all cursor-pointer"
-          >
-            <span>+ Tambah Produk</span>
-          </Link>
-        ) : (
-          <div className="px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-slate-400" />
-            <span>Mode Kasir: Lihat Katalog</span>
-          </div>
-        )}
+        {/* Action Button: Visible for both Owner and Kasir */}
+        <Link
+          href="/produk/tambah"
+          className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-[#eb4b2b] hover:bg-[#d43a1c] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-[#eb4b2b]/25 transition-all cursor-pointer"
+        >
+          <span>+ Tambah Produk</span>
+        </Link>
       </div>
 
       {/* Main Stock Table / Cards */}

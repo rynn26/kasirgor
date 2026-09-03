@@ -19,6 +19,7 @@ export interface DbCourtBooking {
   customer_name: string;
   phone: string;
   community_name: string | null;
+  booking_date?: string | null;
   date: string;
   court_id: string | null;
   court_name: string;
@@ -84,6 +85,7 @@ function mapDbToBooking(
     customerName: row.customer_name,
     phone: row.phone,
     communityName: row.community_name || undefined,
+    bookingDate: row.booking_date || (row.dp_paid_at ? row.dp_paid_at.split('T')[0] : (row.created_at ? row.created_at.split('T')[0] : row.date)),
     date: row.date,
     courtId: row.court_id || '',
     courtName: row.court_name,
@@ -205,7 +207,7 @@ export async function createBooking(
       total_amount: booking.totalAmount,
       dp_amount: booking.dpAmount,
       dp_payment_method: booking.dpPaymentMethod || null,
-      dp_paid_at: booking.dpPaidAt || null,
+      dp_paid_at: booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : null),
       dp_cashier: booking.dpCashier || null,
       amount_paid_total: booking.amountPaidTotal,
       remaining_balance: booking.remainingBalance,
@@ -350,6 +352,7 @@ export async function updateBooking(
     phone: string;
     communityName: string;
     memberType: 'MEMBER' | 'INSIDENTIL';
+    bookingDate: string;
     date: string;
     courtId: string;
     courtName: string;
@@ -362,6 +365,7 @@ export async function updateBooking(
     totalAmount: number;
     dpAmount: number;
     dpPaymentMethod: PaymentMethod;
+    dpPaidAt: string;
     settlementAmount: number;
     settlementPaymentMethod: PaymentMethod;
     amountPaidTotal: number;
@@ -374,6 +378,8 @@ export async function updateBooking(
   if (data.customerName !== undefined) updatePayload.customer_name = data.customerName;
   if (data.phone !== undefined) updatePayload.phone = data.phone;
   if (data.communityName !== undefined) updatePayload.community_name = data.communityName;
+  if (data.dpPaidAt !== undefined) updatePayload.dp_paid_at = data.dpPaidAt;
+  else if (data.bookingDate !== undefined) updatePayload.dp_paid_at = `${data.bookingDate}T12:00:00.000Z`;
   if (data.date !== undefined) updatePayload.date = data.date;
   if (data.courtId !== undefined) updatePayload.court_id = data.courtId;
   if (data.courtName !== undefined) updatePayload.court_name = data.courtName;

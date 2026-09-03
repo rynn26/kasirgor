@@ -124,6 +124,10 @@ export default function HistoryPage() {
         {filtered.length > 0 ? (
           filtered.map((tx) => {
             const isCancelled = tx.status === 'CANCELLED';
+            const itemSummary = tx.items && tx.items.length > 0
+              ? tx.items.map((i) => `${i.product.name} (${i.quantity})`).join(', ')
+              : 'Transaksi Kasir';
+
             return (
               <div
                 key={tx.id}
@@ -146,10 +150,10 @@ export default function HistoryPage() {
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className={`font-bold text-xs sm:text-sm truncate group-hover:text-[#b92b10] transition-colors font-mono ${
+                      <h4 className={`font-bold text-sm sm:text-base truncate group-hover:text-[#b92b10] transition-colors ${
                         isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
                       }`}>
-                        {tx.invoiceNumber}
+                        {itemSummary}
                       </h4>
                       {isCancelled && (
                         <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-red-100 text-red-600">
@@ -157,11 +161,9 @@ export default function HistoryPage() {
                         </span>
                       )}
                     </div>
-                    <p suppressHydrationWarning className="text-[11px] text-slate-500 mt-0.5 truncate">
-                      {isMounted ? formatDate(tx.createdAt, true) : '01 Sep 2026, 02:03:58'} •{' '}
-                      <span className="font-medium text-slate-700">
-                        {tx.items.map((i) => `${i.product.name} (${i.quantity})`).join(', ')}
-                      </span>
+                    <p suppressHydrationWarning className="text-[11px] sm:text-xs text-slate-500 mt-0.5 truncate">
+                      {isMounted ? formatDate(tx.createdAt, true) : '01 Sep 2026, 02:03:58'}
+                      {tx.customerName ? ` • ${tx.customerName}` : ''}
                     </p>
                   </div>
                 </div>

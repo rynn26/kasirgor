@@ -134,6 +134,8 @@ export async function createTransaction(
 ): Promise<Transaction> {
   const txId = crypto.randomUUID();
 
+  const txCreatedAt = transaction.createdAt || new Date().toISOString();
+
   const { error: txError } = await supabase.from('transactions').insert({
     id: txId,
     invoice_number: transaction.invoiceNumber,
@@ -150,6 +152,7 @@ export async function createTransaction(
     change_amount: transaction.change,
     status: transaction.status,
     notes: transaction.notes || null,
+    created_at: txCreatedAt,
   });
 
   if (txError) throw txError;
@@ -165,6 +168,7 @@ export async function createTransaction(
     quantity: item.quantity,
     discount_per_item: item.discountPerItem || 0,
     note: item.note || null,
+    created_at: txCreatedAt,
   }));
 
   const { error: itemsError } = await supabase

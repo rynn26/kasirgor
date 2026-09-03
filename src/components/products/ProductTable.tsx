@@ -36,16 +36,17 @@ export const ProductTable: React.FC = () => {
 
   const categories = [
     'Semua', 
-    'Makanan',
+    'Makanan & Snack',
     'Minuman Dingin',
-    'Snack & Cemilan',
-    'Peralatan & Raket', 
-    'Aksesoris & Grip', 
-    'Pakaian & Kaos Kaki', 
+    'Perlengkapan Olahraga',
   ];
 
   const filtered = products.filter((p) => {
-    const matchCategory = selectedCat === 'Semua' || p.category === selectedCat;
+    const matchCategory =
+      selectedCat === 'Semua' ||
+      p.category === selectedCat ||
+      (selectedCat === 'Makanan & Snack' && (p.category === 'Makanan' || p.category === 'Snack & Cemilan')) ||
+      (selectedCat === 'Perlengkapan Olahraga' && (p.category === 'Peralatan & Raket' || p.category === 'Aksesoris & Grip' || p.category === 'Pakaian & Kaos Kaki'));
     const matchSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchTerm.toLowerCase());
@@ -135,14 +136,25 @@ export const ProductTable: React.FC = () => {
 
                 {/* Bottom Row: Price & Stock Amount Summary + Quick Edit indicator */}
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-medium">
-                      Harga Jual
-                    </span>
-                    <span className="text-base font-black text-[#eb4b2b]">
-                      {formatRupiah(prod.price)}
-                    </span>
-                  </div>
+                  {isOwner ? (
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">
+                        Harga Jual
+                      </span>
+                      <span className="text-base font-black text-[#eb4b2b]">
+                        {formatRupiah(prod.price)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-medium">
+                        Harga
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400 italic">
+                        Khusus Owner
+                      </span>
+                    </div>
+                  )}
 
                   <div className="text-right flex items-center gap-2">
                     <div>

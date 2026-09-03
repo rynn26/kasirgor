@@ -1,11 +1,19 @@
 export type ProductCategory = 
   | 'Semua'
+  | 'Makanan & Snack'
+  | 'Minuman Dingin'
+  | 'Perlengkapan Olahraga'
+  | 'Makanan'
+  | 'Snack & Cemilan'
   | 'Peralatan & Raket'
   | 'Aksesoris & Grip'
-  | 'Pakaian & Kaos Kaki'
-  | 'Minuman Dingin'
-  | 'Makanan'
-  | 'Snack & Cemilan';
+  | 'Pakaian & Kaos Kaki';
+
+export const PRODUCT_CATEGORIES = [
+  'Makanan & Snack',
+  'Minuman Dingin',
+  'Perlengkapan Olahraga',
+] as const;
 
 export interface Product {
   id: string;

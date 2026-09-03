@@ -100,7 +100,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const { products, selectedCategory, searchQuery } = get();
     return products.filter((p) => {
       const matchCategory =
-        selectedCategory === 'Semua' || p.category === selectedCategory;
+        selectedCategory === 'Semua' ||
+        p.category === selectedCategory ||
+        (selectedCategory === 'Makanan & Snack' && (p.category === 'Makanan' || p.category === 'Snack & Cemilan')) ||
+        (selectedCategory === 'Perlengkapan Olahraga' && (p.category === 'Peralatan & Raket' || p.category === 'Aksesoris & Grip' || p.category === 'Pakaian & Kaos Kaki'));
       const matchSearch =
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||

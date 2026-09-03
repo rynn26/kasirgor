@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah } from '@/lib/utils';
-import { CourtBooking } from '@/types/booking';
-import { X, Search, Check, ReceiptText } from 'lucide-react';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
+import { CourtBooking, PaymentMethod } from '@/types/booking';
+import { X, Search, Check, ReceiptText, QrCode, Banknote } from 'lucide-react';
 
 interface SettlementModalProps {
   isOpen: boolean;
@@ -28,6 +28,8 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
   const [activeBookingId, setActiveBookingId] = useState<string | null>(selectedBookingId || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
+  const [cashReceived, setCashReceived] = useState<number>(0);
 
   // Filter pending/DP bookings
   const pendingBookings = bookings.filter(
@@ -53,25 +55,51 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     }
   }, [selectedBookingId, pendingBookings]);
 
-  if (!isOpen) return null;
-
   const currentBooking = bookings.find((b) => b.id === activeBookingId);
   const totalSettlementDue = currentBooking ? currentBooking.remainingBalance : 0;
+
+  useEffect(() => {
+    if (currentBooking) {
+      setCashReceived(currentBooking.remainingBalance);
+    }
+  }, [currentBooking?.id, currentBooking?.remainingBalance]);
+
+  if (!isOpen) return null;
+
+  const isCash = paymentMethod === 'CASH';
+  const cashChange = Math.max(0, (cashReceived || 0) - totalSettlementDue);
+  const isUnderpaid = isCash && (cashReceived || 0) > 0 && (cashReceived || 0) < totalSettlementDue;
+
+  const nextRound10k = Math.ceil(totalSettlementDue / 10000) * 10000;
+  const nextRound50k = Math.ceil(totalSettlementDue / 50000) * 50000;
+  const quickNominals = [
+    nextRound10k,
+    nextRound50k,
+    100000,
+    150000,
+    200000,
+  ].filter((v, i, a) => v > 0 && a.indexOf(v) === i && v > totalSettlementDue);
 
   const handleConfirmSettlement = async () => {
     if (!currentBooking) {
       showToast('Pilih booking yang ingin dilunasi');
       return;
     }
+
+    if (paymentMethod === 'CASH' && (cashReceived || 0) > 0 && (cashReceived || 0) < totalSettlementDue) {
+      showToast('Uang tunai yang diterima kurang dari total pelunasan');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const updated = await settleBooking(currentBooking.id, {
         settlementAmount: totalSettlementDue,
-        paymentMethod: 'CASH',
+        paymentMethod: paymentMethod,
         cashier: cashierName || 'Yuli',
         additionalItems: [],
       });
-      showToast(`Pelunasan ${currentBooking.customerName} berhasil diproses!`);
+      showToast(`Pelunasan ${currentBooking.customerName} via ${paymentMethod === 'QRIS' ? 'QRIS' : 'Cash'} berhasil diproses!`);
       onSuccess(updated);
     } catch {
       showToast('Gagal memproses pelunasan. Coba lagi.');
@@ -178,7 +206,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                     <h4 className="font-black text-sm text-slate-900">{currentBooking.customerName}</h4>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-semibold text-slate-500 block">{currentBooking.date}</span>
+                    <span className="text-[10px] font-semibold text-slate-500 block">Jadwal Main: {currentBooking.date}</span>
                     <span className="font-bold text-xs text-blue-700">{currentBooking.startTime} - {currentBooking.endTime} WIB</span>
                   </div>
                 </div>
@@ -209,6 +237,127 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
                   {formatRupiah(totalSettlementDue)}
                 </div>
               </div>
+
+              {/* Pilihan Metode Pembayaran Pelunasan (QRIS / Cash) */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
+                    Metode Pembayaran Pelunasan
+                  </label>
+                  <span className="text-[11px] font-bold text-blue-600">
+                    {paymentMethod === 'QRIS' ? 'QRIS Digital' : 'Tunai / Cash'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('QRIS')}
+                    className={`p-3 rounded-2xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      paymentMethod === 'QRIS'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20 ring-2 ring-blue-600/20'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>QRIS</span>
+                    {paymentMethod === 'QRIS' && <Check className="w-3.5 h-3.5 stroke-[3] ml-1" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethod('CASH');
+                      if (!cashReceived || cashReceived < totalSettlementDue) {
+                        setCashReceived(totalSettlementDue);
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      paymentMethod === 'CASH'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20 ring-2 ring-blue-600/20'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <Banknote className="w-4 h-4" />
+                    <span>Cash / Tunai</span>
+                    {paymentMethod === 'CASH' && <Check className="w-3.5 h-3.5 stroke-[3] ml-1" />}
+                  </button>
+                </div>
+
+                {/* Detail Jika Cash */}
+                {paymentMethod === 'CASH' && (
+                  <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-slate-600">
+                        Uang Tunai Diterima
+                      </label>
+                      <span className={`text-[11px] font-bold ${
+                        isUnderpaid ? 'text-rose-600' : 'text-emerald-600'
+                      }`}>
+                        {isUnderpaid
+                          ? `Kurang: ${formatRupiah(totalSettlementDue - (cashReceived || 0))}`
+                          : `Kembalian: ${formatRupiah(cashChange)}`}
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={cashReceived ? formatNumber(cashReceived) : ''}
+                        onChange={(e) => setCashReceived(parseNumberInput(e.target.value))}
+                        placeholder={formatNumber(totalSettlementDue) || '0'}
+                        className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-blue-600 transition-all"
+                      />
+                    </div>
+
+                    {/* Quick Nominals */}
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setCashReceived(totalSettlementDue)}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors cursor-pointer ${
+                          cashReceived === totalSettlementDue
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50'
+                        }`}
+                      >
+                        Uang Pas
+                      </button>
+                      {quickNominals.map((nom) => (
+                        <button
+                          key={nom}
+                          type="button"
+                          onClick={() => setCashReceived(nom)}
+                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-colors cursor-pointer ${
+                            cashReceived === nom
+                              ? 'bg-blue-600 text-white border-blue-600 font-bold'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {formatRupiah(nom)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detail Jika QRIS */}
+                {paymentMethod === 'QRIS' && (
+                  <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl flex items-center gap-2.5 text-blue-900">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                      <QrCode className="w-4 h-4" />
+                    </div>
+                    <div className="text-xs">
+                      <span className="font-bold block">Pembayaran QRIS</span>
+                      <span className="text-[11px] text-blue-700 font-medium">
+                        Pelanggan scan barcode QRIS senilai <span className="font-bold text-blue-900">{formatRupiah(totalSettlementDue)}</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -225,7 +374,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
 
           <button
             type="button"
-            disabled={!currentBooking || isProcessing}
+            disabled={!currentBooking || isProcessing || isUnderpaid}
             onClick={handleConfirmSettlement}
             className="flex-[2] py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-blue-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
@@ -237,3 +386,4 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     </div>
   );
 };
+

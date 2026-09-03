@@ -55,6 +55,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
   const [phone, setPhone] = useState('');
   const [selectedSport, setSelectedSport] = useState('Badminton');
   const [memberType, setMemberType] = useState<'MEMBER' | 'INSIDENTIL'>('INSIDENTIL');
+  const [bookingDate, setBookingDate] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('19:00');
   const [endTime, setEndTime] = useState('21:00');
@@ -69,7 +70,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (booking) {
+    if (booking && isOpen) {
       setCustomerName(booking.customerName || '');
       setPhone(booking.phone || '');
       const isPickleball = booking.communityName?.includes('Pickleball') || booking.courtName.toLowerCase().includes('pickleball');
@@ -77,6 +78,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       setSelectedSport(sport);
       const isMem = booking.memberType === 'MEMBER' || booking.communityName?.toLowerCase().includes('member');
       setMemberType(sport === 'Badminton' && isMem ? 'MEMBER' : 'INSIDENTIL');
+      setBookingDate(booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : booking.date));
       setDate(booking.date || '');
       setStartTime(booking.startTime || '19:00');
       setEndTime(booking.endTime || '21:00');
@@ -172,7 +174,9 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
           ? (memberType === 'MEMBER' ? 'Badminton (Member)' : 'Badminton (Insidentil)')
           : 'Pickleball (Insidentil)',
         memberType: selectedSport === 'Badminton' ? memberType : 'INSIDENTIL',
+        bookingDate,
         date,
+        dpPaidAt: bookingDate ? `${bookingDate}T12:00:00.000Z` : booking.dpPaidAt,
         courtId: selectedCourtIds[0] || booking.courtId || courts[0]?.id || '',
         courtName: selectedCourtsNames,
         courtPricePerHour: baseRatePerHour,
@@ -324,11 +328,28 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
             )}
           </div>
 
-          {/* Date, Start Time & End Time */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Tanggal Booking & Tanggal Main */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div className="space-y-1">
               <label className="font-bold text-slate-800 flex items-center gap-1">
-                <span>Tanggal</span>
+                <span>Tanggal Booking / DP</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="w-3.5 h-3.5 text-[#b92b10] absolute left-3 top-2.5" />
+                <input
+                  type="date"
+                  required
+                  value={bookingDate}
+                  onChange={(e) => setBookingDate(e.target.value)}
+                  className="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-[#b92b10] cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-slate-800 flex items-center gap-1">
+                <span>Tanggal Main</span>
                 <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -342,7 +363,10 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                 />
               </div>
             </div>
+          </div>
 
+          {/* Jam Mulai & Jam Selesai */}
+          <div className="grid grid-cols-2 gap-2.5">
             <div className="space-y-1">
               <label className="font-bold text-slate-800 flex items-center gap-1">
                 <span>Jam Mulai</span>

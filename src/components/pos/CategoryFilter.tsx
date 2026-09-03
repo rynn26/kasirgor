@@ -6,23 +6,15 @@ import { useProductStore } from '@/lib/store/useProductStore';
 
 const CATEGORIES: ProductCategory[] = [
   'Semua',
-  'Makanan',
+  'Makanan & Snack',
   'Minuman Dingin',
-  'Snack & Cemilan',
-  'Peralatan & Raket',
-  'Aksesoris & Grip',
-  'Pakaian & Kaos Kaki',
+  'Perlengkapan Olahraga',
 ];
 
 export const CategoryFilter: React.FC = () => {
   const { selectedCategory, setSelectedCategory } = useProductStore();
 
   const getDisplayName = (cat: ProductCategory) => {
-    if (cat === 'Minuman Dingin') return 'Minuman';
-    if (cat === 'Snack & Cemilan') return 'Snack';
-    if (cat === 'Peralatan & Raket') return 'Peralatan';
-    if (cat === 'Aksesoris & Grip') return 'Aksesoris';
-    if (cat === 'Pakaian & Kaos Kaki') return 'Pakaian';
     return cat;
   };
 

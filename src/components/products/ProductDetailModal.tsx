@@ -40,7 +40,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const { showToast } = useToastStore();
 
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<ProductCategory>('Makanan');
+  const [category, setCategory] = useState<ProductCategory>('Makanan & Snack');
   const [sku, setSku] = useState('');
   const [price, setPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
@@ -52,7 +52,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   useEffect(() => {
     if (product) {
       setName(product.name);
-      setCategory(product.category);
+      let cat = product.category;
+      if (cat === 'Makanan' || cat === 'Snack & Cemilan') cat = 'Makanan & Snack';
+      if (cat === 'Peralatan & Raket' || cat === 'Aksesoris & Grip' || cat === 'Pakaian & Kaos Kaki') cat = 'Perlengkapan Olahraga';
+      setCategory(cat);
       setSku(product.sku);
       setPrice(product.price ? String(product.price) : '');
       setCostPrice(product.costPrice ? String(product.costPrice) : '');
@@ -76,7 +79,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       showToast('Nama produk tidak boleh kosong');
       return;
     }
-    if (numPrice <= 0) {
+    if (isOwner && numPrice <= 0) {
       showToast('Harga jual harus lebih dari 0');
       return;
     }
@@ -86,8 +89,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         name,
         category,
         sku,
-        price: numPrice,
-        costPrice: numCost > 0 ? numCost : undefined,
+        price: isOwner ? numPrice : product.price,
+        costPrice: isOwner ? (numCost > 0 ? numCost : undefined) : product.costPrice,
         stock,
         unit,
         description: description.trim() || undefined,
@@ -95,6 +98,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       });
       showToast(`Produk "${name}" berhasil diperbarui`);
       setIsEditing(false);
+      onClose();
     } catch (err) {
       showToast('Gagal memperbarui produk. Coba lagi.');
     }
@@ -250,12 +254,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 onChange={(e) => setCategory(e.target.value as ProductCategory)}
                 className="w-full px-3.5 py-2.5 bg-white disabled:bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b] cursor-pointer"
               >
-                <option value="Makanan">Makanan</option>
+                <option value="Makanan & Snack">Makanan & Snack</option>
                 <option value="Minuman Dingin">Minuman Dingin</option>
-                <option value="Snack & Cemilan">Snack & Cemilan</option>
-                <option value="Peralatan & Raket">Peralatan & Raket</option>
-                <option value="Aksesoris & Grip">Aksesoris & Grip</option>
-                <option value="Pakaian & Kaos Kaki">Pakaian & Kaos Kaki</option>
+                <option value="Perlengkapan Olahraga">Perlengkapan Olahraga</option>
               </select>
             </div>
 
@@ -274,89 +275,86 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
 
           {/* Pricing Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Harga Jual */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">Harga Jual (Rp) *</label>
-              <input
-                type="number"
-                required
-                disabled={!isOwner}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white disabled:bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-bold focus:outline-none focus:border-[#eb4b2b]"
-              />
-            </div>
+          {isOwner ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Harga Jual */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">Harga Jual (Rp) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-bold focus:outline-none focus:border-[#eb4b2b]"
+                  />
+                </div>
 
-            {/* Harga Modal */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">Harga Modal (Rp)</label>
-              <input
-                type="number"
-                disabled={!isOwner}
-                value={costPrice}
-                onChange={(e) => setCostPrice(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white disabled:bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b]"
-              />
-            </div>
-          </div>
+                {/* Harga Modal */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">Harga Modal (Rp)</label>
+                  <input
+                    type="number"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b]"
+                  />
+                </div>
+              </div>
 
-          {/* Margin Keuntungan Preview */}
-          {numPrice > 0 && numCost > 0 && (
-            <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs flex items-center justify-between text-emerald-800">
-              <span className="font-medium flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                Estimasi Profit / Margin:
-              </span>
-              <span className="font-black text-emerald-700">
-                {formatRupiah(margin)} / {unit} ({marginPercent}%)
-              </span>
+              {/* Margin Keuntungan Preview */}
+              {numPrice > 0 && numCost > 0 && (
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs flex items-center justify-between text-emerald-800">
+                  <span className="font-medium flex items-center gap-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                    Estimasi Profit / Margin:
+                  </span>
+                  <span className="font-black text-emerald-700">
+                    {formatRupiah(margin)} / {unit} ({marginPercent}%)
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs flex items-center gap-2.5 text-slate-600">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Harga modal & harga jual hanya dapat dilihat dan diatur oleh <strong>Owner</strong>.</span>
             </div>
           )}
 
           {/* ============================================================ */}
-          {/* 4. ACTIONS (Save & Delete for Owner, Close for Kasir) */}
+          {/* 4. ACTIONS */}
           {/* ============================================================ */}
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-            {isOwner ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="px-3.5 py-2.5 rounded-xl text-red-600 hover:bg-red-50 border border-red-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
-                  title="Hapus Produk"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Hapus</span>
-                </button>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="px-3.5 py-2.5 rounded-xl text-red-600 hover:bg-red-50 border border-red-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Hapus Produk"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Hapus</span>
+              </button>
+            )}
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 rounded-xl"
-                  >
-                    Tutup
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-[#eb4b2b] hover:bg-[#d43a1c] text-white font-bold text-xs shadow-md shadow-[#eb4b2b]/25 transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>Simpan Perubahan</span>
-                  </button>
-                </div>
-              </>
-            ) : (
+            <div className={`flex items-center space-x-2 ${!isOwner ? 'w-full justify-end' : ''}`}>
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
+                className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 rounded-xl cursor-pointer"
               >
                 Tutup
               </button>
-            )}
+
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl bg-[#eb4b2b] hover:bg-[#d43a1c] text-white font-bold text-xs shadow-md shadow-[#eb4b2b]/25 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Simpan Perubahan</span>
+              </button>
+            </div>
           </div>
         </form>
 

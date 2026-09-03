@@ -44,11 +44,13 @@ export const RecentTransactionsTable: React.FC = () => {
               </div>
 
               <div className="min-w-0">
-                <h4 className="font-mono font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-[#b92b10] transition-colors">
-                  {tx.invoiceNumber}
+                <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-[#b92b10] transition-colors">
+                  {tx.items && tx.items.length > 0
+                    ? tx.items.map((i) => `${i.product.name} (${i.quantity})`).join(', ')
+                    : tx.invoiceNumber}
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  {formatDate(tx.createdAt, true)} • {tx.items.length} item
+                  {formatDate(tx.createdAt, true)}
                 </p>
               </div>
             </div>

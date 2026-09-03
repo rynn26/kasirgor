@@ -61,6 +61,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   // Form State
   const [courtId, setCourtId] = useState(initialCourtId || courts[0]?.id || 'court-00001');
   const [courtCount, setCourtCount] = useState(1);
+  const [bookingDate, setBookingDate] = useState(todayStr);
   const [date, setDate] = useState(initialDate || todayStr);
   const [selectedMemberDayIndex, setSelectedMemberDayIndex] = useState<number>(() => {
     const d = new Date();
@@ -201,6 +202,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       memberDay: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.dayName : undefined,
       memberSessionsCount: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.sessionCount : undefined,
       memberDates: (!isPickleball && memberType === 'MEMBER') ? memberSchedule.dates : undefined,
+      bookingDate,
       date: firstDate,
       courtId: selectedCourt?.id || courtId || '',
       courtName: courtNameLabel,
@@ -214,7 +216,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       totalAmount: finalTotal,
       dpAmount: finalTotal,
       dpPaymentMethod: paymentMethod,
-      dpPaidAt: new Date().toISOString(),
+      dpPaidAt: bookingDate ? `${bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : new Date().toISOString(),
       dpCashier: cashierName || 'Yuli',
       settlementAmount: finalTotal,
       settlementPaymentMethod: paymentMethod,
@@ -266,6 +268,26 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <span>1. Waktu & Durasi Bermain</span>
             </label>
+
+            {/* Tanggal Booking */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-600">
+                  Tanggal Booking
+                </label>
+                <span className="text-[10px] text-slate-400">
+                  (Tgl pesan / bayar DP)
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={bookingDate}
+                  onChange={(e) => setBookingDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#b92b10]"
+                />
+              </div>
+            </div>
 
             {/* Date, Start Time, Court Count & Duration */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

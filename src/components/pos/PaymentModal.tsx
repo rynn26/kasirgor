@@ -11,7 +11,8 @@ import {
   X, 
   Banknote, 
   QrCode, 
-  AlertCircle
+  AlertCircle,
+  Calendar
 } from 'lucide-react';
 
 interface PaymentModalProps {
@@ -43,16 +44,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const subtotal = getSubtotal();
   const discountTotal = getDiscountTotal();
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [transactionDate, setTransactionDate] = useState(todayStr);
+  const [isOwner, setIsOwner] = useState(false);
+
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [cashReceived, setCashReceived] = useState<number>(grandTotal);
   const [inputCashStr, setInputCashStr] = useState<string>(grandTotal.toString());
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          setIsOwner(parsed.role === 'owner');
+        } catch {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
+      setTransactionDate(todayStr);
       setCashReceived(grandTotal);
       setInputCashStr(grandTotal > 0 ? grandTotal.toString() : '');
     }
-  }, [isOpen, grandTotal]);
+  }, [isOpen, grandTotal, todayStr]);
 
   const change = Math.max(0, cashReceived - grandTotal);
   const isUnderpaid = paymentMethod === 'CASH' && cashReceived < grandTotal;
@@ -69,9 +87,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     const finalAmountPaid = paymentMethod === 'CASH' ? cashReceived : grandTotal;
     const finalChange = paymentMethod === 'CASH' ? change : 0;
 
+    const nowTime = new Date().toTimeString().slice(0, 8);
+    const finalCreatedAt = isOwner && transactionDate
+      ? new Date(`${transactionDate}T${nowTime}`).toISOString()
+      : new Date().toISOString();
+
     const newTxData: Omit<Transaction, 'id'> = {
       invoiceNumber: generateInvoiceNumber(),
-      createdAt: new Date().toISOString(),
+      createdAt: finalCreatedAt,
       cashierName,
       customerName: customerName.trim() || 'Pelanggan Umum',
       tableOrCourtNumber: tableOrCourtNumber.trim() || undefined,
@@ -144,6 +167,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               {items.reduce((s, i) => s + i.quantity, 0)} Item
             </span>
           </div>
+
+          {/* Opsi Khusus Owner: Tanggal Transaksi (Bisa Input Data Kemarin / Backdate) */}
+          {isOwner && (
+            <div className="bg-amber-50/70 rounded-2xl p-3.5 border border-amber-200/90 space-y-1.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Tanggal Transaksi (Khusus Owner)</span>
+                </span>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-200">
+                  Bisa pilih tgl kemarin
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Card: Metode Pembayaran (Cash & QRIS) */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-3">

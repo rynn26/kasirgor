@@ -16,7 +16,7 @@ export default function TambahProdukOwnerPage() {
 
   // Form State
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<any>('Makanan');
+  const [category, setCategory] = useState<string>('Makanan & Snack');
   const [unit, setUnit] = useState('pcs');
   const [costPrice, setCostPrice] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
@@ -48,7 +48,7 @@ export default function TambahProdukOwnerPage() {
       return;
     }
 
-    if (!sellingPrice || Number(sellingPrice) <= 0) {
+    if (isOwner && (!sellingPrice || Number(sellingPrice) <= 0)) {
       showToast('Silakan masukkan harga jual yang valid');
       return;
     }
@@ -56,14 +56,14 @@ export default function TambahProdukOwnerPage() {
     setIsSubmitting(true);
 
     try {
-      const numPrice = Number(sellingPrice) || 0;
-      const numCostPrice = Number(costPrice) || 0;
+      const numPrice = isOwner ? (Number(sellingPrice) || 0) : 0;
+      const numCostPrice = isOwner ? (Number(costPrice) || 0) : 0;
       const numStock = Number(stock) || 0;
       const autoSku = `PRD-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await addProduct({
         name,
-        category: category || 'Makanan',
+        category: (category || 'Makanan & Snack') as any,
         sku: autoSku,
         price: numPrice,
         costPrice: numCostPrice > 0 ? numCostPrice : undefined,
@@ -73,7 +73,10 @@ export default function TambahProdukOwnerPage() {
         isAvailable: numStock > 0,
       });
 
-      showToast(`Produk "${name}" berhasil disimpan ke database`);
+      showToast(isOwner 
+        ? `Produk "${name}" berhasil disimpan ke database` 
+        : `Produk "${name}" berhasil diinput! Penetapan harga akan ditentukan oleh Owner.`
+      );
       router.push('/produk');
     } catch (err: any) {
       console.error('Gagal simpan produk:', err);
@@ -84,49 +87,11 @@ export default function TambahProdukOwnerPage() {
     }
   };
 
-  // If user is Cashier, block access and display notification
-  if (isOwner === false) {
-    return (
-      <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-4">
-        <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center border border-slate-200 shadow-xl space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-xs">
-            <Lock className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-1">
-            <h2 className="text-lg font-black text-slate-900">Akses Dibatasi</h2>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Hanya akun dengan peran <strong>Owner / Pemilik</strong> yang memiliki wewenang untuk menambah produk baru ke inventori toko.
-            </p>
-          </div>
-
-          <div className="pt-2 space-y-2">
-            <button
-              type="button"
-              onClick={() => router.push('/produk')}
-              className="w-full py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer"
-            >
-              Kembali ke Katalog Produk
-            </button>
-
-            <button
-              type="button"
-              onClick={() => router.push('/kasir')}
-              className="w-full py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-            >
-              Masuk ke Kasir POS
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-full bg-[#f8fafc] max-w-md mx-auto relative pb-32">
+    <div className="min-h-screen bg-[#f8fafc] pb-24 max-w-2xl mx-auto">
       
       {/* ============================================================ */}
-      {/* 1. HEADER: ← Tambah Produk */}
+      {/* TOP NAVBAR */}
       {/* ============================================================ */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 py-3.5 border-b border-slate-100 flex items-center justify-between">
         <button
@@ -139,7 +104,7 @@ export default function TambahProdukOwnerPage() {
         </button>
 
         <h1 className="text-base font-bold text-[#eb4b2b] tracking-tight">
-          Tambah Produk (Owner)
+          {isOwner ? 'Tambah Produk (Owner)' : 'Tambah Produk Baru (Kasir)'}
         </h1>
 
         <div className="w-7" />
@@ -182,12 +147,9 @@ export default function TambahProdukOwnerPage() {
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b] cursor-pointer"
               >
-                <option value="Makanan">Makanan</option>
+                <option value="Makanan & Snack">Makanan & Snack</option>
                 <option value="Minuman Dingin">Minuman Dingin</option>
-                <option value="Snack & Cemilan">Snack & Cemilan</option>
-                <option value="Peralatan & Raket">Peralatan & Raket</option>
-                <option value="Aksesoris & Grip">Aksesoris & Grip</option>
-                <option value="Pakaian & Kaos Kaki">Pakaian & Kaos Kaki</option>
+                <option value="Perlengkapan Olahraga">Perlengkapan Olahraga</option>
               </select>
             </div>
 
@@ -210,48 +172,60 @@ export default function TambahProdukOwnerPage() {
         {/* ============================================================ */}
         {/* CARD 2: HARGA */}
         {/* ============================================================ */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
-          <h2 className="text-xs sm:text-sm font-bold text-slate-900">
-            Harga
-          </h2>
+        {isOwner ? (
+          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-900">
+              Harga
+            </h2>
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Harga Modal */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-700 block">
-                Harga Modal
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={costPrice ? formatNumber(costPrice) : ''}
-                  onChange={(e) => setCostPrice(parseNumberInput(e.target.value).toString())}
-                  placeholder="Contoh: 10.000"
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
-                />
+            <div className="grid grid-cols-2 gap-3">
+              {/* Harga Modal */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Harga Modal
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={costPrice ? formatNumber(costPrice) : ''}
+                    onChange={(e) => setCostPrice(parseNumberInput(e.target.value).toString())}
+                    placeholder="Contoh: 10.000"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Harga Jual */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-700 block">
-                Harga Jual
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  required
-                  value={sellingPrice ? formatNumber(sellingPrice) : ''}
-                  onChange={(e) => setSellingPrice(parseNumberInput(e.target.value).toString())}
-                  placeholder="Contoh: 15.000"
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-bold placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
-                />
+              {/* Harga Jual */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Harga Jual *
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={sellingPrice ? formatNumber(sellingPrice) : ''}
+                    onChange={(e) => setSellingPrice(parseNumberInput(e.target.value).toString())}
+                    placeholder="Contoh: 15.000"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-bold placeholder-slate-400 focus:outline-none focus:border-[#eb4b2b] focus:ring-1 focus:ring-[#eb4b2b]/20 transition-all"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-slate-700 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+              <Lock className="w-4 h-4 text-amber-600" />
+              <span>Harga Modal & Harga Jual Dilindungi</span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Sebagai Kasir, Anda dapat menginput nama produk, kategori, dan stok fisik. Penetapan harga modal dan harga jual hanya dapat dilihat dan diatur oleh <strong>Owner</strong>.
+            </p>
+          </div>
+        )}
 
         {/* ============================================================ */}
         {/* CARD 3: STOK & INVENTORI */}

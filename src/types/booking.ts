@@ -30,7 +30,8 @@ export interface CourtBooking {
   memberDay?: string;
   memberSessionsCount?: number;
   memberDates?: string[];
-  date: string; // YYYY-MM-DD
+  bookingDate?: string; // YYYY-MM-DD (Tanggal Booking / Pemesanan)
+  date: string; // YYYY-MM-DD (Tanggal Main Lapangan)
   courtId: string;
   courtName: string;
   courtType: CourtType;

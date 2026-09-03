@@ -56,10 +56,12 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
   const handleCopyWhatsApp = () => {
     const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
 
+    const bookingDateStr = booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : '');
+
     const text = `*BUKTI BOOKING LAPANGAN - ${shopName}*
 ----------------------------------------
 Nama: *${booking.customerName}*
-${isMember ? `Kategori: *Member Bulanan (Rutin Tiap Minggu)*\n` : ''}${booking.notes ? `Jadwal Pertemuan: ${booking.notes}\n` : ''}Tanggal: *${booking.date}*
+${isMember ? `Kategori: *Member Bulanan (Rutin Tiap Minggu)*\n` : ''}${booking.notes ? `Jadwal Pertemuan: ${booking.notes}\n` : ''}${bookingDateStr ? `Tgl Booking: *${bookingDateStr}*\n` : ''}Tgl Main: *${booking.date}*
 Waktu: *${booking.startTime} - ${booking.endTime} WIB* (${booking.durationHours} Jam)
 ----------------------------------------
 Total Biaya Sewa: ${formatRupiah(booking.courtFee)}
@@ -81,13 +83,15 @@ Terima kasih telah bermain di ${shopName}!`;
     }
 
     const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
+    const bookingDateStr = booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : '');
 
     const message = encodeURIComponent(
       `Halo Kak *${booking.customerName}*, berikut bukti reservasi lapangan di *${shopName}*:\n\n` +
       `👤 *Nama*: ${booking.customerName}\n` +
       (isMember ? `🏷️ *Kategori*: Member Bulanan (Rutin Tiap Minggu)\n` : '') +
       (booking.notes ? `🗓️ *Jadwal Member*: ${booking.notes}\n` : '') +
-      `📅 *Tanggal*: ${booking.date}\n` +
+      (bookingDateStr ? `📝 *Tgl Booking*: ${bookingDateStr}\n` : '') +
+      `📅 *Tgl Main*: ${booking.date}\n` +
       `⏰ *Waktu*: ${booking.startTime} - ${booking.endTime} WIB (${booking.durationHours} Jam)\n` +
       `💰 *Total*: ${formatRupiah(booking.totalAmount)}\n` +
       `💳 *DP Diterima*: ${formatRupiah(booking.dpAmount)}\n` +
@@ -152,8 +156,8 @@ Terima kasih telah bermain di ${shopName}!`;
             {/* Detail Transaksi */}
             <div className="space-y-1 text-[10px] py-1 border-b border-dashed border-gray-300">
               <div className="flex justify-between">
-                <span className="text-gray-600">Tanggal Transaksi:</span>
-                <span>{formatDate(booking.createdAt, true)}</span>
+                <span className="text-gray-600">Tanggal Booking:</span>
+                <span>{booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : formatDate(booking.createdAt, false))}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Nama:</span>
@@ -175,7 +179,7 @@ Terima kasih telah bermain di ${shopName}!`;
             {/* Detail Sewa Lapangan */}
             <div className="py-2 border-b border-dashed border-gray-300 space-y-1.5">
               <div className="flex justify-between text-[10px] text-gray-700">
-                <span>Jadwal Main:</span>
+                <span>Tanggal Main:</span>
                 <span className="font-semibold">{booking.date}</span>
               </div>
               <div className="flex justify-between text-[10px] text-gray-700">

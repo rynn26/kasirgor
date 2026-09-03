@@ -190,7 +190,7 @@ export const BottomNav: React.FC = () => {
       { name: 'Beranda', href: '/dashboard', icon: Home },
       { name: 'Transaksi', href: '/kasir', icon: Store },
       { name: 'Produk', href: '/produk', icon: Package },
-      { name: 'History', href: '/history', icon: BarChart3 },
+      { name: 'Laporan', href: '/laporan', icon: BarChart3 },
     ];
 
   return (

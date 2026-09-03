@@ -64,6 +64,7 @@ export default function InputDpBookingPage() {
   const [phone, setPhone] = useState('');
   const [selectedSport, setSelectedSport] = useState('Badminton');
   const [memberType, setMemberType] = useState<'MEMBER' | 'INSIDENTIL'>('INSIDENTIL');
+  const [bookingDate, setBookingDate] = useState(todayStr);
   const [date, setDate] = useState(todayStr);
   const [selectedMemberDayIndex, setSelectedMemberDayIndex] = useState<number>(() => {
     const d = new Date();
@@ -76,7 +77,6 @@ export default function InputDpBookingPage() {
   const [dpAmount, setDpAmount] = useState<number>(100000);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
-  const [notes, setNotes] = useState('');
 
   // Auto calculate member weekly sessions in month
   const memberSchedule = React.useMemo(() => {
@@ -222,14 +222,19 @@ export default function InputDpBookingPage() {
       : 'Pickleball (Insidentil)';
 
     const finalNotes = memberType === 'MEMBER'
-      ? `Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})${notes.trim() ? ` • ${notes.trim()}` : ''}`
-      : (notes.trim() || undefined);
+      ? `Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})`
+      : undefined;
 
     const firstDate = memberType === 'MEMBER' && memberSchedule.dates.length > 0
       ? memberSchedule.dates[0]
       : date;
 
     const remaining = Math.max(0, netTotalSewa - finalDp);
+
+    const nowTime = new Date().toTimeString().slice(0, 8);
+    const finalDpPaidAt = bookingDate 
+      ? new Date(`${bookingDate}T${nowTime}`).toISOString() 
+      : new Date().toISOString();
 
     const newBooking = await addBooking({
       customerName: finalCustomerName,
@@ -239,6 +244,7 @@ export default function InputDpBookingPage() {
       memberDay: memberType === 'MEMBER' ? memberSchedule.dayName : undefined,
       memberSessionsCount: memberType === 'MEMBER' ? memberSchedule.sessionCount : undefined,
       memberDates: memberType === 'MEMBER' ? memberSchedule.dates : undefined,
+      bookingDate,
       date: firstDate,
       courtId: selectedCourtIds[0] || courts[0]?.id || '',
       courtName: selectedCourtsNames,
@@ -252,7 +258,7 @@ export default function InputDpBookingPage() {
       totalAmount: netTotalSewa,
       dpAmount: finalDp,
       dpPaymentMethod: paymentMethod,
-      dpPaidAt: new Date().toISOString(),
+      dpPaidAt: finalDpPaidAt,
       dpCashier: cashierName || 'Yuli',
       amountPaidTotal: finalDp,
       remainingBalance: remaining,
@@ -460,7 +466,30 @@ export default function InputDpBookingPage() {
           </div>
         )}
 
-        {/* 3. Tanggal */}
+        {/* Tanggal Booking */}
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span className="flex items-center gap-1">
+              <span>Tanggal Booking</span>
+              <span className="text-red-500">*</span>
+            </span>
+            <span className="text-[11px] text-slate-400 font-medium">
+              Tanggal pesan / bayar DP
+            </span>
+          </label>
+          <div className="relative">
+            <Calendar className="w-4 h-4 text-[#b92b10] absolute left-3.5 top-3" />
+            <input
+              type="date"
+              required
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+              className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white cursor-pointer"
+            />
+          </div>
+        </div>
+
+        {/* 3. Tanggal Main */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
             <span className="flex items-center gap-1">
@@ -737,21 +766,7 @@ export default function InputDpBookingPage() {
           </div>
         )}
 
-        {/* 8. Catatan (Opsional) */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-slate-800">
-            Catatan (Opsional)
-          </label>
-          <input
-            type="text"
-            placeholder="Contoh: DP untuk 2 lapangan"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-medium text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
-          />
-        </div>
-
-        {/* 9. Tombol Submit Simpan DP */}
+        {/* 8. Tombol Submit Simpan DP */}
         <div className="pt-2">
           <button
             type="submit"
