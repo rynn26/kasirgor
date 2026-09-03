@@ -301,7 +301,11 @@ export default function LaporanPenjualanPage() {
     // Court breakdown
     const courtMap: Record<string, { amount: number; hours: number }> = {};
     filtered.forEach((b) => {
-      const key = b.courtName;
+      const cleanName = (b.courtName || '')
+        .replace(/\s*\([^)]*VIP[^)]*\)/gi, '')
+        .replace(/\s*\([^)]*Vinyl[^)]*\)/gi, '')
+        .trim();
+      const key = cleanName || b.courtName || 'Lapangan 1';
       if (!courtMap[key]) courtMap[key] = { amount: 0, hours: 0 };
       courtMap[key].amount += b.amountPaidTotal;
       courtMap[key].hours += b.durationHours;

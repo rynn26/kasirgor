@@ -160,7 +160,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
 
     try {
       const courtName = selectedCourt?.name || 'Lapangan 1';
-      const courtType = selectedCourt?.type || 'VIP Vinyl BWF';
+      const courtType = selectedCourt?.type || 'Karpet';
       const isPb = selectedSport === 'Pickleball';
       const finalCommunityName = isPb
         ? 'Pickleball (Insidentil)'

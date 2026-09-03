@@ -330,7 +330,7 @@ export default function InputDpBookingPage() {
       date: firstDate,
       courtId: selectedCourtIds[0] || courts[0]?.id || '',
       courtName: selectedCourtsNames,
-      courtType: courts.find((c) => c.id === selectedCourtIds[0])?.type || courts[0]?.type || 'VIP Vinyl BWF',
+      courtType: courts.find((c) => c.id === selectedCourtIds[0])?.type || courts[0]?.type || 'Karpet',
       courtPricePerHour: baseRatePerHour,
       startTime,
       endTime,

@@ -202,7 +202,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       date: firstDate,
       courtId: selectedCourt?.id || courtId || '',
       courtName: courtNameLabel,
-      courtType: selectedCourt?.type || 'VIP Vinyl BWF',
+      courtType: selectedCourt?.type || 'Karpet',
       courtPricePerHour: Math.round(finalTotal / (durationHours * courtCount || 1)),
       startTime,
       endTime,
