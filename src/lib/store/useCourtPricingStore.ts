@@ -11,13 +11,13 @@ import {
 export interface TimeSlotPricing {
   // Pagi-Sore (Insidentil Badminton)
   dayPrice: number;
-  dayStart: string; // default "07:00"
-  dayEnd: string;   // default "18:00"
+  dayStart: string; // default "08:00"
+  dayEnd: string;   // default "17:00"
 
   // Sore-Malam (Insidentil Badminton)
   nightPrice: number;
-  nightStart: string; // default "18:00"
-  nightEnd: string;   // default "24:00"
+  nightStart: string; // default "17:00"
+  nightEnd: string;   // default "23:00"
 
   // Member Badminton
   memberDayPrice: number;
@@ -42,13 +42,13 @@ export interface PricingRule {
 export const DEFAULT_PRICING: TimeSlotPricing = {
   // Slot 1: Pagi-Sore (Insidentil Badminton)
   dayPrice: 60000,
-  dayStart: '07:00',
-  dayEnd: '18:00',
+  dayStart: '08:00',
+  dayEnd: '17:00',
 
   // Slot 2: Sore-Malam (Insidentil Badminton)
   nightPrice: 85000,
-  nightStart: '18:00',
-  nightEnd: '24:00',
+  nightStart: '17:00',
+  nightEnd: '23:00',
 
   // Member Badminton (default sama dengan insidentil)
   memberDayPrice: 60000,
@@ -60,8 +60,8 @@ export const DEFAULT_PRICING: TimeSlotPricing = {
 
   // Legacy (DB compat) — mirrors nightPrice
   afternoonPrice: 85000,
-  afternoonStart: '18:00',
-  afternoonEnd: '24:00',
+  afternoonStart: '17:00',
+  afternoonEnd: '23:00',
 };
 
 interface CourtPricingState {

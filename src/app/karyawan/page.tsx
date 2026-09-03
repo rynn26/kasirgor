@@ -685,7 +685,7 @@ export default function ManajemenKaryawanPage() {
                 <label className="text-xs font-bold text-slate-700 block">Penugasan Unit Operasional</label>
                 <select
                   value={assignedUnit}
-                  onChange={(e) => setAssignedUnit(e.target.value as any)}
+                  onChange={(e) => setAssignedUnit(e.target.value as 'Kasir Toko & F&B' | 'Booking Lapangan' | 'Semua Unit')}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b] focus:bg-white cursor-pointer"
                 >
                   <option value="Kasir Toko & F&B">Kasir Toko & F&B</option>

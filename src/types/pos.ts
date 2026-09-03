@@ -23,6 +23,7 @@ export interface Product {
   price: number;
   costPrice?: number;
   stock: number;
+  minimumStock?: number; // batas stok minimum sebelum dianggap menipis
   unit: string; // 'pcs', 'slop', 'botol', 'porsi', 'pasang', etc.
   image?: string;
   barcode?: string;
@@ -37,7 +38,7 @@ export interface CartItem {
   note?: string;
 }
 
-export type PaymentMethod = 'CASH' | 'QRIS' | 'TRANSFER' | 'DEBIT';
+export type PaymentMethod = 'CASH' | 'QRIS';
 
 export interface Transaction {
   id: string;

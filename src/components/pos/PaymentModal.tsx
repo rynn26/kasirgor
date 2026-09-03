@@ -111,25 +111,38 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     };
 
     try {
-      // 1. Simpan transaksi ke Supabase
-      const saved = await addTransaction(newTxData);
-
-      // 2. Potong stok di Supabase (await to ensure stock is updated)
+      // Deduct stock first, then save transaction only if stock deduction succeeds
       for (const item of items) {
         await updateStock(item.product.id, -item.quantity);
       }
 
-      // 3. Efek Confetti
+      // Save transaction to Supabase; roll back stock if this fails
+      let saved: Transaction;
+      try {
+        saved = await addTransaction(newTxData);
+      } catch (txErr) {
+        // Rollback stock deductions
+        for (const item of items) {
+          try {
+            await updateStock(item.product.id, item.quantity);
+          } catch {
+            console.error('Stock rollback failed for product:', item.product.id);
+          }
+        }
+        throw txErr;
+      }
+
+      // Efek Confetti
       confetti({
         particleCount: 90,
         spread: 70,
         origin: { y: 0.6 },
       });
 
-      // 4. Callback sukses dengan transaksi yang sudah disimpan
+      // Callback sukses dengan transaksi yang sudah disimpan
       onSuccess(saved);
 
-      // 5. Bersihkan keranjang & tutup modal
+      // Bersihkan keranjang & tutup modal
       clearCart();
       onClose();
     } catch (err) {

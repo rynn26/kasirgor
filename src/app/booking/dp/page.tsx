@@ -7,24 +7,18 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
-import { CourtBooking, PaymentMethod } from '@/types/booking';
-import { 
-  ArrowLeft, 
-  User, 
-  Calendar, 
-  Clock, 
-  Plus, 
-  Minus, 
-  QrCode, 
-  Banknote, 
-  Building2, 
-  CreditCard, 
-  Check, 
-  X, 
-  Info,
-  Phone,
-  Sparkles,
-  ShieldCheck,
+import { CourtBooking } from '@/types/booking';
+import { PaymentMethod } from '@/types/pos';
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  Plus,
+  Minus,
+  QrCode,
+  Banknote,
+  Check,
+  X,
   CheckCircle2,
   Repeat,
   Tag
@@ -136,12 +130,9 @@ export default function InputDpBookingPage() {
       );
       setBaseRatePerHour(calc.ratePerHour);
       setFeeBreakdown(calc.breakdown);
-      if (memberType === 'MEMBER') {
-        const sessionCount = memberSchedule.sessionCount || 4;
-        setTotalSewa(calc.totalFee * sessionCount);
-      } else {
-        setTotalSewa(calc.totalFee);
-      }
+      // Harga memberDayPrice / memberNightPrice sudah harga BULANAN (flat per bulan)
+      // TIDAK perlu dikalikan sessionCount lagi
+      setTotalSewa(calc.totalFee);
     }
   }, [selectedCourtIds, date, startTime, calculatedDuration, courtCount, memberType, selectedSport, memberSchedule.sessionCount]);
 
@@ -681,12 +672,9 @@ export default function InputDpBookingPage() {
                 <span className="font-black text-blue-950">Rp {slot.price.toLocaleString('id-ID')}</span>
               </div>
             ))}
-            {memberType === 'MEMBER' && memberSchedule.sessionCount > 1 && (
+            {memberType === 'MEMBER' && (
               <div className="flex items-center justify-between text-[11px] text-blue-700 font-semibold">
-                <span>× {memberSchedule.sessionCount} sesi dalam bulan ini</span>
-                <span className="font-black text-blue-950">
-                  = Rp {(feeBreakdown[0]?.price * memberSchedule.sessionCount * (courtCount || 1)).toLocaleString('id-ID')}
-                </span>
+                <span>Harga flat per bulan ({memberSchedule.sessionCount}x pertemuan sudah termasuk)</span>
               </div>
             )}
             <div className="pt-1 border-t border-blue-200 flex items-center justify-between text-[11px]">

@@ -11,7 +11,7 @@ export interface Court {
 
 export type BookingStatus = 'DP_PAID' | 'SETTLED' | 'IN_PLAY' | 'COMPLETED' | 'CANCELLED';
 
-export type PaymentMethod = 'CASH' | 'QRIS' | 'TRANSFER' | 'DEBIT';
+import { PaymentMethod } from '@/types/pos';
 
 export interface AdditionalItem {
   id: string;

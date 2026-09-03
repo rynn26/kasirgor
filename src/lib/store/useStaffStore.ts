@@ -43,6 +43,7 @@ export const useStaffStore = create<StaffState>((set, get) => ({
       set({ shiftSchedules });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal memuat jadwal shift' });
+      throw err;
     }
   },
 

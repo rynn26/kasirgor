@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { CourtBooking, PaymentMethod, BookingStatus } from '@/types/booking';
+import { CourtBooking, BookingStatus } from '@/types/booking';
+import { PaymentMethod } from '@/types/pos';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';

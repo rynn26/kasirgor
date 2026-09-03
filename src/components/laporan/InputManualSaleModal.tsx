@@ -460,7 +460,6 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
               >
                 <option value="CASH">Tunai (Cash)</option>
                 <option value="QRIS">QRIS</option>
-                <option value="TRANSFER">Transfer Bank</option>
               </select>
             </div>
 

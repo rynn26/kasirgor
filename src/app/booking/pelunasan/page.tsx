@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
-import { formatRupiah, formatDate } from '@/lib/utils';
+import { formatRupiah } from '@/lib/utils';
 import { CourtBooking } from '@/types/booking';
 import {
   ArrowLeft,
@@ -16,8 +16,6 @@ import {
   ReceiptText,
   CheckCircle2,
   Plus,
-  Clock,
-  Phone
 } from 'lucide-react';
 import { SettlementModal } from '@/components/booking/SettlementModal';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
@@ -192,7 +190,7 @@ export default function PelunasanBookingPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveFilterTab(tab.id as any)}
+                onClick={() => setActiveFilterTab(tab.id as 'ALL' | 'DP' | 'LUNAS')}
                 className={`py-2 px-4 rounded-full font-bold transition-all cursor-pointer whitespace-nowrap ${
                   isSelected
                     ? 'bg-emerald-700 text-white shadow-xs'

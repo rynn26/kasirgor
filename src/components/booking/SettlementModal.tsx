@@ -5,7 +5,8 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
-import { CourtBooking, PaymentMethod } from '@/types/booking';
+import { CourtBooking } from '@/types/booking';
+import { PaymentMethod } from '@/types/pos';
 import { X, Search, Check, ReceiptText, QrCode, Banknote } from 'lucide-react';
 
 interface SettlementModalProps {
@@ -47,13 +48,14 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
     );
   });
 
+  const firstPendingId = pendingBookings[0]?.id;
   useEffect(() => {
     if (selectedBookingId) {
       setActiveBookingId(selectedBookingId);
-    } else if (pendingBookings.length > 0 && !activeBookingId) {
-      setActiveBookingId(pendingBookings[0].id);
+    } else if (firstPendingId && !activeBookingId) {
+      setActiveBookingId(firstPendingId);
     }
-  }, [selectedBookingId, pendingBookings]);
+  }, [selectedBookingId, firstPendingId, activeBookingId]);
 
   const currentBooking = bookings.find((b) => b.id === activeBookingId);
   const totalSettlementDue = currentBooking ? currentBooking.remainingBalance : 0;

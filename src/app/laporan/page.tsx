@@ -149,8 +149,6 @@ export default function LaporanPenjualanPage() {
     const paymentColors: Record<string, string> = {
       'Cash (Tunai)': '#f59e0b',
       QRIS: '#a62512',
-      TRANSFER: '#3b82f6',
-      DEBIT: '#8b5cf6',
     };
     const paymentBreakdown = Object.entries(paymentMap).map(([name, amount]) => ({
       name,
@@ -249,8 +247,6 @@ export default function LaporanPenjualanPage() {
     const paymentColors: Record<string, string> = {
       CASH: '#f59e0b',
       QRIS: '#059669',
-      TRANSFER: '#0284c7',
-      DEBIT: '#8b5cf6',
     };
     const payTotal = Object.values(mergedPay).reduce((s, v) => s + v, 0) || 1;
     const paymentBreakdown = Object.entries(mergedPay).map(([name, amount]) => ({
@@ -328,7 +324,18 @@ export default function LaporanPenjualanPage() {
 
   // Donut SVG
   const C = 238.76;
-  let accumulatedPercent = 0;
+  const donutItems = current.paymentBreakdown.reduce<Array<{ item: typeof current.paymentBreakdown[number]; strokeDasharray: string; strokeDashoffset: number }>>(
+    (acc, item) => {
+      const offset = acc.length > 0 ? acc[acc.length - 1].strokeDashoffset : 0;
+      acc.push({
+        item,
+        strokeDasharray: `${(item.percent / 100) * C} ${C}`,
+        strokeDashoffset: offset - (item.percent / 100) * C,
+      });
+      return acc;
+    },
+    []
+  );
 
   const handleExportExcel = () => {
     if (isLapangan) {
@@ -729,25 +736,20 @@ export default function LaporanPenjualanPage() {
           <div className="grid grid-cols-2 items-center gap-4 pt-1">
             <div className="flex items-center justify-center">
               <svg viewBox="0 0 100 100" className="w-28 h-28 -rotate-90">
-                {current.paymentBreakdown.map((item, idx) => {
-                  const strokeDasharray = `${(item.percent / 100) * C} ${C}`;
-                  const strokeDashoffset = -(accumulatedPercent / 100) * C;
-                  accumulatedPercent += item.percent;
-                  return (
-                    <circle
-                      key={idx}
-                      cx="50"
-                      cy="50"
-                      r="38"
-                      fill="transparent"
-                      stroke={item.color}
-                      strokeWidth="15"
-                      strokeDasharray={strokeDasharray}
-                      strokeDashoffset={strokeDashoffset}
-                      className="transition-all duration-500"
-                    />
-                  );
-                })}
+                {donutItems.map(({ item, strokeDasharray, strokeDashoffset }, idx) => (
+                  <circle
+                    key={idx}
+                    cx="50"
+                    cy="50"
+                    r="38"
+                    fill="transparent"
+                    stroke={item.color}
+                    strokeWidth="15"
+                    strokeDasharray={strokeDasharray}
+                    strokeDashoffset={strokeDashoffset}
+                    className="transition-all duration-500"
+                  />
+                ))}
               </svg>
             </div>
             <div className="space-y-2 text-xs font-semibold">
@@ -831,18 +833,37 @@ function buildKantinChartPoints(
   start: string,
   end: string
 ): { day: string; x: number; y: number; amount: number }[] {
-  let slots: { label: string; test: (dateStr: string, hour?: number) => boolean }[] = [];
+  const daysInMonth = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).getDate();
 
   if (period === 'HARI_INI') {
     const hours = [8, 11, 14, 17, 20, 22];
-    slots = hours.map((h, i) => ({
+    const slotDefs = hours.map((h, i) => ({
       label: `${String(h).padStart(2, '0')}`,
-      test: (dateStr, hour = 0) => dateStr === start && hour >= h && hour < (hours[i + 1] ?? 24),
+      test: (dateStr: string, hour = 0) => dateStr === start && hour >= h && hour < (hours[i + 1] ?? 24),
     }));
-  } else if (period === 'MINGGU_INI') {
+    const amounts = slotDefs.map(({ test }) =>
+      filtered
+        .filter((t) => {
+          const dateStr = t.createdAt.split('T')[0];
+          const hour = new Date(t.createdAt).getHours();
+          return test(dateStr, hour);
+        })
+        .reduce((s, t) => s + t.grandTotal, 0)
+    );
+    const maxAmt = Math.max(...amounts, 1);
+    const xStep = slotDefs.length > 1 ? 295 / (slotDefs.length - 1) : 0;
+    return slotDefs.map((slot, i) => ({
+      day: slot.label,
+      amount: amounts[i],
+      x: Math.round(20 + i * xStep),
+      y: Math.round(155 - (amounts[i] / maxAmt) * 120),
+    }));
+  }
+
+  if (period === 'MINGGU_INI') {
     const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     const startDate = new Date(start + 'T00:00:00');
-    slots = Array.from({ length: 7 }, (_, i) => {
+    const weekSlots = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
       const dateStr = d.toISOString().split('T')[0];
@@ -851,43 +872,23 @@ function buildKantinChartPoints(
         test: (s: string) => s === dateStr,
       };
     });
-  } else {
-    // BULAN_INI — 7 sample days spread across month
-    const daysInMonth = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).getDate();
-    const sampleDays = [1, Math.round(daysInMonth * 0.16), Math.round(daysInMonth * 0.33),
-      Math.round(daysInMonth * 0.5), Math.round(daysInMonth * 0.66), Math.round(daysInMonth * 0.83), daysInMonth];
-    const startDate = new Date(start + 'T00:00:00');
-    slots = sampleDays.map((d) => {
-      const date = new Date(startDate.getFullYear(), startDate.getMonth(), d);
-      const dateStr = date.toISOString().split('T')[0];
-      return {
-        label: String(d),
-        test: (s: string) => s <= dateStr && s >= (slots[sampleDays.indexOf(d) - 1]?.label === String(d) ? dateStr : (new Date(date.getTime() - 4 * 86400000).toISOString().split('T')[0])),
-      };
-    });
-    // simpler approach: bucket by day ranges
-    return buildMonthlyPoints(filtered, start, daysInMonth);
+    const amounts = weekSlots.map(({ test }) =>
+      filtered
+        .filter((t) => test(t.createdAt.split('T')[0]))
+        .reduce((s, t) => s + t.grandTotal, 0)
+    );
+    const maxAmt = Math.max(...amounts, 1);
+    const xStep = weekSlots.length > 1 ? 295 / (weekSlots.length - 1) : 0;
+    return weekSlots.map((slot, i) => ({
+      day: slot.label,
+      amount: amounts[i],
+      x: Math.round(20 + i * xStep),
+      y: Math.round(155 - (amounts[i] / maxAmt) * 120),
+    }));
   }
 
-  const amounts = slots.map(({ test }) =>
-    filtered
-      .filter((t) => {
-        const dateStr = t.createdAt.split('T')[0];
-        const hour = new Date(t.createdAt).getHours();
-        return test(dateStr, hour);
-      })
-      .reduce((s, t) => s + t.grandTotal, 0)
-  );
-
-  const maxAmt = Math.max(...amounts, 1);
-  const xStep = slots.length > 1 ? 295 / (slots.length - 1) : 0;
-
-  return slots.map((slot, i) => ({
-    day: slot.label,
-    amount: amounts[i],
-    x: Math.round(20 + i * xStep),
-    y: Math.round(155 - (amounts[i] / maxAmt) * 120),
-  }));
+  // BULAN_INI — bucket by day ranges (7 buckets)
+  return buildMonthlyPoints(filtered, start, daysInMonth);
 }
 
 function buildMonthlyPoints(
@@ -897,16 +898,17 @@ function buildMonthlyPoints(
 ): { day: string; x: number; y: number; amount: number }[] {
   const buckets = 7;
   const bucketSize = Math.ceil(daysInMonth / buckets);
-  const startDate = new Date(start + 'T00:00:00');
+  const [yr, mo] = start.split('-').map(Number);
+  const pad = (n: number) => String(n).padStart(2, '0');
   const results = Array.from({ length: buckets }, (_, i) => {
-    const bucketStart = new Date(startDate.getFullYear(), startDate.getMonth(), i * bucketSize + 1);
-    const bucketEnd = new Date(startDate.getFullYear(), startDate.getMonth(), Math.min((i + 1) * bucketSize, daysInMonth));
-    const bStart = bucketStart.toISOString().split('T')[0];
-    const bEnd = bucketEnd.toISOString().split('T')[0];
+    const dayStart = i * bucketSize + 1;
+    const dayEnd = Math.min((i + 1) * bucketSize, daysInMonth);
+    const bStart = `${yr}-${pad(mo)}-${pad(dayStart)}`;
+    const bEnd = `${yr}-${pad(mo)}-${pad(dayEnd)}`;
     const amount = filtered
       .filter((t) => t.createdAt.split('T')[0] >= bStart && t.createdAt.split('T')[0] <= bEnd)
       .reduce((s, t) => s + t.grandTotal, 0);
-    return { day: String(i * bucketSize + 1), amount };
+    return { day: String(dayStart), amount };
   });
   const maxAmt = Math.max(...results.map((r) => r.amount), 1);
   const xStep = 295 / (buckets - 1);
@@ -923,8 +925,6 @@ function buildLapanganChartPoints(
   start: string,
   end: string
 ): { day: string; x: number; y: number; amount: number }[] {
-  let slots: { label: string; test: (dateStr: string) => boolean }[] = [];
-
   if (period === 'HARI_INI') {
     const hours = [8, 11, 14, 17, 20, 22];
     const amounts = hours.map((h) => {
@@ -969,14 +969,15 @@ function buildMonthlyPointsBookings(
 ): { day: string; x: number; y: number; amount: number }[] {
   const buckets = 7;
   const bucketSize = Math.ceil(daysInMonth / buckets);
-  const startDate = new Date(start + 'T00:00:00');
+  const [yr, mo] = start.split('-').map(Number);
+  const pad = (n: number) => String(n).padStart(2, '0');
   const results = Array.from({ length: buckets }, (_, i) => {
-    const bucketStart = new Date(startDate.getFullYear(), startDate.getMonth(), i * bucketSize + 1);
-    const bucketEnd = new Date(startDate.getFullYear(), startDate.getMonth(), Math.min((i + 1) * bucketSize, daysInMonth));
-    const bStart = bucketStart.toISOString().split('T')[0];
-    const bEnd = bucketEnd.toISOString().split('T')[0];
+    const dayStart = i * bucketSize + 1;
+    const dayEnd = Math.min((i + 1) * bucketSize, daysInMonth);
+    const bStart = `${yr}-${pad(mo)}-${pad(dayStart)}`;
+    const bEnd = `${yr}-${pad(mo)}-${pad(dayEnd)}`;
     const amount = filtered.filter((b) => b.date >= bStart && b.date <= bEnd).reduce((s, b) => s + b.amountPaidTotal, 0);
-    return { day: String(i * bucketSize + 1), amount };
+    return { day: String(dayStart), amount };
   });
   const maxAmt = Math.max(...results.map((r) => r.amount), 1);
   const xStep = 295 / (buckets - 1);

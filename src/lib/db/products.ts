@@ -9,6 +9,7 @@ export interface DbProduct {
   price: number;
   cost_price: number | null;
   stock: number;
+  minimum_stock: number | null;
   unit: string;
   image: string | null;
   barcode: string | null;
@@ -27,6 +28,7 @@ function mapDbToProduct(row: DbProduct): Product {
     price: Number(row.price),
     costPrice: row.cost_price ? Number(row.cost_price) : undefined,
     stock: row.stock,
+    minimumStock: row.minimum_stock ? Number(row.minimum_stock) : undefined,
     unit: row.unit,
     image: row.image || undefined,
     barcode: row.barcode || undefined,
@@ -44,6 +46,7 @@ function mapProductToDb(p: Partial<Product>): Record<string, unknown> {
   if (p.price !== undefined) obj.price = p.price;
   if (p.costPrice !== undefined) obj.cost_price = p.costPrice;
   if (p.stock !== undefined) obj.stock = p.stock;
+  if (p.minimumStock !== undefined) obj.minimum_stock = p.minimumStock ?? null;
   if (p.unit) obj.unit = p.unit;
   if (p.image !== undefined) obj.image = p.image || null;
   if (p.barcode !== undefined) obj.barcode = p.barcode || null;
@@ -100,6 +103,7 @@ export async function updateProduct(
     price: 'price',
     costPrice: 'cost_price',
     stock: 'stock',
+    minimumStock: 'minimum_stock',
     unit: 'unit',
     image: 'image',
     barcode: 'barcode',

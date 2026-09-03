@@ -6,13 +6,12 @@ import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { formatDate, formatRupiah } from '@/lib/utils';
 import { Transaction } from '@/types/pos';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
-import { 
-  ArrowLeft, 
-  Search, 
-  Receipt, 
+import {
+  ArrowLeft,
+  Search,
+  Receipt,
   History as HistoryIcon,
   ChevronRight,
-  XCircle
 } from 'lucide-react';
 
 export default function HistoryPage() {
@@ -25,7 +24,6 @@ export default function HistoryPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -41,9 +39,8 @@ export default function HistoryPage() {
       tx.items.some((item) => item.product.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchMethod = methodFilter === 'ALL' || tx.paymentMethod === methodFilter;
-    const matchStatus = statusFilter === 'ALL' || (statusFilter === 'CANCELLED' ? tx.status === 'CANCELLED' : tx.status !== 'CANCELLED');
 
-    return matchSearch && matchMethod && matchStatus;
+    return matchSearch && matchMethod;
   });
 
   return (

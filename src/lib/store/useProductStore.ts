@@ -93,6 +93,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }));
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal update stok' });
+      throw err;
     }
   },
 

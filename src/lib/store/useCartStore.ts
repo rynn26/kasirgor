@@ -162,19 +162,48 @@ export const useCartStore = create<CartState>()(
           notes: state.notes || undefined,
         };
 
-        // Save transaction to DB first
-        await useTransactionStore.getState().addTransaction({
-          ...transaction,
-          createdAt: new Date().toISOString(),
-        });
-
-        // Deduct stock via product store after transaction is saved
+        // Deduct stock via product store first; track how many succeeded for rollback
         const stockUpdates = state.items.map((item) => ({
           id: item.product.id,
           delta: -item.quantity,
         }));
-        for (const { id, delta } of stockUpdates) {
-          await useProductStore.getState().updateStock(id, delta);
+        let stockDeductedCount = 0;
+        try {
+          for (const { id, delta } of stockUpdates) {
+            await useProductStore.getState().updateStock(id, delta);
+            stockDeductedCount++;
+          }
+        } catch (stockErr) {
+          // Rollback only the ones that already succeeded
+          for (let i = 0; i < stockDeductedCount; i++) {
+            try {
+              await useProductStore.getState().updateStock(stockUpdates[i].id, -stockUpdates[i].delta);
+            } catch {
+              console.error('Stock rollback failed for product:', stockUpdates[i].id);
+            }
+          }
+          set({ isProcessing: false });
+          throw stockErr;
+        }
+
+        // Save transaction to DB; roll back stock if this fails
+        try {
+          await useTransactionStore.getState().addTransaction({
+            ...transaction,
+            createdAt: new Date().toISOString(),
+          });
+        } catch (txErr) {
+          // Rollback: re-add stock for each item
+          for (const { id, delta } of stockUpdates) {
+            try {
+              await useProductStore.getState().updateStock(id, -delta);
+            } catch {
+              // Best-effort rollback; log but don't mask original error
+              console.error('Stock rollback failed for product:', id);
+            }
+          }
+          set({ isProcessing: false });
+          throw txErr;
         }
 
         set({ isProcessing: false });

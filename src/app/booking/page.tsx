@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah, formatDate } from '@/lib/utils';
-import { CourtBooking, BookingStatus } from '@/types/booking';
+import { formatRupiah } from '@/lib/utils';
+import { CourtBooking } from '@/types/booking';
 import {
   CalendarCheck,
   CalendarDays,
@@ -16,7 +16,6 @@ import {
   ChevronRight,
   Search,
   Clock,
-  User,
   Phone,
   Store,
   CheckCircle2,
@@ -40,16 +39,15 @@ export default function BookingLapanganPage() {
     loadBookings,
     setSelectedDate,
   } = useCourtBookingStore();
-  const { showToast } = useToastStore();
+  const { showToast: _showToast } = useToastStore();
 
   // View state
-  const [activeTab, setActiveTab] = useState<'LIST' | 'GRID'>('LIST');
+  const [_activeTab, setActiveTab] = useState<'LIST' | 'GRID'>('LIST');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DP_PAID' | 'SETTLED' | 'IN_PLAY'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals state
   const [isDpModalOpen, setIsDpModalOpen] = useState(false);
-  const [dpModalMode, setDpModalMode] = useState<'DP' | 'FULL'>('DP');
   const [prefilledCourtId, setPrefilledCourtId] = useState<string | undefined>();
   const [prefilledStartTime, setPrefilledStartTime] = useState<string | undefined>();
 
@@ -109,7 +107,6 @@ export default function BookingLapanganPage() {
   const handleGridSlotClick = (courtId: string, time: string) => {
     setPrefilledCourtId(courtId);
     setPrefilledStartTime(time);
-    setDpModalMode('DP');
     setIsDpModalOpen(true);
   };
 
@@ -259,7 +256,6 @@ export default function BookingLapanganPage() {
           <button
             type="button"
             onClick={() => {
-              setDpModalMode('FULL');
               setPrefilledCourtId(undefined);
               setPrefilledStartTime(undefined);
               setIsDpModalOpen(true);
@@ -304,7 +300,7 @@ export default function BookingLapanganPage() {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setStatusFilter(tab.id as any)}
+                onClick={() => setStatusFilter(tab.id as 'ALL' | 'DP_PAID' | 'SETTLED' | 'IN_PLAY')}
                 className={`px-3.5 py-1.5 rounded-full font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   statusFilter === tab.id
                     ? 'bg-slate-900 text-white shadow-xs'
@@ -347,8 +343,7 @@ export default function BookingLapanganPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setDpModalMode('DP');
-                  setIsDpModalOpen(true);
+                                setIsDpModalOpen(true);
                 }}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
@@ -487,7 +482,6 @@ export default function BookingLapanganPage() {
       {/* Modal 1: Create DP or Full Booking */}
       <CreateDpBookingModal
         isOpen={isDpModalOpen}
-        initialMode={dpModalMode}
         initialCourtId={prefilledCourtId}
         initialStartTime={prefilledStartTime}
         initialDate={selectedDate}

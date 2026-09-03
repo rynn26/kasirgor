@@ -45,6 +45,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [price, setPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState(0);
+  const [minimumStock, setMinimumStock] = useState(5);
   const [unit, setUnit] = useState('pcs');
   const [description, setDescription] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -60,6 +61,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setPrice(product.price ? String(product.price) : '');
       setCostPrice(product.costPrice ? String(product.costPrice) : '');
       setStock(product.stock);
+      setMinimumStock(product.minimumStock ?? 5);
       setUnit(product.unit || 'pcs');
       setDescription(product.description || '');
       setIsEditing(false);
@@ -92,6 +94,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         price: isOwner ? numPrice : product.price,
         costPrice: isOwner ? (numCost > 0 ? numCost : undefined) : product.costPrice,
         stock,
+        minimumStock: minimumStock > 0 ? minimumStock : undefined,
         unit,
         description: description.trim() || undefined,
         isAvailable: stock > 0,
@@ -172,11 +175,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
               stock <= 0 
                 ? 'bg-rose-50 text-rose-600 border border-rose-200' 
-                : stock <= 5 
+                : stock <= minimumStock 
                 ? 'bg-amber-50 text-amber-700 border border-amber-200' 
                 : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
             }`}>
-              {stock <= 0 ? 'Stok Habis' : stock <= 5 ? 'Stok Menipis' : 'Stok Tersedia'}
+              {stock <= 0 ? 'Stok Habis' : stock <= minimumStock ? 'Stok Menipis' : 'Stok Tersedia'}
             </span>
           </div>
 
@@ -273,6 +276,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               />
             </div>
           </div>
+
+          {/* Minimum Stok */}
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 text-amber-500" />
+              Minimum Stok (batas peringatan stok menipis)
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={minimumStock}
+              onChange={(e) => setMinimumStock(Math.max(0, Number(e.target.value)))}
+              placeholder="5"
+              className="w-40 px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
 
           {/* Pricing Grid */}
           {isOwner ? (

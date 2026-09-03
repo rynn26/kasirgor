@@ -5,22 +5,17 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
-import { PaymentMethod, CourtBooking } from '@/types/booking';
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  User, 
-  Phone, 
-  CreditCard, 
-  QrCode, 
-  Banknote, 
-  Building2, 
-  Check, 
-  Sparkles,
-  Info,
+import { PaymentMethod } from '@/types/pos';
+import { CourtBooking } from '@/types/booking';
+import {
+  X,
+  Clock,
+  User,
+  Phone,
+  QrCode,
+  Banknote,
+  Check,
   CalendarCheck2,
-  Repeat,
   Tag
 } from 'lucide-react';
 import { getMemberDatesInMonth } from '@/lib/memberUtils';
@@ -31,7 +26,6 @@ interface CreateDpBookingModalProps {
   initialCourtId?: string;
   initialStartTime?: string;
   initialDate?: string;
-  initialMode?: 'DP' | 'FULL';
   onClose: () => void;
   onSuccess: (booking: CourtBooking) => void;
 }
@@ -47,7 +41,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   initialCourtId,
   initialStartTime = '08:00',
   initialDate,
-  initialMode = 'FULL',
   onClose,
   onSuccess,
 }) => {
@@ -140,12 +133,9 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         customerTypeCasted,
         sportTypeCasted
       );
-      if (memberType === 'MEMBER') {
-        const sessionCount = memberSchedule.sessionCount || 4;
-        setCourtFee(calc.totalFee * sessionCount);
-      } else {
-        setCourtFee(calc.totalFee);
-      }
+      // Harga memberDayPrice / memberNightPrice sudah merupakan harga BULANAN (flat per bulan)
+      // TIDAK perlu dikalikan sessionCount lagi
+      setCourtFee(calc.totalFee);
     }
   }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball]);
 

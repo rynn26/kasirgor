@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
-import { CourtBooking, BookingStatus, PaymentMethod, AdditionalItem } from '@/types/booking';
+import { CourtBooking, BookingStatus, AdditionalItem } from '@/types/booking';
+import { PaymentMethod } from '@/types/pos';
 import { Court } from '@/types/booking';
 
 export interface DbCourt {

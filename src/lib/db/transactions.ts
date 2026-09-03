@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { Transaction, CartItem, PaymentMethod } from '@/types/pos';
+import { Transaction, CartItem, PaymentMethod, ProductCategory } from '@/types/pos';
 
 export interface DbTransaction {
   id: string;
@@ -40,7 +40,7 @@ function mapDbItemToCartItem(item: DbTransactionItem): CartItem {
       id: item.product_id || '',
       sku: item.product_sku || '',
       name: item.product_name,
-      category: (item.category || 'Makanan') as never,
+      category: (item.category || 'Makanan') as ProductCategory,
       price: Number(item.price),
       stock: 0,
       unit: '',

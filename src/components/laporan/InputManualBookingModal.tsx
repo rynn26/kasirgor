@@ -16,7 +16,7 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useCourtPricingStore } from '@/lib/store/useCourtPricingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
-import { PaymentMethod } from '@/types/booking';
+import { PaymentMethod } from '@/types/pos';
 
 interface InputManualBookingModalProps {
   isOpen: boolean;
@@ -199,7 +199,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
       showToast(`Data sewa lapangan tanggal ${date} berhasil dicatat ke laporan!`);
       if (onSuccess) onSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       console.error('Gagal mencatat sewa lapangan manual:', err);
       showToast('Gagal menyimpan data sewa lapangan. Coba lagi.');
     } finally {
@@ -525,7 +525,6 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
                 >
                   <option value="CASH">Tunai (Cash)</option>
                   <option value="QRIS">QRIS</option>
-                  <option value="TRANSFER">Transfer Bank</option>
                 </select>
               </div>
 

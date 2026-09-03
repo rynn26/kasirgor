@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartSidebar } from '@/components/pos/CartSidebar';
 import { PaymentModal } from '@/components/pos/PaymentModal';
@@ -15,9 +15,8 @@ import { Transaction } from '@/types/pos';
 import { ShoppingCart, ArrowRight } from 'lucide-react';
 
 export default function KasirPage() {
-  const router = useRouter();
   const { items, getTotalItems, getGrandTotal } = useCartStore();
-  const { loadProducts, isLoading: productsLoading } = useProductStore();
+  const { loadProducts } = useProductStore();
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);

@@ -142,10 +142,6 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       .filter((t) => t.paymentMethod === 'QRIS')
       .reduce((sum, t) => sum + t.grandTotal, 0);
 
-    const transferRevenue = completed
-      .filter((t) => t.paymentMethod === 'TRANSFER' || t.paymentMethod === 'DEBIT')
-      .reduce((sum, t) => sum + t.grandTotal, 0);
-
     return {
       totalRevenue,
       totalTransactions,
@@ -153,7 +149,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
       averageBasketSize,
       cashRevenue,
       qrisRevenue,
-      transferRevenue,
+      transferRevenue: 0,
     };
   },
 

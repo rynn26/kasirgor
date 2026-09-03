@@ -100,22 +100,34 @@ export default function KeranjangPage() {
     };
 
     try {
-      // 1. Simpan transaksi ke Supabase
-      await addTransaction(newTxData);
-
-      // 2. Potong stok produk di Supabase (await to ensure stock is updated)
+      // Deduct stock first, then save transaction only if stock deduction succeeds
       for (const item of items) {
         await updateStock(item.product.id, -item.quantity);
       }
 
-      // 3. Efek Confetti
+      // Save transaction to Supabase; roll back stock if this fails
+      try {
+        await addTransaction(newTxData);
+      } catch (txErr) {
+        // Rollback stock deductions
+        for (const item of items) {
+          try {
+            await updateStock(item.product.id, item.quantity);
+          } catch {
+            console.error('Stock rollback failed for product:', item.product.id);
+          }
+        }
+        throw txErr;
+      }
+
+      // Efek Confetti
       confetti({
         particleCount: 75,
         spread: 70,
         origin: { y: 0.6 },
       });
 
-      // 4. Toast & redirect
+      // Toast & redirect
       showToast('Transaksi berhasil disimpan!');
       clearCart();
       setTimeout(() => {

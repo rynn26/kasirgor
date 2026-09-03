@@ -2,11 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
-import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
-import { formatRupiah, formatDate } from '@/lib/utils';
+import { formatRupiah } from '@/lib/utils';
 import { CourtBooking } from '@/types/booking';
 import {
   ArrowLeft,
@@ -17,18 +15,13 @@ import {
   ChevronRight,
   X,
   Printer,
-  MessageCircle,
   CheckCircle2,
-  QrCode,
-  Banknote,
   Clock,
-  TrendingUp,
   Wallet,
   Pencil,
   Trash2,
   AlertTriangle,
   Ban,
-  XCircle,
   FileSpreadsheet
 } from 'lucide-react';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
@@ -36,9 +29,7 @@ import { EditCourtBookingModal } from '@/components/booking/EditCourtBookingModa
 import { exportCourtBookingsToExcel, printCourtBookingsPDF } from '@/lib/exportUtils';
 
 export default function HistoryBookingPage() {
-  const router = useRouter();
   const { bookings, loadBookings, deleteBooking, cancelBooking } = useCourtBookingStore();
-  const { cashierName } = useShiftStore();
   const { showToast } = useToastStore();
 
   useEffect(() => {
@@ -57,7 +48,6 @@ export default function HistoryBookingPage() {
   // Financial Summary
   const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
   const totalRevenue = activeBookings.reduce((sum, b) => sum + b.amountPaidTotal, 0);
-  const totalBookingsCount = bookings.length;
   const lunasCount = activeBookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
   const pendingDpCount = activeBookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
   const totalPiutang = activeBookings.reduce((sum, b) => sum + b.remainingBalance, 0);
@@ -291,7 +281,7 @@ export default function HistoryBookingPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setStatusFilter(tab.id as any)}
+                onClick={() => setStatusFilter(tab.id as 'ALL' | 'SETTLED' | 'DP_PAID' | 'CANCELLED')}
                 className={`px-3 py-1.5 rounded-full font-bold transition-all cursor-pointer whitespace-nowrap ${
                   isSelected
                     ? 'bg-emerald-700 text-white shadow-xs'
@@ -316,7 +306,7 @@ export default function HistoryBookingPage() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setMethodFilter(tab.id as any)}
+                onClick={() => setMethodFilter(tab.id as 'ALL' | 'CASH' | 'QRIS')}
                 className={`px-3 py-1.5 rounded-full font-bold transition-all cursor-pointer whitespace-nowrap ${
                   isSelected
                     ? 'bg-slate-900 text-white shadow-xs'

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Court, CourtBooking, BookingStatus, PaymentMethod, AdditionalItem } from '@/types/booking';
+import { Court, CourtBooking, BookingStatus, AdditionalItem } from '@/types/booking';
+import { PaymentMethod } from '@/types/pos';
 import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, deleteBooking as dbDeleteBooking, updateBooking as dbUpdateBooking, updateCourt as dbUpdateCourt } from '@/lib/db/bookings';
 
 interface CourtBookingState {
