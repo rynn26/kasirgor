@@ -13,6 +13,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { useCourtPricingStore } from '@/lib/store/useCourtPricingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { PaymentMethod } from '@/types/booking';
@@ -29,6 +30,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
   onSuccess,
 }) => {
   const { courts, loadCourts, addBooking } = useCourtBookingStore();
+  const { calculateBookingFee, loadFromDb } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
   const yesterdayStr = () => {
@@ -37,6 +39,8 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
     return d.toISOString().split('T')[0];
   };
 
+  const [selectedSport, setSelectedSport] = useState<'Badminton' | 'Pickleball'>('Badminton');
+  const [memberType, setMemberType] = useState<'INSIDENTIL' | 'MEMBER'>('INSIDENTIL');
   const [date, setDate] = useState(yesterdayStr());
   const [bookingDate, setBookingDate] = useState(yesterdayStr());
   const [courtId, setCourtId] = useState('');
@@ -52,12 +56,13 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    loadFromDb();
     if (courts.length === 0) {
       loadCourts();
     } else if (!courtId && courts.length > 0) {
       setCourtId(courts[0].id);
     }
-  }, [courts, courtId, loadCourts]);
+  }, [courts, courtId, loadCourts, loadFromDb]);
 
   useEffect(() => {
     if (isOpen) {
@@ -71,15 +76,24 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
     }
   }, [isOpen, courts, courtId]);
 
-  // Recalculate default fee when court or duration changes
+  // Recalculate default fee when court, duration, sport, or time changes
   const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
 
   useEffect(() => {
     if (selectedCourt) {
-      const calculated = (selectedCourt.pricePerHour || 80000) * durationHours;
-      setTotalAmount(calculated.toString());
+      const fee = calculateBookingFee(
+        selectedCourt.id,
+        date,
+        startTime,
+        durationHours,
+        1,
+        selectedCourt.pricePerHour || 80000,
+        selectedSport === 'Pickleball' ? 'insidentil' : (memberType === 'MEMBER' ? 'member' : 'insidentil'),
+        selectedSport === 'Pickleball' ? 'pickleball' : 'badminton'
+      );
+      setTotalAmount(fee.toString());
     }
-  }, [selectedCourt, durationHours]);
+  }, [selectedCourt, date, startTime, durationHours, selectedSport, memberType, calculateBookingFee]);
 
   if (!isOpen) return null;
 
@@ -113,19 +127,22 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
     try {
       const courtName = selectedCourt?.name || 'Lapangan 1';
       const courtType = selectedCourt?.type || 'VIP Vinyl BWF';
-      const courtPricePerHour = selectedCourt?.pricePerHour || 80000;
+      const isPb = selectedSport === 'Pickleball';
+      const finalCommunityName = isPb
+        ? 'Pickleball (Insidentil)'
+        : (memberType === 'MEMBER' ? 'Badminton (Member)' : 'Badminton (Insidentil)');
 
       await addBooking({
         customerName: customerName.trim(),
         phone: phone.trim() || '08xxxxxxxxxx',
-        communityName: 'Insidentil',
-        memberType: 'INSIDENTIL',
+        communityName: finalCommunityName,
+        memberType: isPb ? 'INSIDENTIL' : memberType,
         bookingDate,
         date,
         courtId: selectedCourt?.id || courtId || '',
         courtName,
         courtType,
-        courtPricePerHour,
+        courtPricePerHour: Math.round(numTotal / (durationHours || 1)),
         startTime,
         endTime,
         durationHours,
@@ -142,7 +159,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
         amountPaidTotal: finalAmountPaid,
         remainingBalance,
         status: isLunas ? 'SETTLED' : 'DP_PAID',
-        notes: `[Input Manual Owner] Main: ${date} (${startTime}-${endTime})`,
+        notes: `[Input Manual Owner] ${selectedSport} - Main: ${date} (${startTime}-${endTime})`,
       });
 
       showToast(`Data sewa lapangan tanggal ${date} berhasil dicatat ke laporan!`);
@@ -190,6 +207,41 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
           
+          {/* Pilihan Cabang Olahraga: Badminton vs Pickleball */}
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-800 text-xs block">
+              Cabang Olahraga
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setSelectedSport('Badminton')}
+                className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  selectedSport === 'Badminton'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🏸 Badminton</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSport('Pickleball');
+                  setMemberType('INSIDENTIL');
+                }}
+                className={`py-2 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  selectedSport === 'Pickleball'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🏓 Pickleball</span>
+              </button>
+            </div>
+          </div>
+
           {/* Tanggal Booking vs Tanggal Main */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
             <span className="font-bold text-slate-800 text-xs block">
