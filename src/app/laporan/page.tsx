@@ -15,10 +15,18 @@ import {
   QrCode,
   Store,
   CalendarCheck,
+  Calendar,
   Clock,
   Layers,
   Plus,
+  Wallet,
 } from 'lucide-react';
+import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
+import { PaymentMethodDetailModal } from '@/components/laporan/PaymentMethodDetailModal';
+import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
+import { ReceiptModal } from '@/components/pos/ReceiptModal';
+import { CourtBooking } from '@/types/booking';
+import { Transaction } from '@/types/pos';
 import { InputManualSaleModal } from '@/components/laporan/InputManualSaleModal';
 import { InputManualBookingModal } from '@/components/laporan/InputManualBookingModal';
 import { formatRupiah } from '@/lib/utils';
@@ -33,14 +41,36 @@ import {
   printCourtBookingsPDF 
 } from '@/lib/exportUtils';
 
-type PeriodType = 'BULAN_INI' | 'HARI_INI' | 'MINGGU_INI';
+type PeriodType = 'BULAN_INI' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
 
-function getDateRange(period: PeriodType): { start: string; end: string; label: string } {
+function formatShortDate(dateStr: string): string {
+  if (!dateStr) return 'Pilih Tanggal';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    const date = new Date(y, m - 1, d);
+    return `${d} ${date.toLocaleString('id-ID', { month: 'short' })} ${y}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function getDateRange(period: PeriodType, customDate?: string): { start: string; end: string; label: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+  if (period === 'CUSTOM' && customDate) {
+    const [y, m, d] = customDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dateFormatted = `${pad(d)} ${dateObj.toLocaleString('id-ID', { month: 'long' })} ${y}`;
+    return {
+      start: customDate,
+      end: customDate,
+      label: `Tanggal ${dateFormatted}`,
+    };
+  }
   if (period === 'HARI_INI') {
     const today = fmt(now);
     return { start: today, end: today, label: `Hari Ini (${pad(now.getDate())} ${now.toLocaleString('id-ID', { month: 'long' })} ${now.getFullYear()})` };
@@ -76,8 +106,18 @@ export default function LaporanPenjualanPage() {
 
   const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan'>('kantin');
   const [period, setPeriod] = useState<PeriodType>('BULAN_INI');
+  const [customDate, setCustomDate] = useState<string>(() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  });
+  const dateInputRef = React.useRef<HTMLInputElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; amount: number } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isOwnerRevenueModalOpen, setIsOwnerRevenueModalOpen] = useState(false);
+  const [selectedPaymentMethodDetail, setSelectedPaymentMethodDetail] = useState<string | null>(null);
+  const [selectedBookingForReceipt, setSelectedBookingForReceipt] = useState<CourtBooking | null>(null);
+  const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<Transaction | null>(null);
   const [isInputManualOpen, setIsInputManualOpen] = useState(false);
   const [isInputManualBookingOpen, setIsInputManualBookingOpen] = useState(false);
 
@@ -93,6 +133,8 @@ export default function LaporanPenjualanPage() {
           const parsed = JSON.parse(session);
           setIsOwner(parsed.role === 'owner');
         } catch {}
+      } else {
+        setIsOwner(true);
       }
     }
   }, [loadTransactions, loadBookings, loadCourts]);
@@ -124,7 +166,7 @@ export default function LaporanPenjualanPage() {
   // DERIVED DATA: KANTIN / POS TOKO
   // =============================================
   const kantinData = useMemo(() => {
-    const { start, end, label } = getDateRange(period);
+    const { start, end, label } = getDateRange(period, customDate);
 
     const filtered = transactions.filter(
       (t) =>
@@ -185,7 +227,7 @@ export default function LaporanPenjualanPage() {
     const prevFiltered = transactions.filter(
       (t) =>
         t.status === 'COMPLETED' &&
-        isInPrevPeriod(t.createdAt.split('T')[0], period)
+        isInPrevPeriod(t.createdAt.split('T')[0], period, customDate)
     );
     const prevSales = prevFiltered.reduce((s, t) => s + t.grandTotal, 0);
     const growthPct =
@@ -202,13 +244,13 @@ export default function LaporanPenjualanPage() {
       growthPct,
       filteredTransactions: filtered,
     };
-  }, [transactions, period]);
+  }, [transactions, period, customDate]);
 
   // =============================================
   // DERIVED DATA: ARENA LAPANGAN GOR
   // =============================================
   const lapanganData = useMemo(() => {
-    const { start, end, label } = getDateRange(period);
+    const { start, end, label } = getDateRange(period, customDate);
 
     const filtered = bookings.filter(
       (b) =>
@@ -222,7 +264,7 @@ export default function LaporanPenjualanPage() {
     const totalHours = filtered.reduce((s, b) => s + b.durationHours, 0);
 
     // Occupancy: how many court-hour slots were used
-    const totalSlots = courts.length * (period === 'HARI_INI' ? 14 : period === 'MINGGU_INI' ? 98 : 420);
+    const totalSlots = courts.length * ((period === 'HARI_INI' || period === 'CUSTOM') ? 14 : period === 'MINGGU_INI' ? 98 : 420);
     const usedSlots = totalHours;
     const occupancyRate = totalSlots > 0 ? `${Math.min(100, Math.round((usedSlots / totalSlots) * 100))}%` : '0%';
 
@@ -280,7 +322,7 @@ export default function LaporanPenjualanPage() {
     const prevFiltered = bookings.filter(
       (b) =>
         b.status !== 'CANCELLED' &&
-        isInPrevPeriod(b.date, period)
+        isInPrevPeriod(b.date, period, customDate)
     );
     const prevSales = prevFiltered.reduce((s, b) => s + b.amountPaidTotal, 0);
     const growthPct =
@@ -298,7 +340,7 @@ export default function LaporanPenjualanPage() {
       growthPct,
       filteredBookings: filtered,
     };
-  }, [bookings, courts, period]);
+  }, [bookings, courts, period, customDate]);
 
   const current = isLapangan ? lapanganData : kantinData;
 
@@ -399,6 +441,18 @@ export default function LaporanPenjualanPage() {
             </p>
           </div>
           <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setIsOwnerRevenueModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600"
+                title="Lihat Rekap Total Omset Hari Ini (Kantin + DP + Pelunasan Lapangan)"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                <span>Rekap Omset</span>
+              </button>
+            )}
+
             {!isLapangan && (
               <button
                 type="button"
@@ -449,7 +503,7 @@ export default function LaporanPenjualanPage() {
         </div>
 
         {/* Period Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {([
             { id: 'BULAN_INI', label: 'Bulan Ini' },
             { id: 'MINGGU_INI', label: 'Minggu Ini' },
@@ -473,6 +527,50 @@ export default function LaporanPenjualanPage() {
               </button>
             );
           })}
+
+          {/* Custom Date Picker Pill */}
+          <div className="relative shrink-0">
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={customDate}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setCustomDate(e.target.value);
+                  setPeriod('CUSTOM');
+                  setHoveredPoint(null);
+                }
+              }}
+              onClick={(e) => {
+                if (period !== 'CUSTOM') {
+                  setPeriod('CUSTOM');
+                  setHoveredPoint(null);
+                }
+                try {
+                  (e.currentTarget as HTMLInputElement).showPicker?.();
+                } catch {}
+              }}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+              title="Pilih Tanggal"
+            />
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
+                period === 'CUSTOM'
+                  ? isLapangan
+                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                    : 'bg-[#a62512] text-white border-[#a62512] shadow-xs'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {period === 'CUSTOM' && customDate
+                  ? formatShortDate(customDate)
+                  : 'Pilih Tanggal'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -747,25 +845,35 @@ export default function LaporanPenjualanPage() {
                     strokeWidth="15"
                     strokeDasharray={strokeDasharray}
                     strokeDashoffset={strokeDashoffset}
-                    className="transition-all duration-500"
+                    onClick={() => setSelectedPaymentMethodDetail(item.name)}
+                    className="transition-all duration-500 cursor-pointer hover:opacity-80"
                   />
                 ))}
               </svg>
             </div>
             <div className="space-y-2 text-xs font-semibold">
               {current.paymentBreakdown.map((item, idx) => (
-                <div key={idx} className="space-y-0.5 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedPaymentMethodDetail(item.name)}
+                  className="w-full text-left space-y-1 p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/90 active:scale-[0.98] border border-slate-200/90 hover:border-slate-300 shadow-2xs transition-all cursor-pointer group"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-1.5">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-slate-700 font-bold">{item.name}</span>
+                      <span className="text-slate-800 font-bold group-hover:text-slate-950 transition-colors">{item.name}</span>
                     </div>
-                    <span className="font-black text-slate-900">{item.percent}%</span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-black text-slate-900">{item.percent}%</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                    </div>
                   </div>
-                  <div className={`text-[11px] font-black pl-4 ${isLapangan ? 'text-emerald-700' : 'text-[#a62512]'}`}>
-                    {formatRupiah(item.amount)}
+                  <div className={`text-[11px] font-black pl-4 flex items-center justify-between ${isLapangan ? 'text-emerald-700' : 'text-[#a62512]'}`}>
+                    <span>{formatRupiah(item.amount)}</span>
+                    <span className="text-[10px] font-semibold text-slate-400 group-hover:underline">Lihat Rincian ›</span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -820,6 +928,40 @@ export default function LaporanPenjualanPage() {
           loadBookings();
         }}
       />
+
+      {/* Modal Rekap Total Omset Hari Ini untuk Owner */}
+      <OwnerDailyRevenueModal
+        isOpen={isOwnerRevenueModalOpen}
+        onClose={() => setIsOwnerRevenueModalOpen(false)}
+      />
+
+      {/* Modal Rincian Metode Pembayaran (QRIS / Cash) */}
+      <PaymentMethodDetailModal
+        isOpen={Boolean(selectedPaymentMethodDetail)}
+        onClose={() => setSelectedPaymentMethodDetail(null)}
+        methodName={selectedPaymentMethodDetail || ''}
+        isLapangan={isLapangan}
+        periodLabel={current.label}
+        filteredBookings={lapanganData.filteredBookings}
+        filteredTransactions={kantinData.filteredTransactions}
+        onOpenBookingReceipt={(bkg) => setSelectedBookingForReceipt(bkg)}
+        onOpenKantinReceipt={(tx) => setSelectedTxForReceipt(tx)}
+      />
+
+      {/* Modal Nota Booking Lapangan */}
+      <BookingReceiptModal
+        isOpen={Boolean(selectedBookingForReceipt)}
+        booking={selectedBookingForReceipt}
+        onClose={() => setSelectedBookingForReceipt(null)}
+      />
+
+      {/* Modal Nota Transaksi Kantin */}
+      <ReceiptModal
+        isOpen={Boolean(selectedTxForReceipt)}
+        transaction={selectedTxForReceipt}
+        onClose={() => setSelectedTxForReceipt(null)}
+        onNewTransaction={() => setSelectedTxForReceipt(null)}
+      />
     </div>
   );
 }
@@ -835,7 +977,7 @@ function buildKantinChartPoints(
 ): { day: string; x: number; y: number; amount: number }[] {
   const daysInMonth = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).getDate();
 
-  if (period === 'HARI_INI') {
+  if (period === 'HARI_INI' || period === 'CUSTOM') {
     const hours = [8, 11, 14, 17, 20, 22];
     const slotDefs = hours.map((h, i) => ({
       label: `${String(h).padStart(2, '0')}`,
@@ -925,7 +1067,7 @@ function buildLapanganChartPoints(
   start: string,
   end: string
 ): { day: string; x: number; y: number; amount: number }[] {
-  if (period === 'HARI_INI') {
+  if (period === 'HARI_INI' || period === 'CUSTOM') {
     const hours = [8, 11, 14, 17, 20, 22];
     const amounts = hours.map((h) => {
       return filtered
@@ -984,11 +1126,16 @@ function buildMonthlyPointsBookings(
   return results.map((r, i) => ({ ...r, x: Math.round(20 + i * xStep), y: Math.round(155 - (r.amount / maxAmt) * 120) }));
 }
 
-function isInPrevPeriod(dateStr: string, period: PeriodType): boolean {
+function isInPrevPeriod(dateStr: string, period: PeriodType, customDate?: string): boolean {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+  if (period === 'CUSTOM' && customDate) {
+    const [y, m, d] = customDate.split('-').map(Number);
+    const prevDate = new Date(y, m - 1, d - 1);
+    return dateStr === fmt(prevDate);
+  }
   if (period === 'HARI_INI') {
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);

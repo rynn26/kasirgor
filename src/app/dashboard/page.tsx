@@ -18,8 +18,10 @@ import {
   ShoppingCart,
   Store,
   CalendarCheck,
-  Repeat
+  Repeat,
+  Wallet,
 } from 'lucide-react';
+import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useProductStore } from '@/lib/store/useProductStore';
@@ -45,6 +47,7 @@ export default function DashboardUnifiedPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('HARI');
   const [hoveredPoint, setHoveredPoint] = useState<{ index: number; label: string; value: number } | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isOwnerRevenueModalOpen, setIsOwnerRevenueModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [greeting, setGreeting] = useState('Selamat sore');
   const [isMounted, setIsMounted] = useState(false);
@@ -663,17 +666,30 @@ export default function DashboardUnifiedPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsNotificationOpen(true)}
-              className="relative p-2 rounded-2xl hover:bg-slate-100 text-[#eb4b2b] transition-all cursor-pointer"
-              title="Notifikasi & Peringatan"
-            >
-              <Bell className="w-6 h-6 fill-[#eb4b2b] text-[#eb4b2b]" />
-              {(lowStockCount > 0 || outOfStockCount > 0 || bookingsPendingSettlement > 0) && (
-                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-white animate-pulse" />
-              )}
-            </button>
+            <div className="flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => setIsOwnerRevenueModalOpen(true)}
+                className="px-3 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer border border-amber-600"
+                title="Lihat Total Omset Hari Ini (Kantin + DP + Pelunasan Lapangan)"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Rekap Omset Hari Ini</span>
+                <span className="sm:hidden">Rekap Omset</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsNotificationOpen(true)}
+                className="relative p-2 rounded-2xl hover:bg-slate-100 text-[#eb4b2b] transition-all cursor-pointer"
+                title="Notifikasi & Peringatan"
+              >
+                <Bell className="w-6 h-6 fill-[#eb4b2b] text-[#eb4b2b]" />
+                {(lowStockCount > 0 || outOfStockCount > 0 || bookingsPendingSettlement > 0) && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-white animate-pulse" />
+                )}
+              </button>
+            </div>
           </div>
 
           {activeUnit === 'kantin' ? (
@@ -1385,6 +1401,12 @@ export default function DashboardUnifiedPage() {
           setSelectedTx(null);
           router.push('/kasir');
         }}
+      />
+
+      {/* Owner Daily Revenue Modal */}
+      <OwnerDailyRevenueModal
+        isOpen={isOwnerRevenueModalOpen}
+        onClose={() => setIsOwnerRevenueModalOpen(false)}
       />
     </div>
   );

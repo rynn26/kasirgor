@@ -20,7 +20,14 @@ export default function HistoryPage() {
 
   useEffect(() => {
     loadTransactions();
-  }, []);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get('method');
+      if (m === 'CASH' || m === 'QRIS') {
+        setMethodFilter(m);
+      }
+    }
+  }, [loadTransactions]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('ALL');
