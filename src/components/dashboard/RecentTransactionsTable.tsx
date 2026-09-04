@@ -4,12 +4,12 @@ import React, { useState } from 'react';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { formatDate, formatRupiah } from '@/lib/utils';
 import { Transaction } from '@/types/pos';
-import { ReceiptModal } from '@/components/pos/ReceiptModal';
+import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Receipt, ArrowUpRight, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export const RecentTransactionsTable: React.FC = () => {
-  const { transactions } = useTransactionStore();
+  const { transactions, loadTransactions } = useTransactionStore();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   const recentList = transactions.slice(0, 4);
@@ -46,8 +46,8 @@ export const RecentTransactionsTable: React.FC = () => {
               <div className="min-w-0">
                 <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-[#b92b10] transition-colors">
                   {tx.items && tx.items.length > 0
-                    ? tx.items.map((i) => `${i.product.name} (${i.quantity})`).join(', ')
-                    : tx.invoiceNumber}
+                    ? tx.items.map((i) => `${i.product.name} (${i.quantity}x)`).join(', ')
+                    : (tx.customerName || 'Pelanggan Umum')}
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   {formatDate(tx.createdAt, true)}
@@ -67,12 +67,12 @@ export const RecentTransactionsTable: React.FC = () => {
         ))}
       </div>
 
-      {/* Receipt Modal for detail viewing */}
-      <ReceiptModal
+      {/* Transaction Detail, Edit & Void Modal */}
+      <TransactionDetailModal
         isOpen={Boolean(selectedTx)}
         transaction={selectedTx}
         onClose={() => setSelectedTx(null)}
-        onNewTransaction={() => setSelectedTx(null)}
+        onUpdated={() => loadTransactions()}
       />
     </div>
   );

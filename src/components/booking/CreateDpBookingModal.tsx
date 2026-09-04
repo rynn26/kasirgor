@@ -26,6 +26,7 @@ interface CreateDpBookingModalProps {
   initialCourtId?: string;
   initialStartTime?: string;
   initialDate?: string;
+  initialDuration?: number;
   onClose: () => void;
   onSuccess: (booking: CourtBooking) => void;
 }
@@ -41,6 +42,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   initialCourtId,
   initialStartTime = '08:00',
   initialDate,
+  initialDuration = 1,
   onClose,
   onSuccess,
 }) => {
@@ -61,7 +63,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
     return d.getDay();
   });
   const [startTime, setStartTime] = useState(initialStartTime);
-  const [durationHours, setDurationHours] = useState(2);
+  const [durationHours, setDurationHours] = useState(initialDuration || 1);
   
   // Customer info
   const [customerName, setCustomerName] = useState('');
@@ -82,7 +84,10 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   };
 
   // Payment info
-  const [courtFee, setCourtFee] = useState<number>(160000);
+  const [courtFee, setCourtFee] = useState<number>(0);
+  const [isManualFee, setIsManualFee] = useState<boolean>(false);
+  const [autoFee, setAutoFee] = useState<number>(0);
+  const [baseRatePerHour, setBaseRatePerHour] = useState<number>(40000);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
@@ -99,10 +104,16 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
   // Sync props if modal re-opens
   useEffect(() => {
-    if (initialCourtId) setCourtId(initialCourtId);
-    if (initialStartTime) setStartTime(initialStartTime);
-    setDate(initialDate || todayStr);
-  }, [initialCourtId, initialStartTime, initialDate, isOpen]);
+    if (isOpen) {
+      if (initialCourtId) setCourtId(initialCourtId);
+      if (initialStartTime) setStartTime(initialStartTime);
+      setDate(initialDate || todayStr);
+      setDurationHours(initialDuration || 1);
+      setIsManualFee(false);
+      setDiscountAmount(0);
+      setCashReceived(0);
+    }
+  }, [initialCourtId, initialStartTime, initialDate, initialDuration, isOpen, todayStr]);
 
   // Sync courtId when courts load from database
   useEffect(() => {
@@ -133,11 +144,14 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         customerTypeCasted,
         sportTypeCasted
       );
-      // Harga memberDayPrice / memberNightPrice sudah merupakan harga BULANAN (flat per bulan)
-      // TIDAK perlu dikalikan sessionCount lagi
-      setCourtFee(calc.totalFee);
+      setAutoFee(calc.totalFee);
+      setBaseRatePerHour(calc.ratePerHour);
+      // Only set courtFee if user has not manually typed a custom fee
+      if (!isManualFee) {
+        setCourtFee(calc.totalFee);
+      }
     }
-  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball]);
+  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball, isManualFee]);
 
   if (!isOpen) return null;
 
@@ -214,10 +228,10 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       dpPaymentMethod: paymentMethod,
       dpPaidAt: bookingDate ? `${bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : new Date().toISOString(),
       dpCashier: cashierName || 'Yuli',
-      settlementAmount: finalTotal,
-      settlementPaymentMethod: paymentMethod,
-      settlementPaidAt: new Date().toISOString(),
-      settlementCashier: cashierName || 'Yuli',
+      settlementAmount: undefined,
+      settlementPaymentMethod: undefined,
+      settlementPaidAt: undefined,
+      settlementCashier: undefined,
       amountPaidTotal: finalTotal,
       remainingBalance: 0,
       status: 'SETTLED',
@@ -352,7 +366,10 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                     <button
                       key={hrs}
                       type="button"
-                      onClick={() => setDurationHours(hrs)}
+                      onClick={() => {
+                        setDurationHours(hrs);
+                        setIsManualFee(false);
+                      }}
                       className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         durationHours === hrs
                           ? 'bg-[#b92b10] text-white shadow-xs'
@@ -519,21 +536,49 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             {/* Manual Tarif Sewa & Diskon Inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                  <span>Tarif Sewa Lapangan (Rp) *</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Ketik manual</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">
+                    Total Tarif Sewa ({durationHours} Jam) *
+                  </label>
+                  {isManualFee ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsManualFee(false);
+                        setCourtFee(autoFee);
+                      }}
+                      className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                    >
+                      Reset Otomatis
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-normal">Ketik manual</span>
+                  )}
+                </div>
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">Rp</span>
                   <input
                     type="text"
                     inputMode="numeric"
                     required
-                    placeholder="Contoh: 160.000"
+                    placeholder="Contoh: 80.000"
                     value={courtFee ? formatNumber(courtFee) : ''}
-                    onChange={(e) => setCourtFee(parseNumberInput(e.target.value))}
+                    onChange={(e) => {
+                      setIsManualFee(true);
+                      setCourtFee(parseNumberInput(e.target.value));
+                    }}
                     className="w-full pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
                   />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                  <span>
+                    Tarif dasar: Rp {formatNumber(baseRatePerHour)}/jam × {durationHours} jam
+                  </span>
+                  {isManualFee && (
+                    <span className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                      Harga Manual (Tidak Dikali)
+                    </span>
+                  )}
                 </div>
               </div>
 

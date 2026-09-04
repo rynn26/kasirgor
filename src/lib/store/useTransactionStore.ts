@@ -32,7 +32,7 @@ interface TransactionState {
     }
   ) => Promise<Transaction>;
   setSelectedTransaction: (transaction: Transaction | null) => void;
-  getDailySummary: () => DailySummary;
+  getDailySummary: (targetDate?: string) => DailySummary;
   loadTransactionsByDate: (date: string) => Promise<void>;
 }
 
@@ -118,11 +118,11 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
     set({ selectedTransaction: transaction });
   },
 
-  getDailySummary: () => {
+  getDailySummary: (targetDate?: string) => {
     const { transactions } = get();
-    const today = new Date().toISOString().split('T')[0];
+    const dateToFilter = targetDate || new Date().toISOString().split('T')[0];
     const completed = transactions.filter(
-      (t) => t.status === 'COMPLETED' && t.createdAt.startsWith(today)
+      (t) => t.status === 'COMPLETED' && t.createdAt.startsWith(dateToFilter)
     );
 
     const totalRevenue = completed.reduce((sum, t) => sum + t.grandTotal, 0);

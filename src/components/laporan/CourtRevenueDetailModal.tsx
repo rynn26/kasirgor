@@ -208,16 +208,13 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">
-                          {b.bookingCode}
-                        </span>
-                        {isMember && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                      {isMember && (
+                        <div className="mb-1">
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                             Member
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <h4 className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
                         {b.customerName}
                       </h4>

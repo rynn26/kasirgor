@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { Product, ProductCategory } from '@/types/pos';
+import { Product, ProductCategory, normalizeProductCategory } from '@/types/pos';
 
 export interface DbProduct {
   id: string;
@@ -24,7 +24,7 @@ function mapDbToProduct(row: DbProduct): Product {
     id: row.id,
     sku: row.sku,
     name: row.name,
-    category: row.category as ProductCategory,
+    category: normalizeProductCategory(row.category),
     price: Number(row.price),
     costPrice: row.cost_price ? Number(row.cost_price) : undefined,
     stock: row.stock,

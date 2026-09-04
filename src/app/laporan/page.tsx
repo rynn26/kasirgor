@@ -20,19 +20,23 @@ import {
   Layers,
   Plus,
   Wallet,
+  Trash2,
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { PaymentMethodDetailModal } from '@/components/laporan/PaymentMethodDetailModal';
 import { CourtRevenueDetailModal } from '@/components/laporan/CourtRevenueDetailModal';
+import { CategorySalesDetailModal } from '@/components/laporan/CategorySalesDetailModal';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
-import { ReceiptModal } from '@/components/pos/ReceiptModal';
+import { EditCourtBookingModal } from '@/components/booking/EditCourtBookingModal';
+import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { CourtBooking } from '@/types/booking';
-import { Transaction } from '@/types/pos';
+import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { InputManualSaleModal } from '@/components/laporan/InputManualSaleModal';
 import { InputManualBookingModal } from '@/components/laporan/InputManualBookingModal';
 import { formatRupiah } from '@/lib/utils';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { 
@@ -101,27 +105,46 @@ function getDateRange(period: PeriodType, customDate?: string): { start: string;
 
 export default function LaporanPenjualanPage() {
   const { transactions, loadTransactions } = useTransactionStore();
-  const { bookings, courts, loadBookings, loadCourts } = useCourtBookingStore();
+  const { bookings, courts, loadBookings, loadCourts, deleteBooking } = useCourtBookingStore();
   const { selectedUnit, setUnit } = useShiftStore();
   const { showToast } = useToastStore();
 
   const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan'>('kantin');
-  const [period, setPeriod] = useState<PeriodType>('BULAN_INI');
-  const [customDate, setCustomDate] = useState<string>(() => {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  });
+  const {
+    selectedDate: customDate,
+    period,
+    setSelectedDate,
+    setPeriod,
+  } = useAppDateStore();
   const dateInputRef = React.useRef<HTMLInputElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; amount: number } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isOwnerRevenueModalOpen, setIsOwnerRevenueModalOpen] = useState(false);
   const [selectedPaymentMethodDetail, setSelectedPaymentMethodDetail] = useState<string | null>(null);
   const [selectedCourtDetail, setSelectedCourtDetail] = useState<string | null>(null);
+  const [selectedCategoryDetail, setSelectedCategoryDetail] = useState<string | null>(null);
   const [selectedBookingForReceipt, setSelectedBookingForReceipt] = useState<CourtBooking | null>(null);
+  const [editingBooking, setEditingBooking] = useState<CourtBooking | null>(null);
+  const [deletingBooking, setDeletingBooking] = useState<CourtBooking | null>(null);
+  const [isDeletingBookingProcess, setIsDeletingBookingProcess] = useState(false);
   const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<Transaction | null>(null);
   const [isInputManualOpen, setIsInputManualOpen] = useState(false);
   const [isInputManualBookingOpen, setIsInputManualBookingOpen] = useState(false);
+
+  const handleConfirmDeleteBooking = async () => {
+    if (!deletingBooking) return;
+    setIsDeletingBookingProcess(true);
+    try {
+      await deleteBooking(deletingBooking.id);
+      showToast('🗑️ Data booking berhasil dihapus!');
+      setDeletingBooking(null);
+      loadBookings();
+    } catch {
+      showToast('Gagal menghapus booking');
+    } finally {
+      setIsDeletingBookingProcess(false);
+    }
+  };
 
   useEffect(() => {
     loadTransactions();
@@ -205,7 +228,7 @@ export default function LaporanPenjualanPage() {
     const catMap: Record<string, { qty: number; amount: number }> = {};
     filtered.forEach((t) => {
       t.items.forEach((item) => {
-        const cat = item.product.category || 'Lainnya';
+        const cat = normalizeProductCategory(item.product.category);
         if (!catMap[cat]) catMap[cat] = { qty: 0, amount: 0 };
         catMap[cat].qty += item.quantity;
         catMap[cat].amount += item.product.price * item.quantity;
@@ -271,29 +294,26 @@ export default function LaporanPenjualanPage() {
     const occupancyRate = totalSlots > 0 ? `${Math.min(100, Math.round((usedSlots / totalSlots) * 100))}%` : '0%';
 
     // Payment breakdown
-    const dpPayMap: Record<string, number> = {};
-    const settlePayMap: Record<string, number> = {};
+    const paymentBreakdownMap: Record<string, number> = {};
     filtered.forEach((b) => {
-      if (b.dpPaymentMethod) {
-        dpPayMap[b.dpPaymentMethod] = (dpPayMap[b.dpPaymentMethod] || 0) + b.dpAmount;
+      const totalPaid = b.amountPaidTotal || 0;
+      const dpAmt = b.dpAmount || 0;
+      const realDp = Math.min(dpAmt, totalPaid);
+      const realSettle = Math.max(0, totalPaid - realDp);
+
+      if (b.dpPaymentMethod && realDp > 0) {
+        paymentBreakdownMap[b.dpPaymentMethod] = (paymentBreakdownMap[b.dpPaymentMethod] || 0) + realDp;
       }
-      if (b.settlementPaymentMethod && b.settlementAmount) {
-        settlePayMap[b.settlementPaymentMethod] =
-          (settlePayMap[b.settlementPaymentMethod] || 0) + b.settlementAmount;
+      if (b.settlementPaymentMethod && realSettle > 0) {
+        paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
       }
-    });
-    const mergedPay: Record<string, number> = {};
-    [dpPayMap, settlePayMap].forEach((map) => {
-      Object.entries(map).forEach(([method, amount]) => {
-        mergedPay[method] = (mergedPay[method] || 0) + amount;
-      });
     });
     const paymentColors: Record<string, string> = {
       CASH: '#f59e0b',
       QRIS: '#059669',
     };
-    const payTotal = Object.values(mergedPay).reduce((s, v) => s + v, 0) || 1;
-    const paymentBreakdown = Object.entries(mergedPay).map(([name, amount]) => ({
+    const payTotal = Object.values(paymentBreakdownMap).reduce((s, v) => s + v, 0) || 1;
+    const paymentBreakdown = Object.entries(paymentBreakdownMap).map(([name, amount]) => ({
       name: name === 'CASH' ? 'Cash (Tunai)' : name,
       amount,
       percent: Math.round((amount / payTotal) * 100),
@@ -542,8 +562,7 @@ export default function LaporanPenjualanPage() {
               value={customDate}
               onChange={(e) => {
                 if (e.target.value) {
-                  setCustomDate(e.target.value);
-                  setPeriod('CUSTOM');
+                  setSelectedDate(e.target.value);
                   setHoveredPoint(null);
                 }
               }}
@@ -822,20 +841,30 @@ export default function LaporanPenjualanPage() {
             <span className="text-[11px] text-slate-400">Total Omzet</span>
           </div>
           {kantinData.categoriesBreakdown.length > 0 ? (
-            <div className="space-y-3 pt-1">
+            <div className="space-y-2 pt-1">
               {kantinData.categoriesBreakdown.map((cat, idx) => (
-                <div key={idx} className="space-y-1">
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedCategoryDetail(cat.category)}
+                  className="w-full text-left space-y-1.5 p-2.5 rounded-xl hover:bg-slate-50 active:bg-slate-100/80 active:scale-[0.99] border border-transparent hover:border-slate-200/80 transition-all cursor-pointer group"
+                >
                   <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-800">{cat.category} ({cat.qty} pcs)</span>
+                    <span className="text-slate-800 group-hover:text-[#a62512] transition-colors flex items-center gap-1.5">
+                      <span>{cat.category} ({cat.qty} pcs)</span>
+                      <span className="text-[10px] font-normal text-slate-400 group-hover:text-[#a62512] inline-flex items-center">
+                        Lihat Rincian <ChevronRight className="w-3 h-3 ml-0.5 inline group-hover:translate-x-0.5 transition-transform" />
+                      </span>
+                    </span>
                     <span className="font-bold text-[#a62512]">{formatRupiah(cat.amount)}</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#a62512] to-[#eb4b2b] transition-all duration-500"
+                      className="h-full rounded-full bg-gradient-to-r from-[#a62512] to-[#eb4b2b] group-hover:brightness-105 transition-all duration-500"
                       style={{ width: `${cat.percent}%` }}
                     />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           ) : (
@@ -983,14 +1012,87 @@ export default function LaporanPenjualanPage() {
         isOpen={Boolean(selectedBookingForReceipt)}
         booking={selectedBookingForReceipt}
         onClose={() => setSelectedBookingForReceipt(null)}
+        onEdit={(b) => {
+          setSelectedBookingForReceipt(null);
+          setEditingBooking(b);
+        }}
+        onDelete={(b) => {
+          setSelectedBookingForReceipt(null);
+          setDeletingBooking(b);
+        }}
       />
 
-      {/* Modal Nota Transaksi Kantin */}
-      <ReceiptModal
+      {/* Modal Edit Booking Lapangan */}
+      <EditCourtBookingModal
+        isOpen={Boolean(editingBooking)}
+        booking={editingBooking}
+        onClose={() => setEditingBooking(null)}
+        onSuccess={() => {
+          loadBookings();
+          setEditingBooking(null);
+        }}
+      />
+
+      {/* Konfirmasi Hapus Booking Lapangan */}
+      {deletingBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="font-bold text-slate-900 text-base">Hapus Reservasi?</h3>
+              <p className="text-xs text-slate-500">
+                Apakah Anda yakin ingin menghapus data sewa <strong>{deletingBooking.customerName}</strong> ({deletingBooking.courtName})? Data tidak dapat dikembalikan.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingBooking(null)}
+                className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteBooking}
+                disabled={isDeletingBookingProcess}
+                className="py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs cursor-pointer"
+              >
+                {isDeletingBookingProcess ? 'Menghapus...' : 'Ya, Hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detail & Edit Transaksi Kantin */}
+      <TransactionDetailModal
         isOpen={Boolean(selectedTxForReceipt)}
         transaction={selectedTxForReceipt}
         onClose={() => setSelectedTxForReceipt(null)}
-        onNewTransaction={() => setSelectedTxForReceipt(null)}
+        onUpdated={() => {
+          loadTransactions();
+          setSelectedTxForReceipt(null);
+        }}
+      />
+
+      {/* Modal Rincian Penjualan per Kategori */}
+      <CategorySalesDetailModal
+        isOpen={Boolean(selectedCategoryDetail)}
+        onClose={() => setSelectedCategoryDetail(null)}
+        categoryName={selectedCategoryDetail || ''}
+        periodLabel={kantinData.label}
+        filteredTransactions={kantinData.filteredTransactions}
+        onOpenKantinReceipt={(tx) => setSelectedTxForReceipt(tx)}
+      />
+
+      {/* Modal Rekap Omset Gabungan */}
+      <OwnerDailyRevenueModal
+        isOpen={isOwnerRevenueModalOpen}
+        onClose={() => setIsOwnerRevenueModalOpen(false)}
+        initialDate={customDate}
       />
     </div>
   );

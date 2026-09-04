@@ -45,6 +45,12 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const dateInputRef = React.useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedDate(initialDate || todayStr);
+    }
+  }, [isOpen, initialDate, todayStr]);
+
   // Perhitungan Data Pendapatan Berdasarkan Tanggal yang Dipilih
   const revenueSummary = useMemo(() => {
     // 1. KANTIN / TOKO & F&B

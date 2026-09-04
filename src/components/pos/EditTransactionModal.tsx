@@ -144,8 +144,8 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
             <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight">
               Edit Transaksi
             </h3>
-            <p className="text-xs text-slate-500 font-mono font-medium">
-              Nota: {transaction.invoiceNumber}
+            <p className="text-xs text-slate-500 font-medium">
+              Ubah item pesanan atau metode pembayaran
             </p>
           </div>
           <button

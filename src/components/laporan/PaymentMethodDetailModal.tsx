@@ -63,25 +63,30 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
       filteredBookings.forEach((b) => {
         if (b.status === 'CANCELLED') return;
 
-        const isDpMatch = b.dpPaymentMethod === targetMethod && (b.dpAmount || 0) > 0;
-        const isSettleMatch = b.settlementPaymentMethod === targetMethod && (b.settlementAmount || 0) > 0;
+        const totalPaid = b.amountPaidTotal || 0;
+        const dpAmt = b.dpAmount || 0;
+        const realDp = Math.min(dpAmt, totalPaid);
+        const realSettle = Math.max(0, totalPaid - realDp);
+
+        const isDpMatch = b.dpPaymentMethod === targetMethod && realDp > 0;
+        const isSettleMatch = b.settlementPaymentMethod === targetMethod && realSettle > 0;
 
         if (isDpMatch && isSettleMatch) {
           list.push({
             booking: b,
-            paidAmount: (b.dpAmount || 0) + (b.settlementAmount || 0),
-            paymentType: 'LUNAS_LANGSUNG',
+            paidAmount: realDp + realSettle,
+            paymentType: b.remainingBalance === 0 ? 'LUNAS_LANGSUNG' : 'PELUNASAN',
           });
         } else if (isDpMatch) {
           list.push({
             booking: b,
-            paidAmount: b.dpAmount || 0,
+            paidAmount: realDp,
             paymentType: b.remainingBalance === 0 ? 'LUNAS_LANGSUNG' : 'DP',
           });
         } else if (isSettleMatch) {
           list.push({
             booking: b,
-            paidAmount: b.settlementAmount || 0,
+            paidAmount: realSettle,
             paymentType: 'PELUNASAN',
           });
         }
@@ -246,9 +251,6 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                          {b.bookingCode}
-                        </span>
                         <h4 className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">
                           {b.customerName}
                         </h4>
@@ -300,12 +302,9 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                          {t.invoiceNumber}
-                        </span>
-                        <span className="font-bold text-xs text-slate-900 line-clamp-1">
-                          {t.customerName ? t.customerName : 'Pelanggan Toko'}
-                        </span>
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-1">
+                          {t.customerName ? t.customerName : 'Pelanggan Umum'}
+                        </h4>
                       </div>
 
                       <div className="text-right">

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
-import { Transaction } from '@/types/pos';
+import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { CourtBooking } from '@/types/booking';
+import { useProductStore } from '@/lib/store/useProductStore';
 
 export interface KantinSalesItemRow {
   no: number;
@@ -44,18 +45,23 @@ export function buildKantinItemRows(transactions: Transaction[]): KantinSalesIte
   > = {};
 
   const validTx = transactions.filter((t) => t.status === 'COMPLETED');
+  const storeProducts = useProductStore.getState().products;
 
   validTx.forEach((tx) => {
     tx.items.forEach((item) => {
       const key = item.product.id || item.product.name;
       const price = item.product.price;
-      const cost = item.product.costPrice || 0;
+      const matched = storeProducts.find(
+        (p) => (item.product.id && p.id === item.product.id) ||
+               (p.name && item.product.name && p.name.trim().toLowerCase() === item.product.name.trim().toLowerCase())
+      );
+      const cost = item.product.costPrice ?? matched?.costPrice ?? 0;
       const cuanPerUnit = Math.max(0, price - cost);
 
       if (!itemMap[key]) {
         itemMap[key] = {
           name: item.product.name,
-          category: item.product.category || 'Lainnya',
+          category: normalizeProductCategory(item.product.category),
           unit: item.product.unit || 'pcs',
           qty: 0,
           price: price,
@@ -503,10 +509,6 @@ export function printCourtBookingsPDF(
                 ${b.startTime} - ${b.endTime}
                 <div style="font-size: 9px; color: #64748b; font-weight: normal;">(${b.durationHours} Jam)</div>
               </td>
-              <td style="border: 1px solid #cbd5e1; padding: 5px 6px; font-family: monospace; font-weight: bold; text-align: center; color: #334155;">
-                ${escapeHtml(b.bookingCode)}
-                ${b.bookingDate && b.bookingDate !== b.date ? `<div style="font-size: 8.5px; color: #94a3b8; font-weight: normal;">Pesan: ${b.bookingDate}</div>` : ''}
-              </td>
               <td style="border: 1px solid #cbd5e1; padding: 5px 8px;">
                 <div style="font-weight: 700; color: #0f172a;">${escapeHtml(b.customerName)}</div>
                 ${b.communityName ? `<div style="font-size: 9px; color: #64748b;">${escapeHtml(b.communityName)}</div>` : ''}
@@ -542,7 +544,7 @@ export function printCourtBookingsPDF(
           return `
           <!-- PEMBATAS TANGGAL -->
           <tr class="date-header-row" style="background-color: #ecfdf5; border-top: 2px solid #059669; border-bottom: 1.5px solid #10b981;">
-            <td colspan="9" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-top: 2px solid #059669;">
+            <td colspan="8" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-top: 2px solid #059669;">
               <table style="width: 100%; border: none; border-collapse: collapse; background: transparent; margin: 0;">
                 <tr style="background: transparent;">
                   <td style="border: none; padding: 0; font-size: 11.5px; font-weight: 800; color: #065f46; text-align: left;">
@@ -561,7 +563,7 @@ export function printCourtBookingsPDF(
         `;
         })
         .join('')
-    : `<tr><td colspan="9" style="text-align: center; padding: 16px; color: #94a3b8;">Belum ada data reservasi lapangan pada periode ini.</td></tr>`;
+    : `<tr><td colspan="8" style="text-align: center; padding: 16px; color: #94a3b8;">Belum ada data reservasi lapangan pada periode ini.</td></tr>`;
 
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -614,6 +616,9 @@ export function printCourtBookingsPDF(
           tr {
             page-break-inside: avoid;
           }
+          .total-row {
+            page-break-inside: avoid;
+          }
           .total-row td {
             background-color: #0f172a;
             color: #ffffff;
@@ -648,7 +653,7 @@ export function printCourtBookingsPDF(
             <div class="summary-val" style="color: #059669;">Rp ${totalPaid.toLocaleString('id-ID')}</div>
           </div>
           <div class="summary-card">
-            <div class="summary-title">Sisa Piutang / Belum Lunas</div>
+            <div class="summary-title">Belum Lunas</div>
             <div class="summary-val" style="color: #d97706;">Rp ${totalRemaining.toLocaleString('id-ID')}</div>
           </div>
         </div>
@@ -656,30 +661,27 @@ export function printCourtBookingsPDF(
         <table>
           <thead>
             <tr>
-              <th style="width: 25px;">No.</th>
-              <th style="width: 90px;">Jadwal</th>
-              <th style="width: 100px;">Kode</th>
+              <th style="width: 28px;">No.</th>
+              <th style="width: 95px;">Jadwal</th>
               <th>Nama Penyewa</th>
-              <th style="width: 110px;">Lapangan</th>
+              <th style="width: 115px;">Lapangan</th>
               <th style="width: 80px;">Kategori</th>
-              <th style="width: 85px;">Total Sewa</th>
-              <th style="width: 85px;">Terbayar</th>
-              <th style="width: 100px;">Status</th>
+              <th style="width: 90px;">Total Sewa</th>
+              <th style="width: 90px;">Terbayar</th>
+              <th style="width: 105px;">Status</th>
             </tr>
           </thead>
           <tbody>
             ${tableRows}
-          </tbody>
-          <tfoot>
             <tr class="total-row">
-              <td colspan="4" style="text-align: center;">TOTAL KESELURUHAN</td>
+              <td colspan="3" style="text-align: center;">TOTAL KESELURUHAN</td>
               <td style="text-align: center;">${activeBookings.length} Booking</td>
               <td style="text-align: center;">${totalHours} Jam</td>
               <td style="text-align: right;">Rp ${totalOmset.toLocaleString('id-ID')}</td>
               <td style="text-align: right; color: #4ade80;">Rp ${totalPaid.toLocaleString('id-ID')}</td>
               <td style="text-align: center; color: #fde047;">${totalRemaining > 0 ? `Sisa Rp ${totalRemaining.toLocaleString('id-ID')}` : 'LUNAS'}</td>
             </tr>
-          </tfoot>
+          </tbody>
         </table>
 
         <script>

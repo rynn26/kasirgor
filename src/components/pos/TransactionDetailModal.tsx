@@ -102,8 +102,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 <Receipt className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-mono font-bold text-slate-900 text-sm sm:text-base leading-tight">
-                  {currentTx.invoiceNumber}
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                  {currentTx.customerName ? currentTx.customerName : 'Pelanggan Umum'}
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {isCancelled ? (

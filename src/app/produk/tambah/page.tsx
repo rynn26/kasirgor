@@ -12,7 +12,7 @@ export default function TambahProdukOwnerPage() {
   const { addProduct } = useProductStore();
   const { showToast } = useToastStore();
 
-  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [isOwner, setIsOwner] = useState<boolean | null>(true);
 
   // Form State
   const [name, setName] = useState('');
@@ -31,12 +31,12 @@ export default function TambahProdukOwnerPage() {
       if (session) {
         try {
           const parsed = JSON.parse(session);
-          setIsOwner(parsed.role === 'owner');
+          setIsOwner(parsed.role !== 'kasir');
         } catch {
-          setIsOwner(false);
+          setIsOwner(true);
         }
       } else {
-        setIsOwner(false);
+        setIsOwner(true);
       }
     }
   }, []);
@@ -48,7 +48,10 @@ export default function TambahProdukOwnerPage() {
       return;
     }
 
-    if (isOwner && (!sellingPrice || Number(sellingPrice) <= 0)) {
+    const numPrice = Number(sellingPrice) || 0;
+    const numCostPrice = Number(costPrice) || 0;
+
+    if (isOwner && numPrice <= 0) {
       showToast('Silakan masukkan harga jual yang valid');
       return;
     }
@@ -56,8 +59,6 @@ export default function TambahProdukOwnerPage() {
     setIsSubmitting(true);
 
     try {
-      const numPrice = isOwner ? (Number(sellingPrice) || 0) : 0;
-      const numCostPrice = isOwner ? (Number(costPrice) || 0) : 0;
       const numStock = Number(stock) || 0;
       const autoSku = `PRD-${Math.floor(1000 + Math.random() * 9000)}`;
 

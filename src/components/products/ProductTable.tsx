@@ -20,7 +20,7 @@ export const ProductTable: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCat, setSelectedCat] = useState<string>('Semua');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -28,8 +28,12 @@ export const ProductTable: React.FC = () => {
       if (session) {
         try {
           const parsed = JSON.parse(session);
-          setIsOwner(parsed.role === 'owner');
-        } catch {}
+          setIsOwner(parsed.role !== 'kasir');
+        } catch {
+          setIsOwner(true);
+        }
+      } else {
+        setIsOwner(true);
       }
     }
   }, []);
@@ -138,12 +142,26 @@ export const ProductTable: React.FC = () => {
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
                   {isOwner ? (
                     <div>
-                      <span className="text-[10px] text-slate-400 block font-medium">
-                        Harga Jual
-                      </span>
-                      <span className="text-base font-black text-[#eb4b2b]">
-                        {formatRupiah(prod.price)}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block font-medium">
+                            Harga Jual
+                          </span>
+                          <span className="text-sm sm:text-base font-black text-[#eb4b2b]">
+                            {formatRupiah(prod.price)}
+                          </span>
+                        </div>
+                        {prod.costPrice !== undefined && prod.costPrice > 0 && (
+                          <div className="pl-3 border-l border-slate-200">
+                            <span className="text-[10px] text-slate-400 block font-medium">
+                              Modal
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-slate-600">
+                              {formatRupiah(prod.costPrice)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div>

@@ -82,6 +82,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
       setDate(y);
       setBookingDate(y);
       setIsSubmitting(false);
+      setIsManualAmount(false);
       if (courts.length > 0 && !courtId) {
         setCourtId(courts[0].id);
       }
@@ -113,6 +114,8 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
   // Recalculate default fee when court, duration, sport, or time changes
   const selectedCourt = courts.find((c) => c.id === courtId) || availableCourts[0] || courts[0];
 
+  const [isManualAmount, setIsManualAmount] = useState(false);
+
   useEffect(() => {
     if (selectedCourt) {
       const fee = calculateBookingFee(
@@ -125,9 +128,11 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
         selectedSport === 'Pickleball' ? 'insidentil' : (memberType === 'MEMBER' ? 'member' : 'insidentil'),
         selectedSport === 'Pickleball' ? 'pickleball' : 'badminton'
       );
-      setTotalAmount(fee.toString());
+      if (!isManualAmount && fee?.totalFee !== undefined) {
+        setTotalAmount(fee.totalFee.toString());
+      }
     }
-  }, [selectedCourt, date, startTime, durationHours, selectedSport, memberType, calculateBookingFee]);
+  }, [selectedCourt, date, startTime, durationHours, selectedSport, memberType, calculateBookingFee, isManualAmount]);
 
   if (!isOpen) return null;
 
@@ -186,10 +191,10 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
         dpPaymentMethod: paymentMethod,
         dpPaidAt: `${bookingDate}T${startTime}:00.000Z`,
         dpCashier: cashierName.trim() || 'Owner',
-        settlementAmount: isLunas ? numTotal : undefined,
-        settlementPaymentMethod: isLunas ? paymentMethod : undefined,
-        settlementPaidAt: isLunas ? `${date}T${startTime}:00.000Z` : undefined,
-        settlementCashier: isLunas ? (cashierName.trim() || 'Owner') : undefined,
+        settlementAmount: undefined,
+        settlementPaymentMethod: undefined,
+        settlementPaidAt: undefined,
+        settlementCashier: undefined,
         amountPaidTotal: finalAmountPaid,
         remainingBalance,
         status: isLunas ? 'SETTLED' : 'DP_PAID',
@@ -491,7 +496,10 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
                   inputMode="numeric"
                   required
                   value={totalAmount ? formatNumber(totalAmount) : ''}
-                  onChange={(e) => setTotalAmount(parseNumberInput(e.target.value).toString())}
+                  onChange={(e) => {
+                    setIsManualAmount(true);
+                    setTotalAmount(parseNumberInput(e.target.value).toString());
+                  }}
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl font-black text-slate-900 text-sm focus:outline-none focus:border-emerald-500"
                 />
               </div>

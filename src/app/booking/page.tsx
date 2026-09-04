@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah } from '@/lib/utils';
@@ -63,7 +64,11 @@ export default function BookingLapanganPage() {
   useEffect(() => {
     loadCourts();
     loadBookings();
-  }, []);
+    const appDateState = useAppDateStore.getState();
+    if (appDateState.isCustomActive && appDateState.selectedDate) {
+      setSelectedDate(appDateState.selectedDate);
+    }
+  }, [loadCourts, loadBookings, setSelectedDate]);
   const [settlementTargetId, setSettlementTargetId] = useState<string | null>(null);
 
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
@@ -167,7 +172,12 @@ export default function BookingLapanganPage() {
             <input
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                if (e.target.value) {
+                  useAppDateStore.getState().setSelectedDate(e.target.value);
+                }
+              }}
               onClick={(e) => {
                 try {
                   e.currentTarget.showPicker?.();
@@ -532,6 +542,7 @@ export default function BookingLapanganPage() {
         initialCourtId={prefilledCourtId}
         initialStartTime={prefilledStartTime}
         initialDate={selectedDate}
+        initialDuration={1}
         onClose={() => setIsDpModalOpen(false)}
         onSuccess={(booking) => {
           setIsDpModalOpen(false);

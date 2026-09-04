@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   Store,
   CalendarCheck,
+  Calendar,
   Repeat,
   Wallet,
 } from 'lucide-react';
@@ -28,7 +29,8 @@ import { useProductStore } from '@/lib/store/useProductStore';
 import { useCartStore } from '@/lib/store/useCartStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
-import { ReceiptModal } from '@/components/pos/ReceiptModal';
+import { useAppDateStore } from '@/lib/store/useAppDateStore';
+import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Transaction } from '@/types/pos';
 
 type TimeFilter = 'HARI' | 'MINGGU' | 'BULAN';
@@ -52,11 +54,15 @@ export default function DashboardUnifiedPage() {
   const [greeting, setGreeting] = useState('Selamat sore');
   const [isMounted, setIsMounted] = useState(false);
 
+  // Global Active Date Store (Prioritas Tanggal)
+  const { selectedDate, isCustomActive, resetToToday } = useAppDateStore();
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const activeDate = isCustomActive && selectedDate ? selectedDate : todayStr;
+
   // Load data from Supabase on mount
   useEffect(() => {
     loadProducts();
     loadTransactions();
-    const today = new Date().toISOString().split('T')[0];
     loadCourts();
     loadBookings();
     setIsMounted(true);
@@ -106,8 +112,14 @@ export default function DashboardUnifiedPage() {
   };
 
   const totalCartItems = getTotalItems();
-  const summary = getDailySummary();
-  const recentTransactions = transactions.slice(0, 5);
+  const summary = useMemo(() => getDailySummary(activeDate), [getDailySummary, activeDate, transactions]);
+  const recentTransactions = useMemo(() => {
+    if (isCustomActive) {
+      const filtered = transactions.filter((t) => t.createdAt.startsWith(activeDate));
+      return filtered.length > 0 ? filtered.slice(0, 10) : [];
+    }
+    return transactions.slice(0, 5);
+  }, [transactions, isCustomActive, activeDate]);
   const activeShiftName = selectedShift?.name || (storedCashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang');
 
   // Low stock products (stok <= 15 dan stok > 0)
@@ -155,14 +167,13 @@ export default function DashboardUnifiedPage() {
     txList: typeof transactions
   ) => {
     if (filter === 'HARI') {
-      // Hourly for today
+      // Hourly for activeDate
       const hours = [8, 11, 14, 17, 20, 22];
-      const today = new Date().toISOString().split('T')[0];
       return hours.map((h, i) => {
         const nextH = hours[i + 1] ?? 24;
         const value = txList
           .filter((t) => {
-            if (!t.createdAt.startsWith(today)) return false;
+            if (!t.createdAt.startsWith(activeDate)) return false;
             const txH = new Date(t.createdAt).getHours();
             return txH >= h && txH < nextH;
           })
@@ -208,13 +219,12 @@ export default function DashboardUnifiedPage() {
       y: Math.round(165 - ((p.value / maxVal) * 125)),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeFilter, transactions]);
+  }, [timeFilter, transactions, activeDate]);
 
-  // Court bookings for today
-  const today = new Date().toISOString().split('T')[0];
+  // Court bookings for active date
   const todayCourtBookings = useMemo(
-    () => bookings.filter((b) => b.date === today && b.status !== 'CANCELLED'),
-    [bookings, today]
+    () => bookings.filter((b) => b.date === activeDate && b.status !== 'CANCELLED'),
+    [bookings, activeDate]
   );
 
   // Court status list — merge courts with today's active bookings
@@ -285,16 +295,21 @@ export default function DashboardUnifiedPage() {
   // Kasir lapangan: pelunasan menunggu count
   const pendingSettlementCount = todayCourtBookings.filter((b) => b.status === 'DP_PAID').length;
 
-  // Kantin hero revenue (today)
+  // Kantin hero revenue (activeDate)
   const todayRevenue = summary.totalRevenue;
   const yesterdayRevenue = useMemo(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const ydStr = yesterday.toISOString().split('T')[0];
-    return transactions
-      .filter((t) => t.status === 'COMPLETED' && t.createdAt.startsWith(ydStr))
-      .reduce((s, t) => s + t.grandTotal, 0);
-  }, [transactions]);
+    try {
+      const [y, m, d] = activeDate.split('-').map(Number);
+      const prevDate = new Date(y, m - 1, d - 1);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const ydStr = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}-${pad(prevDate.getDate())}`;
+      return transactions
+        .filter((t) => t.status === 'COMPLETED' && t.createdAt.startsWith(ydStr))
+        .reduce((s, t) => s + t.grandTotal, 0);
+    } catch {
+      return 0;
+    }
+  }, [transactions, activeDate]);
 
   const revenueGrowth =
     yesterdayRevenue > 0
@@ -322,6 +337,34 @@ export default function DashboardUnifiedPage() {
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-6 max-w-md mx-auto space-y-4 pb-28">
+
+      {/* ============================================================ */}
+      {/* 📅 ACTIVE GLOBAL DATE FILTER BANNER (Prioritas Tanggal Aktif) */}
+      {/* ============================================================ */}
+      {isCustomActive && (
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3.5 rounded-2xl shadow-sm flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-black tracking-wider text-amber-100 block">
+                Filter Tanggal Prioritas Aktif
+              </span>
+              <span className="text-xs sm:text-sm font-black truncate block">
+                {formatDate(activeDate)}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => resetToToday()}
+            className="px-3 py-1.5 rounded-xl bg-white text-orange-600 hover:bg-orange-50 font-black text-xs shrink-0 transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            Reset Hari Ini
+          </button>
+        </div>
+      )}
 
       {/* ============================================================ */}
       {/* UNIT SWITCHER PILL (Kantin vs Lapangan) */}
@@ -415,7 +458,7 @@ export default function DashboardUnifiedPage() {
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-1 shadow-2xs">
                 <span className="text-xs font-semibold text-slate-500 block">
-                  Transaksi Hari Ini
+                  {isCustomActive ? 'Transaksi' : 'Transaksi Hari Ini'}
                 </span>
                 <div className="text-2xl font-black text-slate-900 tracking-tight">
                   {summary.totalTransactions}
@@ -452,8 +495,10 @@ export default function DashboardUnifiedPage() {
                         </div>
 
                         <div className="min-w-0">
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-[#eb4b2b] transition-colors font-mono">
-                            {tx.invoiceNumber}
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-[#eb4b2b] transition-colors">
+                            {tx.items && tx.items.length > 0
+                              ? tx.items.map((i) => `${i.product.name} (${i.quantity}x)`).join(', ')
+                              : (tx.customerName || 'Pelanggan Umum')}
                           </h4>
                           <p suppressHydrationWarning className="text-[11px] text-slate-400 mt-0.5">
                             {isMounted ? formatDate(tx.createdAt, true) : '—'} • {tx.items.reduce((s, i) => s + i.quantity, 0)} Item
@@ -473,7 +518,7 @@ export default function DashboardUnifiedPage() {
                   ))
                 ) : (
                   <div className="py-6 text-center text-xs text-slate-400">
-                    Belum ada transaksi hari ini. Klik <strong>MULAI TRANSAKSI</strong> di atas.
+                    Belum ada transaksi {isCustomActive ? 'pada tanggal ini' : 'hari ini'}. Klik <strong>MULAI TRANSAKSI</strong> di atas.
                   </div>
                 )}
               </div>
@@ -569,7 +614,7 @@ export default function DashboardUnifiedPage() {
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-1 shadow-2xs">
                 <span className="text-xs font-semibold text-slate-500 block">
-                  Jadwal Hari Ini
+                  {isCustomActive ? 'Jadwal' : 'Jadwal Hari Ini'}
                 </span>
                 <div className="text-2xl font-black text-slate-900 tracking-tight">
                   {todayCourtBookings.length} <span className="text-xs font-bold text-slate-400">Tim</span>
@@ -589,7 +634,7 @@ export default function DashboardUnifiedPage() {
             {/* Jadwal Terdekat */}
             <div className="pt-2">
               <h3 className="text-base font-bold text-slate-900 mb-3">
-                Jadwal Lapangan Hari Ini
+                Jadwal Lapangan {isCustomActive ? formatDate(activeDate) : 'Hari Ini'}
               </h3>
 
               <div className="space-y-2.5">
@@ -628,7 +673,7 @@ export default function DashboardUnifiedPage() {
                   ))
                 ) : (
                   <div className="py-6 text-center text-xs text-slate-400">
-                    Belum ada jadwal booking hari ini.
+                    Belum ada jadwal booking {isCustomActive ? 'pada tanggal ini' : 'hari ini'}.
                   </div>
                 )}
               </div>
@@ -701,7 +746,7 @@ export default function DashboardUnifiedPage() {
               <div className="w-full bg-white rounded-[24px] p-5 sm:p-6 shadow-xs border border-slate-200/80 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs sm:text-sm font-medium text-slate-500 block">
-                    Penjualan Toko & Kantin Hari Ini
+                    {isCustomActive ? `Penjualan Toko & Kantin (${formatDate(activeDate)})` : 'Penjualan Toko & Kantin Hari Ini'}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-red-50 text-[#eb4b2b] font-bold text-[10px]">
                     Kantin / Kasir
@@ -943,7 +988,7 @@ export default function DashboardUnifiedPage() {
               <div className="w-full bg-white rounded-[24px] p-5 sm:p-6 shadow-xs border border-slate-200/80 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs sm:text-sm font-medium text-slate-500 block">
-                    Pendapatan Sewa Lapangan Hari Ini
+                    {isCustomActive ? `Pendapatan Sewa Lapangan (${formatDate(activeDate)})` : 'Pendapatan Sewa Lapangan Hari Ini'}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[10px]">
                     Arena Lapangan GOR
@@ -956,7 +1001,7 @@ export default function DashboardUnifiedPage() {
 
                 <div className="flex items-center justify-between pt-1 text-xs">
                   <div className="text-slate-400 font-medium">
-                    {todayCourtBookings.length} booking tercatat hari ini
+                    {todayCourtBookings.length} booking tercatat {isCustomActive ? 'pada tanggal ini' : 'hari ini'}
                   </div>
                   <span className="text-slate-400 font-medium">
                     {bookingsPendingSettlement > 0 ? `${bookingsPendingSettlement} menunggu pelunasan` : 'Semua lunas'}
@@ -1171,7 +1216,7 @@ export default function DashboardUnifiedPage() {
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                    Jadwal Hari Ini
+                    {isCustomActive ? `Jadwal (${formatDate(activeDate)})` : 'Jadwal Hari Ini'}
                   </h2>
                   <Link href="/booking/history" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
                     Riwayat Nota
@@ -1217,7 +1262,7 @@ export default function DashboardUnifiedPage() {
                     ))
                   ) : (
                     <div className="py-6 text-center text-xs text-slate-400">
-                      Belum ada jadwal booking hari ini.
+                      Belum ada jadwal booking {isCustomActive ? 'pada tanggal ini' : 'hari ini'}.
                     </div>
                   )}
                 </div>
@@ -1392,21 +1437,19 @@ export default function DashboardUnifiedPage() {
         </div>
       )}
 
-      {/* Receipt Modal */}
-      <ReceiptModal
+      {/* Transaction Detail, Edit & Void Modal */}
+      <TransactionDetailModal
         isOpen={Boolean(selectedTx)}
         transaction={selectedTx}
         onClose={() => setSelectedTx(null)}
-        onNewTransaction={() => {
-          setSelectedTx(null);
-          router.push('/kasir');
-        }}
+        onUpdated={() => loadTransactions()}
       />
 
       {/* Owner Daily Revenue Modal */}
       <OwnerDailyRevenueModal
         isOpen={isOwnerRevenueModalOpen}
         onClose={() => setIsOwnerRevenueModalOpen(false)}
+        initialDate={activeDate}
       />
     </div>
   );

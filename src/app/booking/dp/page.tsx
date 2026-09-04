@@ -190,6 +190,7 @@ export default function InputDpBookingPage() {
 
   // State for manual total sewa, discount & DP
   const [totalSewa, setTotalSewa] = useState<number>(150000);
+  const [isManualTotal, setIsManualTotal] = useState<boolean>(false);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [baseRatePerHour, setBaseRatePerHour] = useState<number>(75000);
   const [feeBreakdown, setFeeBreakdown] = useState<Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }>>([]);
@@ -214,11 +215,11 @@ export default function InputDpBookingPage() {
       );
       setBaseRatePerHour(calc.ratePerHour);
       setFeeBreakdown(calc.breakdown);
-      // Harga memberDayPrice / memberNightPrice sudah harga BULANAN (flat per bulan)
-      // TIDAK perlu dikalikan sessionCount lagi
-      setTotalSewa(calc.totalFee);
+      if (!isManualTotal) {
+        setTotalSewa(calc.totalFee);
+      }
     }
-  }, [selectedCourtIds, date, startTime, calculatedDuration, courtCount, memberType, selectedSport, memberSchedule.sessionCount]);
+  }, [selectedCourtIds, date, startTime, calculatedDuration, courtCount, memberType, selectedSport, memberSchedule.sessionCount, isManualTotal]);
 
   // Calculate max courts and available courts depending on sport
   const maxCourts = selectedSport === 'Pickleball' ? 2 : 4;
@@ -767,7 +768,10 @@ export default function InputDpBookingPage() {
                 inputMode="numeric"
                 required
                 value={totalSewa ? formatNumber(totalSewa) : ''}
-                onChange={(e) => setTotalSewa(parseNumberInput(e.target.value))}
+                onChange={(e) => {
+                  setIsManualTotal(true);
+                  setTotalSewa(parseNumberInput(e.target.value));
+                }}
                 placeholder="Contoh: 150.000"
                 className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />

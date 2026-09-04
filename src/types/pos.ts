@@ -15,6 +15,27 @@ export const PRODUCT_CATEGORIES = [
   'Perlengkapan Olahraga',
 ] as const;
 
+export function normalizeProductCategory(rawCategory?: string | null): ProductCategory {
+  if (!rawCategory) return 'Makanan & Snack';
+  const trimmed = rawCategory.trim();
+  if (
+    trimmed === 'Makanan' ||
+    trimmed === 'Snack & Cemilan' ||
+    trimmed.toLowerCase() === 'snack' ||
+    trimmed.toLowerCase() === 'makanan'
+  ) {
+    return 'Makanan & Snack';
+  }
+  if (
+    trimmed === 'Peralatan & Raket' ||
+    trimmed === 'Aksesoris & Grip' ||
+    trimmed === 'Pakaian & Kaos Kaki'
+  ) {
+    return 'Perlengkapan Olahraga';
+  }
+  return trimmed as ProductCategory;
+}
+
 export interface Product {
   id: string;
   sku: string;

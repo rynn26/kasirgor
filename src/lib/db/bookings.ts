@@ -102,7 +102,17 @@ function mapDbToBooking(
     dpPaymentMethod: (row.dp_payment_method as PaymentMethod) || undefined,
     dpPaidAt: row.dp_paid_at || undefined,
     dpCashier: row.dp_cashier || undefined,
-    settlementAmount: row.settlement_amount ? Number(row.settlement_amount) : undefined,
+    settlementAmount: (() => {
+      const rawSettlement = row.settlement_amount ? Number(row.settlement_amount) : 0;
+      const dpAmt = Number(row.dp_amount);
+      const paidTot = Number(row.amount_paid_total);
+      // Jika DP + Settlement melebihi total bayar (akibat data ganda saat Sewa Langsung)
+      if (rawSettlement > 0 && dpAmt + rawSettlement > paidTot && paidTot > 0) {
+        const remainingSettle = Math.max(0, paidTot - dpAmt);
+        return remainingSettle > 0 ? remainingSettle : undefined;
+      }
+      return rawSettlement > 0 ? rawSettlement : undefined;
+    })(),
     settlementPaymentMethod:
       (row.settlement_payment_method as PaymentMethod) || undefined,
     settlementPaidAt: row.settlement_paid_at || undefined,
