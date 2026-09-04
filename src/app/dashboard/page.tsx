@@ -288,7 +288,29 @@ export default function DashboardUnifiedPage() {
   // Court KPI stats
   const courtsInPlay = courtStatusList.filter((c) => c.status === 'IN_PLAY').length;
   const bookingsPendingSettlement = todayCourtBookings.filter((b) => b.status === 'DP_PAID').length;
-  const totalBookingRevenue = todayCourtBookings.reduce((s, b) => s + b.amountPaidTotal, 0);
+
+  // Revenue dihitung berdasarkan tanggal uang masuk (DP date & settle date), BUKAN tanggal main
+  // Misal: DP tgl 1 = masuk ke tgl 1, Pelunasan tgl 2 = masuk ke tgl 2
+  const totalBookingRevenue = useMemo(() => {
+    let total = 0;
+    bookings.forEach((b) => {
+      if (b.status === 'CANCELLED') return;
+      const totalPaid = b.amountPaidTotal || 0;
+      const dpAmt = b.dpAmount || 0;
+      const realDp = Math.min(dpAmt, totalPaid);
+      const realSettle = Math.max(0, totalPaid - realDp);
+
+      const bookingDateStr = b.bookingDate || (b.createdAt ? b.createdAt.split('T')[0] : b.date);
+      const dpDate = b.dpPaidAt ? b.dpPaidAt.split('T')[0] : bookingDateStr;
+      const settleDate = b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : bookingDateStr;
+
+      // DP masuk ke tanggal booking/DP
+      if (dpDate === activeDate && realDp > 0) total += realDp;
+      // Pelunasan masuk ke tanggal pelunasan (hanya jika berbeda hari dari DP agar tidak double-count lunas langsung)
+      if (realSettle > 0 && settleDate === activeDate && settleDate !== dpDate) total += realSettle;
+    });
+    return total;
+  }, [bookings, activeDate]);
   const occupancyPct =
     courts.length > 0 ? Math.round((courtsInPlay / courts.length) * 100) : 0;
 

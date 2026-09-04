@@ -6,6 +6,7 @@ import {
   upsertManyPricingRules,
   deletePricingRulesByMonth,
   ensureDefaultPricingRule,
+  repairNullTimeFields,
 } from '@/lib/db/courtPricing';
 
 export interface TimeSlotPricing {
@@ -113,9 +114,24 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         set({ isLoading: true });
         try {
           await ensureDefaultPricingRule();
+          // Repair data lama yang punya night_start null di Supabase
+          await repairNullTimeFields();
           const dbRules = await fetchAllPricingRules();
           if (dbRules.length > 0) {
-            set({ rules: dbRules });
+            // Normalize semua rules: pastikan time fields tidak null
+            const normalizedRules = dbRules.map((r) => ({
+              ...r,
+              pricing: {
+                ...r.pricing,
+                dayStart: r.pricing.dayStart || '08:00',
+                dayEnd: r.pricing.dayEnd || '17:00',
+                nightStart: r.pricing.nightStart || '17:00',
+                nightEnd: r.pricing.nightEnd || '23:00',
+                afternoonStart: r.pricing.afternoonStart || '17:00',
+                afternoonEnd: r.pricing.afternoonEnd || '23:00',
+              },
+            }));
+            set({ rules: normalizedRules });
           }
         } catch (e) {
           console.error('[courtPricing] loadFromDb error:', e);
@@ -190,7 +206,12 @@ export const useCourtPricingStore = create<CourtPricingState>()(
         const monthKey = dateStr ? dateStr.slice(0, 7) : 'ALL';
         const pricing = get().getPricing(courtId, monthKey);
         const hour = parseInt(timeStr.split(':')[0], 10);
-        const dayEndHour = parseInt(pricing.dayEnd.split(':')[0], 10);
+
+        // Tentukan threshold malam: pakai nightStart, fallback ke dayEnd
+        // Jika nilainya >= 20 (tidak masuk akal sebagai batas siang/malam), paksa 17:00
+        const rawThreshold = pricing.nightStart || pricing.dayEnd || '17:00';
+        const rawHour = parseInt(rawThreshold.split(':')[0], 10);
+        const nightStartHour = (rawHour > 0 && rawHour < 20) ? rawHour : 17;
 
         const isPickleball = sportType === 'pickleball';
         const isMember = !isPickleball && customerType === 'member';
@@ -209,8 +230,9 @@ export const useCourtPricingStore = create<CourtPricingState>()(
           nightPrice = pricing.nightPrice || fallbackPrice || 85000;
         }
 
-        if (hour < dayEndHour) {
-          return { price: dayPrice, period: 'Pagi', timeRange: `${pricing.dayStart} - ${pricing.dayEnd}` };
+        // Jam < nightStart = Pagi-Sore, jam >= nightStart = Sore-Malam
+        if (hour < nightStartHour) {
+          return { price: dayPrice, period: 'Pagi', timeRange: `${pricing.dayStart} - ${pricing.nightStart || pricing.dayEnd}` };
         } else {
           return { price: nightPrice, period: 'Malam', timeRange: `${pricing.nightStart} - ${pricing.nightEnd}` };
         }

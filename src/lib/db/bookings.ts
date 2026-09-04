@@ -204,6 +204,7 @@ export async function createBooking(
       customer_name: booking.customerName,
       phone: booking.phone,
       community_name: booking.communityName || null,
+      booking_date: booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : new Date().toISOString().split('T')[0]),
       date: booking.date,
       court_id: booking.courtId || null,
       court_name: booking.courtName,

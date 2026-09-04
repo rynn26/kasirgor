@@ -88,6 +88,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const [isManualFee, setIsManualFee] = useState<boolean>(false);
   const [autoFee, setAutoFee] = useState<number>(0);
   const [baseRatePerHour, setBaseRatePerHour] = useState<number>(40000);
+  const [feeBreakdown, setFeeBreakdown] = useState<Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }>>([]);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [cashReceived, setCashReceived] = useState<number>(0);
@@ -146,12 +147,13 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       );
       setAutoFee(calc.totalFee);
       setBaseRatePerHour(calc.ratePerHour);
+      setFeeBreakdown(calc.breakdown);
       // Only set courtFee if user has not manually typed a custom fee
       if (!isManualFee) {
         setCourtFee(calc.totalFee);
       }
     }
-  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball, isManualFee]);
+  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball, isManualFee, calculateBookingFee]);
 
   if (!isOpen) return null;
 
@@ -384,22 +386,35 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             </div>
 
             {/* Schedule Highlight Banner */}
-            <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-700" />
-                <div>
-                  <span className="font-semibold text-amber-900 block">
+            <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-700" />
+                  <span className="font-semibold text-amber-900">
                     {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan
                   </span>
-                  <span className="text-[10px] text-amber-800 font-medium">
-                    {courtFee > 0 && `Tarif Waktu Otomatis: ${formatRupiah(courtFee)}`}
-                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-amber-700 block">{selectedCourt?.name.split(' ')[0]} {selectedCourt?.name.split(' ')[1]}</span>
+                  <span className="font-black text-[#b92b10]">{formatRupiah(courtFee)}</span>
                 </div>
               </div>
-              <div className="font-bold text-amber-900 text-right">
-                <span>{selectedCourt?.name.split(' ')[0]} {selectedCourt?.name.split(' ')[1]}</span>
-                <span className="block text-[11px] font-black text-[#b92b10]">{formatRupiah(courtFee)}</span>
-              </div>
+              {/* Breakdown tarif per jam — tampil jika ada >1 slot atau beda tarif */}
+              {!isManualFee && feeBreakdown.length > 0 && (
+                <div className="border-t border-amber-200/60 pt-1.5 space-y-0.5">
+                  {feeBreakdown.map((b, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px]">
+                      <span className={`font-medium ${b.period === 'Malam' ? 'text-indigo-700' : 'text-amber-800'}`}>
+                        {b.period === 'Malam' ? '🌙' : '☀️'} {b.hour} ({b.period})
+                        {courtCount > 1 ? ` × ${courtCount} lapangan` : ''}
+                      </span>
+                      <span className="font-bold text-slate-700">
+                        {formatRupiah(b.price * (courtCount || 1))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

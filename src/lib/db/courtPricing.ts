@@ -28,14 +28,14 @@ function mapDbToRule(row: DbCourtPricingRule): PricingRule {
     monthKey: row.month_key,
     pricing: {
       dayPrice: Number(row.day_price),
-      dayStart: row.day_start,
-      dayEnd: row.day_end,
+      dayStart: row.day_start || '08:00',
+      dayEnd: row.day_end || '17:00',
       afternoonPrice: Number(row.afternoon_price),
-      afternoonStart: row.afternoon_start,
-      afternoonEnd: row.afternoon_end,
+      afternoonStart: row.afternoon_start || '17:00',
+      afternoonEnd: row.afternoon_end || '23:00',
       nightPrice: Number(row.night_price),
-      nightStart: row.night_start,
-      nightEnd: row.night_end,
+      nightStart: row.night_start || '17:00',   // fallback ke 17:00 jika null
+      nightEnd: row.night_end || '23:00',
       memberDayPrice: Number(row.member_day_price ?? row.day_price),
       memberNightPrice: Number(row.member_night_price ?? row.night_price),
       pickleballDayPrice: Number(row.pickleball_day_price ?? row.day_price),
@@ -146,5 +146,36 @@ export async function ensureDefaultPricingRule(): Promise<void> {
       monthKey: 'ALL',
       pricing: { ...DEFAULT_PRICING },
     });
+  }
+}
+
+/** Perbaiki semua rows yang punya night_start / night_end null di Supabase */
+export async function repairNullTimeFields(): Promise<void> {
+  try {
+    // Ambil semua rows yang punya night_start null
+    const { data: nullRows } = await supabase
+      .from('court_pricing_rules')
+      .select('id, night_start, night_end, day_start, day_end, afternoon_start, afternoon_end')
+      .or('night_start.is.null,night_end.is.null');
+
+    if (!nullRows || nullRows.length === 0) return;
+
+    // Patch tiap row yang null
+    for (const row of nullRows) {
+      await supabase
+        .from('court_pricing_rules')
+        .update({
+          night_start: row.night_start || '17:00',
+          night_end: row.night_end || '23:00',
+          day_start: row.day_start || '08:00',
+          day_end: row.day_end || '17:00',
+          afternoon_start: row.afternoon_start || '17:00',
+          afternoon_end: row.afternoon_end || '23:00',
+        })
+        .eq('id', row.id);
+    }
+    console.log(`[courtPricing] Repaired ${nullRows.length} rows with null time fields`);
+  } catch (e) {
+    console.error('[courtPricing] repairNullTimeFields error:', e);
   }
 }

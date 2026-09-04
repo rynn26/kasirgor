@@ -776,6 +776,19 @@ export default function InputDpBookingPage() {
                 className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />
             </div>
+            {/* Breakdown tarif per jam */}
+            {!isManualTotal && feeBreakdown.length > 1 && (
+              <div className="px-1 space-y-0.5 pt-0.5">
+                {feeBreakdown.map((b, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px]">
+                    <span className={`font-medium ${b.period === 'Malam' ? 'text-indigo-700' : 'text-amber-700'}`}>
+                      {b.period === 'Malam' ? '🌙' : '☀️'} {b.hour} ({b.period}){courtCount > 1 ? ` ×${courtCount}` : ''}
+                    </span>
+                    <span className="font-bold text-slate-700">{formatRupiah(b.price * (courtCount || 1))}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">
