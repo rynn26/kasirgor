@@ -275,7 +275,7 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
                       <div className="flex items-center gap-1.5 line-clamp-1">
                         <CalendarCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{b.courtName} • {b.startTime}-{b.endTime}</span>
+                        <span>{b.courtName} • {b.bookingDate && b.bookingDate !== b.date ? `Booking ${b.bookingDate} · ` : ''}Main {b.date} ({b.startTime}-{b.endTime})</span>
                       </div>
                       
                       <div className="flex items-center gap-1 text-slate-400 group-hover:text-emerald-700 font-bold text-[11px] transition-colors shrink-0">

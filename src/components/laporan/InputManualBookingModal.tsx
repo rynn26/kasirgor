@@ -21,7 +21,7 @@ import { PaymentMethod } from '@/types/pos';
 interface InputManualBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (date?: string) => void;
 }
 
 export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = ({
@@ -202,7 +202,7 @@ export const InputManualBookingModal: React.FC<InputManualBookingModalProps> = (
       });
 
       showToast(`Data sewa lapangan tanggal ${date} berhasil dicatat ke laporan!`);
-      if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess(date);
       onClose();
     } catch (err) {
       console.error('Gagal mencatat sewa lapangan manual:', err);

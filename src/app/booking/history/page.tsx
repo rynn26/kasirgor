@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah } from '@/lib/utils';
 import { CourtBooking } from '@/types/booking';
@@ -30,6 +31,11 @@ import { exportCourtBookingsToExcel, printCourtBookingsPDF } from '@/lib/exportU
 
 export default function HistoryBookingPage() {
   const { bookings, loadBookings, deleteBooking, cancelBooking } = useCourtBookingStore();
+  const {
+    selectedDate: globalSelectedDate,
+    isCustomActive,
+    setSelectedDate: setGlobalDate,
+  } = useAppDateStore();
   const { showToast } = useToastStore();
 
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -45,9 +51,12 @@ export default function HistoryBookingPage() {
       const d = params.get('date');
       if (d) {
         setSelectedDate(d);
+        setGlobalDate(d);
+      } else if (isCustomActive && globalSelectedDate) {
+        setSelectedDate(globalSelectedDate);
       }
     }
-  }, [loadBookings]);
+  }, [loadBookings, isCustomActive, globalSelectedDate, setGlobalDate]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState<'ALL' | 'CASH' | 'QRIS'>('ALL');
@@ -58,52 +67,96 @@ export default function HistoryBookingPage() {
   const [deletingBooking, setDeletingBooking] = useState<CourtBooking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Financial Summary
-  const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
-  const totalRevenue = activeBookings.reduce((sum, b) => sum + b.amountPaidTotal, 0);
+  // Helper: Dapatkan tanggal transaksi / uang masuk
+  const getTxDate = (b: CourtBooking) =>
+    b.bookingDate || (b.dpPaidAt ? b.dpPaidAt.split('T')[0] : (b.createdAt ? b.createdAt.split('T')[0] : b.date));
+
+  const getSettleDate = (b: CourtBooking) =>
+    b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : getTxDate(b);
+
+  // Financial Summary (menyesuaikan dengan tanggal yang dipilih jika ada)
+  const activeBookings = bookings.filter((b) => {
+    if (b.status === 'CANCELLED') return false;
+    if (selectedDate) {
+      const txDate = getTxDate(b);
+      const settleDate = getSettleDate(b);
+      return txDate === selectedDate || settleDate === selectedDate;
+    }
+    return true;
+  });
+
+  const totalRevenue = activeBookings.reduce((sum, b) => {
+    if (!selectedDate) return sum + b.amountPaidTotal;
+    const totalPaid = b.amountPaidTotal || 0;
+    const dpAmt = b.dpAmount || 0;
+    const realDp = Math.min(dpAmt, totalPaid);
+    const realSettle = Math.max(0, totalPaid - realDp);
+    const txDate = getTxDate(b);
+    const settleDate = getSettleDate(b);
+
+    let amt = 0;
+    if (txDate === selectedDate) {
+      amt += realDp;
+      if (settleDate === txDate) {
+        amt += realSettle;
+      }
+    } else if (settleDate === selectedDate) {
+      amt += realSettle;
+    }
+    return sum + amt;
+  }, 0);
+
   const lunasCount = activeBookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
   const pendingDpCount = activeBookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
   const totalPiutang = activeBookings.reduce((sum, b) => sum + b.remainingBalance, 0);
 
   // Filtered List
-  const filtered = bookings.filter((bkg) => {
-    // Search filter
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      const matchCode = bkg.bookingCode.toLowerCase().includes(q);
-      const matchName = bkg.customerName.toLowerCase().includes(q);
-      const matchPhone = bkg.phone.toLowerCase().includes(q);
-      const matchCourt = bkg.courtName.toLowerCase().includes(q);
-      if (!matchCode && !matchName && !matchPhone && !matchCourt) return false;
-    }
-
-    // Method filter
-    if (methodFilter !== 'ALL') {
-      const isMethodMatch = bkg.dpPaymentMethod === methodFilter || bkg.settlementPaymentMethod === methodFilter;
-      if (!isMethodMatch) return false;
-    }
-
-    // Status filter
-    if (statusFilter !== 'ALL') {
-      if (statusFilter === 'CANCELLED') {
-        if (bkg.status !== 'CANCELLED') return false;
-      } else if (statusFilter === 'SETTLED') {
-        if (bkg.status !== 'SETTLED' && bkg.remainingBalance > 0) return false;
-      } else if (statusFilter === 'DP_PAID') {
-        if (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0) return false;
+  const filtered = bookings
+    .filter((bkg) => {
+      // Search filter
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchCode = bkg.bookingCode.toLowerCase().includes(q);
+        const matchName = bkg.customerName.toLowerCase().includes(q);
+        const matchPhone = bkg.phone.toLowerCase().includes(q);
+        const matchCourt = bkg.courtName.toLowerCase().includes(q);
+        if (!matchCode && !matchName && !matchPhone && !matchCourt) return false;
       }
-    }
 
-    // Date filter (matches play date, booking date, or recurring member dates)
-    if (selectedDate) {
-      const matchPlayDate = bkg.date === selectedDate;
-      const matchBookingDate = bkg.bookingDate === selectedDate;
-      const matchMemberDates = Array.isArray(bkg.memberDates) && bkg.memberDates.includes(selectedDate);
-      if (!matchPlayDate && !matchBookingDate && !matchMemberDates) return false;
-    }
+      // Method filter
+      if (methodFilter !== 'ALL') {
+        const isMethodMatch = bkg.dpPaymentMethod === methodFilter || bkg.settlementPaymentMethod === methodFilter;
+        if (!isMethodMatch) return false;
+      }
 
-    return true;
-  });
+      // Status filter
+      if (statusFilter !== 'ALL') {
+        if (statusFilter === 'CANCELLED') {
+          if (bkg.status !== 'CANCELLED') return false;
+        } else if (statusFilter === 'SETTLED') {
+          if (bkg.status !== 'SETTLED' && bkg.remainingBalance > 0) return false;
+        } else if (statusFilter === 'DP_PAID') {
+          if (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0) return false;
+        }
+      }
+
+      // Date filter (mencocokkan tanggal transaksi kasir / uang masuk)
+      if (selectedDate) {
+        const txDate = getTxDate(bkg);
+        const settleDate = getSettleDate(bkg);
+        if (txDate !== selectedDate && settleDate !== selectedDate) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = getTxDate(a);
+      const dateB = getTxDate(b);
+      if (dateA !== dateB) {
+        return dateB.localeCompare(dateA); // Tanggal transaksi terbaru di atas
+      }
+      return (b.startTime || '').localeCompare(a.startTime || '');
+    });
 
   const handleCancelBooking = async () => {
     if (!deletingBooking) return;
@@ -257,7 +310,12 @@ export default function HistoryBookingPage() {
               ref={dateInputRef}
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                if (e.target.value) {
+                  setGlobalDate(e.target.value);
+                }
+              }}
               onClick={(e) => {
                 try {
                   (e.currentTarget as HTMLInputElement).showPicker?.();
@@ -293,6 +351,23 @@ export default function HistoryBookingPage() {
             </button>
           )}
         </div>
+
+        {/* Date Filter Active Indicator */}
+        {selectedDate && (
+          <div className="flex items-center justify-between px-1 text-xs pt-0.5">
+            <span className="text-slate-500 font-medium flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+              Tanggal: <strong className="text-slate-900 font-bold">{selectedDate}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedDate('')}
+              className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+            >
+              Semua Tanggal
+            </button>
+          </div>
+        )}
 
         {/* Status Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
@@ -360,111 +435,118 @@ export default function HistoryBookingPage() {
               <div
                 key={bkg.id}
                 onClick={() => setSelectedBooking(bkg)}
-                className={`p-4 sm:p-5 rounded-3xl bg-white hover:bg-slate-50 border transition-all flex items-center justify-between gap-3 cursor-pointer shadow-xs group ${
+                className={`p-4 sm:p-5 rounded-3xl bg-white hover:bg-slate-50 border transition-all cursor-pointer shadow-xs group space-y-2.5 ${
                   isCancelled
                     ? 'border-red-200/80 bg-red-50/20 opacity-80'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-start space-x-3.5 min-w-0">
-                  {/* Badge Icon */}
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${
-                    isCancelled
-                      ? 'bg-red-50 text-red-500 border-red-200'
-                      : isLunas 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                        : 'bg-amber-50 text-amber-700 border-amber-100'
-                  }`}>
-                    <Receipt className="w-5 h-5" />
-                  </div>
-
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-
-                      {isCancelled ? (
-                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-red-100 text-red-600">
-                          VOID
-                        </span>
-                      ) : isLunas ? (
-                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                          Lunas
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
-                          DP
-                        </span>
-                      )}
-                      {(bkg.memberType === 'MEMBER' || bkg.communityName?.includes('Member')) && (
-                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200">
-                          Member
-                        </span>
-                      )}
-                    </div>
-
-                    <h4 className={`font-black text-sm truncate group-hover:text-emerald-800 transition-colors ${
-                      isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
-                    }`}>
-                      {bkg.customerName}
-                    </h4>
-
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {sportName} · {bkg.courtName}
-                    </p>
-
-                    <p className="text-[11px] text-slate-400">
-                      {bkg.date} · {bkg.startTime} - {bkg.endTime} ({bkg.durationHours} Jam)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0 flex items-center space-x-2.5">
-                  <div>
-                    <div className={`text-sm font-black ${
-                      isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
-                    }`}>
-                      {formatRupiah(bkg.amountPaidTotal)}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-1 mt-0.5">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700">
-                        {paymentMethodUsed}
+                {/* Baris 1: Status Badge & Action Buttons */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {isCancelled ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-600">
+                        VOID
                       </span>
-                    </div>
-
-                    {isDP && (
-                      <span className="text-[10px] font-bold text-amber-600 block mt-0.5">
-                        Sisa: {formatRupiah(bkg.remainingBalance)}
+                    ) : isLunas ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        Lunas
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
+                        DP
+                      </span>
+                    )}
+                    {(bkg.memberType === 'MEMBER' || bkg.communityName?.includes('Member')) && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200">
+                        Member
+                      </span>
+                    )}
+                    {getTxDate(bkg) !== bkg.date && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+                        Order: {getTxDate(bkg)}
                       </span>
                     )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-1">
+                  {/* Tombol Edit & Hapus */}
+                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       title="Edit Booking"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingBooking(bkg);
-                      }}
+                      onClick={() => setEditingBooking(bkg)}
                       className="p-1.5 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
-
                     <button
                       type="button"
                       title="Hapus / Batalkan"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingBooking(bkg);
-                      }}
+                      onClick={() => setDeletingBooking(bkg)}
                       className="p-1.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
 
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
+                {/* Baris 2: Nama Customer & Total Nominal */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isCancelled
+                        ? 'bg-red-50 text-red-500 border-red-200'
+                        : isLunas 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                    }`}>
+                      <Receipt className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className={`font-black text-sm sm:text-base truncate group-hover:text-emerald-800 transition-colors ${
+                        isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
+                      }`}>
+                        {bkg.customerName}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        {sportName} · {bkg.courtName}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className={`text-base font-black ${
+                      isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
+                    }`}>
+                      {formatRupiah(bkg.amountPaidTotal)}
+                    </div>
+                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                        {paymentMethodUsed}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Baris 3: Jadwal Main (Lega 100%) + Sisa Tagihan + Lihat Nota */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                  <div className="flex items-center gap-1.5 min-w-0 truncate font-medium">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">
+                      Main: <strong className="text-slate-800 font-bold">{bkg.date}</strong> · {bkg.startTime} - {bkg.endTime} ({bkg.durationHours} Jam)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isDP && (
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        Sisa: {formatRupiah(bkg.remainingBalance)}
+                      </span>
+                    )}
+                    <span className="text-emerald-700 font-bold text-[11px] group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                      Lihat Nota
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
                   </div>
                 </div>
               </div>

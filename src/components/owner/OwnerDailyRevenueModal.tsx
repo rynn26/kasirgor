@@ -89,8 +89,10 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       // Porsi Pelunasan yang sesungguhnya dibayarkan setelah DP
       const realSettle = Math.max(0, totalPaid - realDp);
 
+      const bookingDateStr = b.bookingDate || (b.createdAt ? b.createdAt.split('T')[0] : b.date);
+
       // Tanggal DP diterima
-      const dpDate = b.dpPaidAt ? b.dpPaidAt.split('T')[0] : (b.bookingDate || b.date);
+      const dpDate = b.dpPaidAt ? b.dpPaidAt.split('T')[0] : bookingDateStr;
       if (dpDate === selectedDate && realDp > 0) {
         dpCount += 1;
         if (b.dpPaymentMethod === 'CASH') {
@@ -100,8 +102,8 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
         }
       }
 
-      // Tanggal Pelunasan diterima
-      const settleDate = b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : b.date;
+      // Tanggal Pelunasan diterima (jika langsung lunas saat booking, pelunasan jatuh di tanggal booking)
+      const settleDate = b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : bookingDateStr;
       if (settleDate === selectedDate && realSettle > 0) {
         settleCount += 1;
         if (b.settlementPaymentMethod === 'CASH') {

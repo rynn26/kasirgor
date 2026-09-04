@@ -25,7 +25,7 @@ import { PaymentMethod, CartItem } from '@/types/pos';
 interface InputManualSaleModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (date?: string) => void;
 }
 
 export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
@@ -209,7 +209,7 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
       });
 
       showToast(`Data penjualan tanggal ${date} berhasil dicatat ke laporan!`);
-      if (onSuccess) onSuccess();
+      if (onSuccess) onSuccess(date);
       onClose();
     } catch (err: any) {
       console.error('Gagal mencatat penjualan manual:', err);

@@ -78,7 +78,7 @@ function mapDbToTransaction(
 }
 
 export async function fetchTransactions(
-  limit = 100
+  limit = 1000
 ): Promise<Transaction[]> {
   const { data: txs, error } = await supabase
     .from('transactions')

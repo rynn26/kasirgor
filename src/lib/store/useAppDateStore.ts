@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type LaporanPeriod = 'BULAN_INI' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
+export type LaporanPeriod = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
 
 interface AppDateState {
   selectedDate: string; // 'YYYY-MM-DD'

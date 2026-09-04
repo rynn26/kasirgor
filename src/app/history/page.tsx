@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
+import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { formatDate, formatRupiah } from '@/lib/utils';
 import { Transaction } from '@/types/pos';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
@@ -12,11 +13,38 @@ import {
   Receipt,
   History as HistoryIcon,
   ChevronRight,
+  Calendar,
+  X,
 } from 'lucide-react';
+
+function formatShortDate(dateStr: string): string {
+  if (!dateStr) return 'Pilih Tanggal';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    const date = new Date(y, m - 1, d);
+    return `${d} ${date.toLocaleString('id-ID', { month: 'short' })} ${y}`;
+  } catch {
+    return dateStr;
+  }
+}
 
 export default function HistoryPage() {
   const router = useRouter();
   const { transactions, loadTransactions } = useTransactionStore();
+  const {
+    selectedDate: globalSelectedDate,
+    isCustomActive,
+    setSelectedDate: setGlobalDate,
+    resetToToday,
+  } = useAppDateStore();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [methodFilter, setMethodFilter] = useState('ALL');
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadTransactions();
@@ -26,17 +54,30 @@ export default function HistoryPage() {
       if (m === 'CASH' || m === 'QRIS') {
         setMethodFilter(m);
       }
+      const d = params.get('date');
+      if (d) {
+        setSelectedDate(d);
+        setGlobalDate(d);
+      } else if (isCustomActive && globalSelectedDate) {
+        setSelectedDate(globalSelectedDate);
+      }
     }
-  }, [loadTransactions]);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [methodFilter, setMethodFilter] = useState('ALL');
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+  }, [loadTransactions, isCustomActive, globalSelectedDate, setGlobalDate]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    if (newDate) {
+      setGlobalDate(newDate);
+    }
+  };
+
+  const handleClearDate = () => {
+    setSelectedDate('');
+  };
 
   const filtered = transactions.filter((tx) => {
     const matchSearch =
@@ -46,8 +87,9 @@ export default function HistoryPage() {
       tx.items.some((item) => item.product.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchMethod = methodFilter === 'ALL' || tx.paymentMethod === methodFilter;
+    const matchDate = !selectedDate || tx.createdAt.startsWith(selectedDate);
 
-    return matchSearch && matchMethod;
+    return matchSearch && matchMethod && matchDate;
   });
 
   return (
@@ -74,8 +116,8 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        <div className="px-3 py-1 rounded-full bg-red-50 border border-red-100 text-[#b92b10] text-xs font-black">
-          {transactions.length} Nota
+        <div className="px-3 py-1 rounded-full bg-red-50 border border-red-100 text-[#b92b10] text-xs font-black shrink-0">
+          {filtered.length} Nota
         </div>
       </div>
 
@@ -83,17 +125,89 @@ export default function HistoryPage() {
       {/* SEARCH & FILTER CONTROLS */}
       {/* ============================================================ */}
       <div className="bg-white rounded-3xl p-4 border border-slate-200 shadow-xs space-y-3">
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Cari nota, nama produk (misal: Indomie, Kopi)..."
-            className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#b92b10] focus:bg-white"
-          />
+        {/* Search & Date Picker Row */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari nota, nama produk (misal: Indomie, Kopi)..."
+              className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#b92b10] focus:bg-white"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Date Picker Pill */}
+          <div className="relative shrink-0">
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as HTMLInputElement).showPicker?.();
+                } catch {}
+              }}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+              title={selectedDate ? `Tanggal: ${selectedDate}` : 'Filter Tanggal'}
+            />
+            <div
+              className={`p-2.5 sm:px-3 py-2.5 rounded-2xl border flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                selectedDate
+                  ? 'bg-[#b92b10] text-white border-[#b92b10] shadow-xs'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+            >
+              <Calendar className="w-4 h-4 shrink-0" />
+              {selectedDate ? (
+                <span className="text-[11px] font-semibold whitespace-nowrap">
+                  {formatShortDate(selectedDate)}
+                </span>
+              ) : (
+                <span className="text-[11px] hidden sm:inline text-slate-600 font-medium">Tanggal</span>
+              )}
+            </div>
+          </div>
+
+          {selectedDate && (
+            <button
+              type="button"
+              onClick={handleClearDate}
+              title="Hapus Filter Tanggal"
+              className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {/* Date Filter Active Indicator */}
+        {selectedDate && (
+          <div className="flex items-center justify-between px-1 text-xs pt-0.5">
+            <span className="text-slate-500 font-medium flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#b92b10] animate-pulse" />
+              Tanggal: <strong className="text-slate-900 font-bold">{formatDate(selectedDate)}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={handleClearDate}
+              className="text-[11px] font-bold text-[#b92b10] hover:underline cursor-pointer"
+            >
+              Semua Tanggal
+            </button>
+          </div>
+        )}
 
         {/* Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">

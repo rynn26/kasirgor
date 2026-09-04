@@ -58,12 +58,12 @@ export default function PelunasanBookingPage() {
     if (activeFilterTab === 'DP' && !isDP) return false;
     if (activeFilterTab === 'LUNAS' && !isLunas) return false;
 
-    // Date filter (matches play date, booking transaction date, or recurring member dates)
+    // Date filter (matches play date or recurring member dates)
     if (selectedDateFilter) {
-      const matchPlayDate = bkg.date === selectedDateFilter;
-      const matchBookingDate = bkg.bookingDate === selectedDateFilter;
+      const playDate = bkg.date || bkg.bookingDate;
+      const matchPlayDate = playDate === selectedDateFilter;
       const matchMemberDates = Array.isArray(bkg.memberDates) && bkg.memberDates.includes(selectedDateFilter);
-      if (!matchPlayDate && !matchBookingDate && !matchMemberDates) return false;
+      if (!matchPlayDate && !matchMemberDates) return false;
     }
 
     // Search query (name, phone, bookingCode, courtName, communityName, date)

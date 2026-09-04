@@ -46,7 +46,7 @@ import {
   printCourtBookingsPDF 
 } from '@/lib/exportUtils';
 
-type PeriodType = 'BULAN_INI' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
+type PeriodType = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
 
 function formatShortDate(dateStr: string): string {
   if (!dateStr) return 'Pilih Tanggal';
@@ -58,6 +58,38 @@ function formatShortDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function getBookingTxDate(b: CourtBooking): string {
+  return b.bookingDate || (b.dpPaidAt ? b.dpPaidAt.split('T')[0] : (b.createdAt ? b.createdAt.split('T')[0] : b.date));
+}
+
+function getBookingSettleDate(b: CourtBooking): string {
+  return b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : getBookingTxDate(b);
+}
+
+function getBookingAmountInPeriod(b: CourtBooking, start: string, end: string): number {
+  const totalPaid = b.amountPaidTotal || 0;
+  const dpAmt = b.dpAmount || 0;
+  const realDp = Math.min(dpAmt, totalPaid);
+  const realSettle = Math.max(0, totalPaid - realDp);
+
+  const txDate = getBookingTxDate(b);
+  const settleDate = getBookingSettleDate(b);
+
+  let amt = 0;
+  const isDpInPeriod = txDate >= start && txDate <= end;
+  const isSettleInPeriod = settleDate >= start && settleDate <= end;
+
+  if (isDpInPeriod) {
+    amt += realDp;
+    if (settleDate === txDate) {
+      amt += realSettle;
+    }
+  } else if (isSettleInPeriod) {
+    amt += realSettle;
+  }
+  return amt;
 }
 
 function getDateRange(period: PeriodType, customDate?: string): { start: string; end: string; label: string } {
@@ -91,6 +123,17 @@ function getDateRange(period: PeriodType, customDate?: string): { start: string;
       start: fmt(mon),
       end: fmt(sun),
       label: `Minggu Ini (${pad(mon.getDate())} - ${pad(sun.getDate())} ${now.toLocaleString('id-ID', { month: 'short' })} ${now.getFullYear()})`,
+    };
+  }
+  if (period === 'BULAN_LALU') {
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const monthName = prevMonthStart.toLocaleString('id-ID', { month: 'long' });
+    const yr = prevMonthStart.getFullYear();
+    return {
+      start: fmt(prevMonthStart),
+      end: fmt(prevMonthEnd),
+      label: `Bulan Kemarin (${monthName} ${yr})`,
     };
   }
   // BULAN_INI
@@ -143,6 +186,28 @@ export default function LaporanPenjualanPage() {
       showToast('Gagal menghapus booking');
     } finally {
       setIsDeletingBookingProcess(false);
+    }
+  };
+
+  const handleManualSuccess = (inputDate?: string) => {
+    loadTransactions();
+    loadBookings();
+    if (inputDate) {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonthPrefix = `${prevMonth.getFullYear()}-${pad(prevMonth.getMonth() + 1)}`;
+      const thisMonthPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+
+      if (inputDate.startsWith(prevMonthPrefix)) {
+        setPeriod('BULAN_LALU');
+        showToast('📅 Beralih otomatis ke laporan Bulan Kemarin');
+      } else if (inputDate.startsWith(thisMonthPrefix)) {
+        setPeriod('BULAN_INI');
+      } else {
+        setSelectedDate(inputDate);
+        setPeriod('CUSTOM');
+      }
     }
   };
 
@@ -277,14 +342,15 @@ export default function LaporanPenjualanPage() {
   const lapanganData = useMemo(() => {
     const { start, end, label } = getDateRange(period, customDate);
 
-    const filtered = bookings.filter(
-      (b) =>
-        b.status !== 'CANCELLED' &&
-        b.date >= start &&
-        b.date <= end
-    );
+    // Filter booking yang uangnya masuk pada periode ini (atau jadwal main jika belum ada tanggal tx)
+    const filtered = bookings.filter((b) => {
+      if (b.status === 'CANCELLED') return false;
+      const txDate = getBookingTxDate(b);
+      const settleDate = getBookingSettleDate(b);
+      return (txDate >= start && txDate <= end) || (settleDate >= start && settleDate <= end);
+    });
 
-    const totalSales = filtered.reduce((s, b) => s + b.amountPaidTotal, 0);
+    const totalSales = filtered.reduce((s, b) => s + getBookingAmountInPeriod(b, start, end), 0);
     const totalBookings = filtered.length;
     const totalHours = filtered.reduce((s, b) => s + b.durationHours, 0);
 
@@ -293,19 +359,25 @@ export default function LaporanPenjualanPage() {
     const usedSlots = totalHours;
     const occupancyRate = totalSlots > 0 ? `${Math.min(100, Math.round((usedSlots / totalSlots) * 100))}%` : '0%';
 
-    // Payment breakdown
+    // Payment breakdown berdasarkan uang yang masuk pada periode ini
     const paymentBreakdownMap: Record<string, number> = {};
     filtered.forEach((b) => {
       const totalPaid = b.amountPaidTotal || 0;
       const dpAmt = b.dpAmount || 0;
       const realDp = Math.min(dpAmt, totalPaid);
       const realSettle = Math.max(0, totalPaid - realDp);
+      const txDate = getBookingTxDate(b);
+      const settleDate = getBookingSettleDate(b);
 
-      if (b.dpPaymentMethod && realDp > 0) {
+      if (b.dpPaymentMethod && realDp > 0 && txDate >= start && txDate <= end) {
         paymentBreakdownMap[b.dpPaymentMethod] = (paymentBreakdownMap[b.dpPaymentMethod] || 0) + realDp;
       }
       if (b.settlementPaymentMethod && realSettle > 0) {
-        paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
+        if (settleDate === txDate && txDate >= start && txDate <= end) {
+          paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
+        } else if (settleDate >= start && settleDate <= end) {
+          paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
+        }
       }
     });
     const paymentColors: Record<string, string> = {
@@ -329,7 +401,7 @@ export default function LaporanPenjualanPage() {
         .trim();
       const key = cleanName || b.courtName || 'Lapangan 1';
       if (!courtMap[key]) courtMap[key] = { amount: 0, hours: 0 };
-      courtMap[key].amount += b.amountPaidTotal;
+      courtMap[key].amount += getBookingAmountInPeriod(b, start, end);
       courtMap[key].hours += b.durationHours;
     });
     const courtList = Object.entries(courtMap).sort((a, b) => b[1].amount - a[1].amount);
@@ -348,7 +420,7 @@ export default function LaporanPenjualanPage() {
     const prevFiltered = bookings.filter(
       (b) =>
         b.status !== 'CANCELLED' &&
-        isInPrevPeriod(b.date, period, customDate)
+        isInPrevPeriod(getBookingTxDate(b), period, customDate)
     );
     const prevSales = prevFiltered.reduce((s, b) => s + b.amountPaidTotal, 0);
     const growthPct =
@@ -487,7 +559,7 @@ export default function LaporanPenjualanPage() {
                 title="Input Penjualan Kemarin / Manual"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Input Data Kemarin</span>
+                <span>Input Data Manual</span>
               </button>
             )}
 
@@ -499,7 +571,7 @@ export default function LaporanPenjualanPage() {
                 title="Input Sewa Lapangan Kemarin / Manual"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Input Sewa Kemarin</span>
+                <span>Input Sewa Manual</span>
               </button>
             )}
 
@@ -532,6 +604,7 @@ export default function LaporanPenjualanPage() {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {([
             { id: 'BULAN_INI', label: 'Bulan Ini' },
+            { id: 'BULAN_LALU', label: 'Bulan Kemarin' },
             { id: 'MINGGU_INI', label: 'Minggu Ini' },
             { id: 'HARI_INI', label: 'Hari Ini' },
           ] as { id: PeriodType; label: string }[]).map((item) => {
@@ -964,18 +1037,14 @@ export default function LaporanPenjualanPage() {
       <InputManualSaleModal
         isOpen={isInputManualOpen}
         onClose={() => setIsInputManualOpen(false)}
-        onSuccess={() => {
-          loadTransactions();
-        }}
+        onSuccess={handleManualSuccess}
       />
 
       {/* Modal Input Data Sewa Lapangan Kemarin (Khusus Owner) */}
       <InputManualBookingModal
         isOpen={isInputManualBookingOpen}
         onClose={() => setIsInputManualBookingOpen(false)}
-        onSuccess={() => {
-          loadBookings();
-        }}
+        onSuccess={handleManualSuccess}
       />
 
       {/* Modal Rekap Total Omset Hari Ini untuk Owner */}
@@ -1201,10 +1270,19 @@ function buildLapanganChartPoints(
 ): { day: string; x: number; y: number; amount: number }[] {
   if (period === 'HARI_INI' || period === 'CUSTOM') {
     const hours = [8, 11, 14, 17, 20, 22];
-    const amounts = hours.map((h) => {
+    const amounts = hours.map((h, i) => {
+      const nextH = hours[i + 1] ?? 24;
       return filtered
-        .filter((b) => b.date === start && parseInt(b.startTime.split(':')[0]) >= h && parseInt(b.startTime.split(':')[0]) < (hours[hours.indexOf(h) + 1] ?? 24))
-        .reduce((s, b) => s + b.amountPaidTotal, 0);
+        .filter((b) => {
+          const txDate = getBookingTxDate(b);
+          const txHour = b.dpPaidAt
+            ? new Date(b.dpPaidAt).getHours()
+            : b.createdAt
+            ? new Date(b.createdAt).getHours()
+            : parseInt(b.startTime.split(':')[0]);
+          return txDate === start && txHour >= h && txHour < nextH;
+        })
+        .reduce((s, b) => s + getBookingAmountInPeriod(b, start, end), 0);
     });
     const maxAmt = Math.max(...amounts, 1);
     const xStep = 295 / (hours.length - 1);
@@ -1223,7 +1301,9 @@ function buildLapanganChartPoints(
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
       const dateStr = d.toISOString().split('T')[0];
-      const amount = filtered.filter((b) => b.date === dateStr).reduce((s, b) => s + b.amountPaidTotal, 0);
+      const amount = filtered
+        .filter((b) => getBookingTxDate(b) === dateStr || getBookingSettleDate(b) === dateStr)
+        .reduce((s, b) => s + getBookingAmountInPeriod(b, dateStr, dateStr), 0);
       return { day: dayNames[d.getDay()], amount };
     });
     const maxAmt = Math.max(...results.map((r) => r.amount), 1);
@@ -1231,7 +1311,7 @@ function buildLapanganChartPoints(
     return results.map((r, i) => ({ ...r, x: Math.round(20 + i * xStep), y: Math.round(155 - (r.amount / maxAmt) * 120) }));
   }
 
-  // BULAN_INI
+  // BULAN_INI / BULAN_LALU
   const daysInMonth = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).getDate();
   return buildMonthlyPointsBookings(filtered, start, daysInMonth);
 }
@@ -1250,7 +1330,12 @@ function buildMonthlyPointsBookings(
     const dayEnd = Math.min((i + 1) * bucketSize, daysInMonth);
     const bStart = `${yr}-${pad(mo)}-${pad(dayStart)}`;
     const bEnd = `${yr}-${pad(mo)}-${pad(dayEnd)}`;
-    const amount = filtered.filter((b) => b.date >= bStart && b.date <= bEnd).reduce((s, b) => s + b.amountPaidTotal, 0);
+    const amount = filtered
+      .filter((b) => {
+        const txDate = getBookingTxDate(b);
+        return txDate >= bStart && txDate <= bEnd;
+      })
+      .reduce((s, b) => s + getBookingAmountInPeriod(b, bStart, bEnd), 0);
     return { day: String(dayStart), amount };
   });
   const maxAmt = Math.max(...results.map((r) => r.amount), 1);
@@ -1283,6 +1368,11 @@ function isInPrevPeriod(dateStr: string, period: PeriodType, customDate?: string
     const prevMon = new Date(prevSun);
     prevMon.setDate(prevSun.getDate() - 6);
     return dateStr >= fmt(prevMon) && dateStr <= fmt(prevSun);
+  }
+  if (period === 'BULAN_LALU') {
+    const twoMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const twoMonthsAgoEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+    return dateStr >= fmt(twoMonthsAgoStart) && dateStr <= fmt(twoMonthsAgoEnd);
   }
   // BULAN_INI — prev month
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
