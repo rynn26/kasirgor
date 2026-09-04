@@ -160,9 +160,15 @@ Terima kasih telah bermain di ${shopName}!`;
             {/* Detail Transaksi */}
             <div className="space-y-1 text-[10px] py-1 border-b border-dashed border-gray-300">
               <div className="flex justify-between">
-                <span className="text-gray-600">Tanggal Booking:</span>
-                <span>{booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : formatDate(booking.createdAt, false))}</span>
+                <span className="text-gray-600">Tgl/Jam Booking:</span>
+                <span>{formatDate(booking.dpPaidAt || booking.createdAt)}</span>
               </div>
+              {isLunas && booking.settlementPaidAt && booking.settlementPaidAt !== booking.dpPaidAt && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Jam Pelunasan:</span>
+                  <span>{formatDate(booking.settlementPaidAt)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Nama:</span>
                 <span className="font-bold">{booking.customerName}</span>

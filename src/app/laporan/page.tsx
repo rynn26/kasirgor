@@ -81,14 +81,23 @@ function getBookingAmountInPeriod(b: CourtBooking, start: string, end: string): 
   const isDpInPeriod = txDate >= start && txDate <= end;
   const isSettleInPeriod = settleDate >= start && settleDate <= end;
 
+  // Uang DP dihitung pada tanggal DP (txDate)
   if (isDpInPeriod) {
     amt += realDp;
-    if (settleDate === txDate) {
+  }
+
+  // Uang pelunasan dihitung pada tanggal pelunasan (settleDate)
+  // Jika tanggal sama dengan DP (misal sewa langsung), cukup satu kali masuk via isDpInPeriod
+  if (realSettle > 0) {
+    if (settleDate !== txDate && isSettleInPeriod) {
+      // Pelunasan di tanggal berbeda — masuk ke tanggal pelunasan
+      amt += realSettle;
+    } else if (settleDate === txDate && isDpInPeriod) {
+      // Sewa langsung (bayar penuh sekaligus) — masuk bersama DP
       amt += realSettle;
     }
-  } else if (isSettleInPeriod) {
-    amt += realSettle;
   }
+
   return amt;
 }
 
@@ -1333,7 +1342,9 @@ function buildMonthlyPointsBookings(
     const amount = filtered
       .filter((b) => {
         const txDate = getBookingTxDate(b);
-        return txDate >= bStart && txDate <= bEnd;
+        const settleDate = getBookingSettleDate(b);
+        // Sertakan booking jika DP atau pelunasan jatuh di bucket ini
+        return (txDate >= bStart && txDate <= bEnd) || (settleDate >= bStart && settleDate <= bEnd);
       })
       .reduce((s, b) => s + getBookingAmountInPeriod(b, bStart, bEnd), 0);
     return { day: String(dayStart), amount };
