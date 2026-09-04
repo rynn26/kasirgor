@@ -152,29 +152,48 @@ export async function ensureDefaultPricingRule(): Promise<void> {
 /** Perbaiki semua rows yang punya night_start / night_end null di Supabase */
 export async function repairNullTimeFields(): Promise<void> {
   try {
-    // Ambil semua rows yang punya night_start null
+    // 1. Fix rows dengan night_start atau night_end null
     const { data: nullRows } = await supabase
       .from('court_pricing_rules')
       .select('id, night_start, night_end, day_start, day_end, afternoon_start, afternoon_end')
       .or('night_start.is.null,night_end.is.null');
 
-    if (!nullRows || nullRows.length === 0) return;
-
-    // Patch tiap row yang null
-    for (const row of nullRows) {
-      await supabase
-        .from('court_pricing_rules')
-        .update({
-          night_start: row.night_start || '17:00',
-          night_end: row.night_end || '23:00',
-          day_start: row.day_start || '08:00',
-          day_end: row.day_end || '17:00',
-          afternoon_start: row.afternoon_start || '17:00',
-          afternoon_end: row.afternoon_end || '23:00',
-        })
-        .eq('id', row.id);
+    if (nullRows && nullRows.length > 0) {
+      for (const row of nullRows) {
+        await supabase
+          .from('court_pricing_rules')
+          .update({
+            night_start: row.night_start || '17:00',
+            night_end: row.night_end || '23:00',
+            day_start: row.day_start || '08:00',
+            day_end: row.day_end || '17:00',
+            afternoon_start: row.afternoon_start || '17:00',
+            afternoon_end: row.afternoon_end || '23:00',
+          })
+          .eq('id', row.id);
+      }
+      console.log(`[courtPricing] Repaired ${nullRows.length} rows with null time fields`);
     }
-    console.log(`[courtPricing] Repaired ${nullRows.length} rows with null time fields`);
+
+    // 2. Fix rows dengan night_start = "18:00" → seharusnya "17:00" (tarif malam mulai jam 17)
+    const { data: wrongRows } = await supabase
+      .from('court_pricing_rules')
+      .select('id, night_start, day_end')
+      .eq('night_start', '18:00');
+
+    if (wrongRows && wrongRows.length > 0) {
+      for (const row of wrongRows) {
+        await supabase
+          .from('court_pricing_rules')
+          .update({
+            night_start: '17:00',
+            afternoon_start: '17:00',
+            day_end: '17:00',
+          })
+          .eq('id', row.id);
+      }
+      console.log(`[courtPricing] Fixed ${wrongRows.length} rows: night_start 18:00 → 17:00`);
+    }
   } catch (e) {
     console.error('[courtPricing] repairNullTimeFields error:', e);
   }

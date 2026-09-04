@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Court, CourtBooking, BookingStatus, AdditionalItem } from '@/types/booking';
 import { PaymentMethod } from '@/types/pos';
-import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, deleteBooking as dbDeleteBooking, updateBooking as dbUpdateBooking, updateCourt as dbUpdateCourt } from '@/lib/db/bookings';
+import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, deleteBooking as dbDeleteBooking, updateBooking as dbUpdateBooking, updateCourt as dbUpdateCourt, repairBookingDates } from '@/lib/db/bookings';
 
 interface CourtBookingState {
   courts: Court[];
@@ -57,7 +57,10 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
   loadBookings: async (date?: string) => {
     set({ isLoading: true, error: null });
     try {
-      // If date is provided, fetch for that date; otherwise fetch all bookings so pelunasan, history, and schedule pages have all data
+      // Repair data lama: pastikan booking_date terisi untuk semua booking tanpa filter tanggal
+      if (!date) {
+        repairBookingDates().catch(() => {}); // fire-and-forget, tidak bloking
+      }
       const bookings = await fetchBookings(date);
       set({ bookings, isLoading: false });
     } catch (err) {

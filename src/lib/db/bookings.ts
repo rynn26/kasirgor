@@ -135,6 +135,41 @@ export async function fetchCourts(): Promise<Court[]> {
   return (data as DbCourt[]).map(mapDbToCourt);
 }
 
+/**
+ * Repair data lama: set booking_date dari dp_paid_at (atau created_at) untuk booking yg booking_date-nya null.
+ * Harus dipanggil sekali saat loadBookings pertama kali.
+ */
+export async function repairBookingDates(): Promise<void> {
+  try {
+    // Ambil semua booking yang booking_date-nya null
+    const { data: rows } = await supabase
+      .from('court_bookings')
+      .select('id, booking_date, dp_paid_at, created_at, date')
+      .is('booking_date', null)
+      .limit(200);
+
+    if (!rows || rows.length === 0) return;
+
+    for (const row of rows) {
+      // Prioritas: dp_paid_at → created_at → date (tanggal main sebagai last resort)
+      const correctDate = row.dp_paid_at
+        ? row.dp_paid_at.split('T')[0]
+        : row.created_at
+        ? row.created_at.split('T')[0]
+        : row.date;
+
+      await supabase
+        .from('court_bookings')
+        .update({ booking_date: correctDate })
+        .eq('id', row.id);
+    }
+
+    console.log(`[bookings] Repaired booking_date for ${rows.length} old bookings`);
+  } catch (e) {
+    console.error('[bookings] repairBookingDates error:', e);
+  }
+}
+
 export async function fetchBookings(date?: string): Promise<CourtBooking[]> {
   let query = supabase
     .from('court_bookings')

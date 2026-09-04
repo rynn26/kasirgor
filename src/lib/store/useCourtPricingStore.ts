@@ -307,7 +307,7 @@ export const useCourtPricingStore = create<CourtPricingState>()(
       },
     }),
     {
-      name: 'kasir_court_pricing_rules', // localStorage fallback / cache
+      name: 'kasir_court_pricing_rules_v2', // v2: clear cache lama yg punya nightStart null
     }
   )
 );

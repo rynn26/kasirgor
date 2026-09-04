@@ -25,11 +25,8 @@ import {
 } from 'lucide-react';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { BookingSuccessModal } from '@/components/booking/BookingSuccessModal';
-import { BookingDraftModal } from '@/components/booking/BookingDraftModal';
-import { useBookingDraftStore, BookingDraft } from '@/lib/store/useBookingDraftStore';
 import { getMemberDatesInMonth } from '@/lib/memberUtils';
 import { useCourtPricingStore } from '@/lib/store/useCourtPricingStore';
-import { BookmarkPlus, Layers, FileText } from 'lucide-react';
 
 const SPORT_TYPES = [
   { id: 'Badminton', name: 'Badminton', icon: '🏸' },
@@ -97,84 +94,8 @@ export default function InputDpBookingPage() {
     }
   };
 
-  // Draft Management State
-  const { drafts, activeDraftId, saveDraft, deleteDraft, setActiveDraftId, getDraft } = useBookingDraftStore();
-  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
-  const [dismissRestoreNotice, setDismissRestoreNotice] = useState(false);
-  const [activeWorkingDraftId, setActiveWorkingDraftId] = useState<string | null>(activeDraftId);
-
-  // Restore draft function
-  const restoreDraft = (draft: BookingDraft) => {
-    setCustomerName(draft.customerName || '');
-    setPhone(draft.phone || '');
-    setSelectedSport(draft.selectedSport || 'Badminton');
-    setMemberType(draft.memberType || 'INSIDENTIL');
-    setBookingDate(draft.bookingDate || todayStr);
-    setDate(draft.date || todayStr);
-    setSelectedMemberDayIndex(draft.selectedMemberDayIndex ?? 1);
-    setStartTime(draft.startTime || '19:00');
-    setEndTime(draft.endTime || '21:00');
-    setCourtCount(draft.courtCount || 1);
-    if (draft.selectedCourtIds && draft.selectedCourtIds.length > 0) {
-      setSelectedCourtIds(draft.selectedCourtIds);
-    }
-    if (draft.dpAmount !== undefined) {
-      setDpAmount(draft.dpAmount);
-    }
-    if (draft.paymentMethod) {
-      setPaymentMethod(draft.paymentMethod);
-    }
-    setActiveWorkingDraftId(draft.id);
-    setActiveDraftId(draft.id);
-    setDismissRestoreNotice(true);
-    showToast(`Draft "${draft.customerName || 'Booking'}" berhasil dipulihkan!`);
-  };
-
-  // Cek apakah ada draft yang aktif dipilih dari modal sebelumnya
-  useEffect(() => {
-    if (activeDraftId) {
-      const targetDraft = getDraft(activeDraftId);
-      if (targetDraft) {
-        restoreDraft(targetDraft);
-      }
-    }
-  }, [activeDraftId]);
-
-  // Handler simpan draft manual / auto
-  const handleSaveCurrentDraft = (showNotification = true) => {
-    const draftId = saveDraft(
-      {
-        customerName,
-        phone,
-        selectedSport,
-        memberType,
-        bookingDate,
-        date,
-        selectedMemberDayIndex,
-        startTime,
-        endTime,
-        courtCount,
-        selectedCourtIds,
-        dpAmount,
-        totalSewa,
-        paymentMethod,
-        cashierName: cashierName || 'Yuli',
-      },
-      activeWorkingDraftId || undefined
-    );
-    setActiveWorkingDraftId(draftId);
-    if (showNotification) {
-      showToast('Draft booking berhasil disimpan!');
-    }
-    return draftId;
-  };
-
-  // Handler Back: jika ada isian yang diketik, simpan draft otomatis agar tidak hilang!
+  // Handler Back
   const handleBack = () => {
-    if (customerName.trim() || phone.trim()) {
-      handleSaveCurrentDraft(false);
-      showToast('Draft booking otomatis disimpan agar tidak hilang!');
-    }
     router.push('/booking');
   };
 
@@ -349,21 +270,10 @@ export default function InputDpBookingPage() {
       notes: finalNotes,
     });
 
-    // Bersihkan draft setelah booking sukses dibuat
-    if (activeWorkingDraftId) {
-      deleteDraft(activeWorkingDraftId);
-    }
-    setActiveDraftId(null);
-    setActiveWorkingDraftId(null);
-
     setLastCreatedBooking(newBooking);
     setIsSuccessOpen(true);
     showToast('DP Booking lapangan berhasil disimpan!');
   };
-
-  // Cari draft terakhir jika ada untuk auto-suggest
-  const latestDraft = drafts[0];
-  const canShowRestoreBanner = !dismissRestoreNotice && drafts.length > 0 && !customerName && !phone;
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-5 max-w-xl mx-auto space-y-4 pb-28">
@@ -395,22 +305,6 @@ export default function InputDpBookingPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Tombol Menu Draft */}
-          <button
-            type="button"
-            onClick={() => setIsDraftModalOpen(true)}
-            title="Buka Daftar Draft Booking"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all cursor-pointer shadow-2xs relative"
-          >
-            <Layers className="w-3.5 h-3.5 text-emerald-700" />
-            <span className="hidden sm:inline">Draft</span>
-            {drafts.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">
-                {drafts.length}
-              </span>
-            )}
-          </button>
-
           <div className="text-right hidden md:block pl-2 border-l border-slate-100">
             <span className="text-[10px] text-slate-400 font-semibold block">Kasir</span>
             <span className="text-xs font-bold text-slate-800">{cashierName || 'Yuli'}</span>
@@ -418,48 +312,6 @@ export default function InputDpBookingPage() {
         </div>
       </div>
 
-      {/* Banner Rekomendasi Pulihkan Draft jika terdeteksi ada draft tersimpan */}
-      {canShowRestoreBanner && latestDraft && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-4 shadow-xs flex items-start justify-between gap-3 animate-in fade-in duration-200">
-          <div className="flex items-start space-x-3">
-            <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
-              <FileText className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-black text-amber-900 leading-snug">
-                Ada Draft Booking Belum Selesai
-              </h4>
-              <p className="text-[11px] text-amber-800 mt-0.5">
-                Pemesan: <strong>{latestDraft.customerName || 'Tanpa Nama'}</strong> ({latestDraft.selectedSport}, tgl {latestDraft.date})
-              </p>
-              <div className="flex items-center gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => restoreDraft(latestDraft)}
-                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-xs cursor-pointer transition-colors"
-                >
-                  Pulihkan Data Ini
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDismissRestoreNotice(true)}
-                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold cursor-pointer transition-colors"
-                >
-                  Abaikan
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setDismissRestoreNotice(true)}
-            className="p-1 text-amber-400 hover:text-amber-700 rounded-lg"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Main Booking Form Card */}
       <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-4">
@@ -940,33 +792,17 @@ export default function InputDpBookingPage() {
           </div>
         )}
 
-        {/* 8. Tombol Submit Simpan DP & Tombol Simpan Draft */}
-        <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
-          <button
-            type="button"
-            onClick={() => handleSaveCurrentDraft(true)}
-            className="sm:w-1/3 py-3.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center justify-center gap-2 border border-slate-200"
-          >
-            <BookmarkPlus className="w-4 h-4 text-emerald-700" />
-            <span>Simpan ke Draft</span>
-          </button>
-
+        {/* 8. Tombol Submit Simpan DP */}
+        <div className="pt-2">
           <button
             type="submit"
-            className="flex-1 py-3.5 px-4 rounded-2xl bg-[#b92b10] hover:bg-[#a3250d] active:scale-[0.99] text-white font-black text-sm sm:text-base shadow-lg shadow-[#b92b10]/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-4 rounded-2xl bg-[#b92b10] hover:bg-[#a3250d] active:scale-[0.99] text-white font-black text-sm sm:text-base shadow-lg shadow-[#b92b10]/25 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
             <span>Simpan DP</span>
           </button>
         </div>
       </form>
-
-      {/* Modal Daftar Draft Booking */}
-      <BookingDraftModal
-        isOpen={isDraftModalOpen}
-        onClose={() => setIsDraftModalOpen(false)}
-        onSelectDraft={(draft) => restoreDraft(draft)}
-      />
 
       {/* Success Confirmation Modal (Step 6) */}
       <BookingSuccessModal
