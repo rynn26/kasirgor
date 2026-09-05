@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { CourtBooking } from '@/types/booking';
 import { useProductStore } from '@/lib/store/useProductStore';
+import { getBookingAmountInPeriod } from '@/lib/bookingUtils';
 
 export interface KantinSalesItemRow {
   no: number;
@@ -325,11 +326,16 @@ export function printKantinPDF(
  */
 export function exportCourtBookingsToExcel(
   periodLabel: string,
-  bookings: CourtBooking[]
+  bookings: CourtBooking[],
+  startDate?: string,
+  endDate?: string
 ) {
   const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
   const totalOmset = activeBookings.reduce((s, b) => s + b.totalAmount, 0);
-  const totalPaid = activeBookings.reduce((s, b) => s + b.amountPaidTotal, 0);
+  const totalPaid = activeBookings.reduce(
+    (s, b) => s + (startDate && endDate ? getBookingAmountInPeriod(b, startDate, endDate) : b.amountPaidTotal),
+    0
+  );
   const totalRemaining = activeBookings.reduce((s, b) => s + b.remainingBalance, 0);
   const totalHours = activeBookings.reduce((s, b) => s + b.durationHours, 0);
 
@@ -350,7 +356,8 @@ export function exportCourtBookingsToExcel(
       'Jam Main',
       'Durasi (Jam)',
       'Total Tarif (Rp)',
-      'Sudah Bayar (Rp)',
+      startDate && endDate ? 'Masuk Periode Ini (Rp)' : 'Sudah Bayar (Rp)',
+      'Total Terbayar (Rp)',
       'Sisa Tagihan (Rp)',
       'Status',
       'Metode Bayar',
@@ -358,7 +365,7 @@ export function exportCourtBookingsToExcel(
   ];
 
   if (activeBookings.length === 0) {
-    data.push(['-', 'Belum ada data sewa lapangan pada periode ini', '-', '-', '-', '-', '-', '-', '-', '-', 0, 0, 0, 0, '-', '-']);
+    data.push(['-', 'Belum ada data sewa lapangan pada periode ini', '-', '-', '-', '-', '-', '-', '-', '-', 0, 0, 0, 0, 0, '-', '-']);
   } else {
     activeBookings.forEach((b, idx) => {
       const isMember = b.memberType === 'MEMBER' || b.communityName?.includes('Member');
@@ -369,6 +376,10 @@ export function exportCourtBookingsToExcel(
       const tglPelunasan = isLunas
         ? (b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date))
         : '-';
+
+      const paidInPeriod = (startDate && endDate)
+        ? getBookingAmountInPeriod(b, startDate, endDate)
+        : b.amountPaidTotal;
 
       data.push([
         idx + 1,
@@ -383,6 +394,7 @@ export function exportCourtBookingsToExcel(
         `${b.startTime} - ${b.endTime}`,
         b.durationHours,
         b.totalAmount,
+        paidInPeriod,
         b.amountPaidTotal,
         b.remainingBalance,
         statusLabel,
@@ -402,9 +414,11 @@ export function exportCourtBookingsToExcel(
     '',
     '',
     '',
+    '',
     totalHours,
     totalOmset,
     totalPaid,
+    activeBookings.reduce((s, b) => s + b.amountPaidTotal, 0),
     totalRemaining,
     '',
     '',
@@ -465,14 +479,19 @@ function formatIndonesianDateHeader(dateStr: string): string {
  */
 export function printCourtBookingsPDF(
   periodLabel: string,
-  bookings: CourtBooking[]
+  bookings: CourtBooking[],
+  startDate?: string,
+  endDate?: string
 ) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return;
 
   const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
   const totalOmset = activeBookings.reduce((s, b) => s + b.totalAmount, 0);
-  const totalPaid = activeBookings.reduce((s, b) => s + b.amountPaidTotal, 0);
+  const totalPaid = activeBookings.reduce(
+    (s, b) => s + (startDate && endDate ? getBookingAmountInPeriod(b, startDate, endDate) : b.amountPaidTotal),
+    0
+  );
   const totalRemaining = activeBookings.reduce((s, b) => s + b.remainingBalance, 0);
   const totalHours = activeBookings.reduce((s, b) => s + b.durationHours, 0);
   const lunasCount = activeBookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
@@ -497,7 +516,10 @@ export function printCourtBookingsPDF(
           const dateBookings = groupedByDate[dateStr];
           const dateHours = dateBookings.reduce((s, b) => s + b.durationHours, 0);
           const dateOmset = dateBookings.reduce((s, b) => s + b.totalAmount, 0);
-          const datePaid = dateBookings.reduce((s, b) => s + b.amountPaidTotal, 0);
+          const datePaid = dateBookings.reduce(
+            (s, b) => s + (startDate && endDate ? getBookingAmountInPeriod(b, startDate, endDate) : b.amountPaidTotal),
+            0
+          );
           const dateRemaining = dateBookings.reduce((s, b) => s + b.remainingBalance, 0);
           const formattedDate = formatIndonesianDateHeader(dateStr);
 
@@ -510,6 +532,10 @@ export function printCourtBookingsPDF(
                 .replace(/\s*\([^)]*VIP[^)]*\)/gi, '')
                 .replace(/\s*\([^)]*Vinyl[^)]*\)/gi, '')
                 .trim();
+              const paidInPeriod = (startDate && endDate)
+                ? getBookingAmountInPeriod(b, startDate, endDate)
+                : b.amountPaidTotal;
+              const isPartial = Boolean(startDate && endDate && paidInPeriod !== b.amountPaidTotal);
 
               return `
             <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; font-size: 11px;">
@@ -538,7 +564,8 @@ export function printCourtBookingsPDF(
                 Rp ${b.totalAmount.toLocaleString('id-ID')}
               </td>
               <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: right; font-weight: 700; color: #047857;">
-                Rp ${b.amountPaidTotal.toLocaleString('id-ID')}
+                Rp ${paidInPeriod.toLocaleString('id-ID')}
+                ${isPartial ? `<div style="font-size: 8.5px; color: #64748b; font-weight: normal;">(Total: Rp ${b.amountPaidTotal.toLocaleString('id-ID')})</div>` : ''}
               </td>
               <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center;">
                 <span style="font-weight: 700; font-size: 9.5px; color: ${isLunas ? '#059669' : '#d97706'};">

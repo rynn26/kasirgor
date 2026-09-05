@@ -28,6 +28,11 @@ import {
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { EditCourtBookingModal } from '@/components/booking/EditCourtBookingModal';
 import { exportCourtBookingsToExcel, printCourtBookingsPDF } from '@/lib/exportUtils';
+import {
+  getBookingTxDate,
+  getBookingSettleDate,
+  getBookingAmountInPeriod,
+} from '@/lib/bookingUtils';
 
 export default function HistoryBookingPage() {
   const { bookings, loadBookings, deleteBooking, cancelBooking } = useCourtBookingStore();
@@ -37,16 +42,20 @@ export default function HistoryBookingPage() {
     setSelectedDate: setGlobalDate,
   } = useAppDateStore();
   const { showToast } = useToastStore();
-
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const getTxDate = getBookingTxDate;
+  const getSettleDate = getBookingSettleDate;
 
   useEffect(() => {
     loadBookings();
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const m = params.get('method');
-      if (m === 'CASH' || m === 'QRIS') {
-        setMethodFilter(m);
+      const action = params.get('action');
+      if (action === 'export') {
+        setTimeout(() => {
+          exportCourtBookingsToExcel('Semua Booking', bookings);
+        }, 500);
       }
       const d = params.get('date');
       if (d) {
@@ -67,13 +76,6 @@ export default function HistoryBookingPage() {
   const [editingBooking, setEditingBooking] = useState<CourtBooking | null>(null);
   const [deletingBooking, setDeletingBooking] = useState<CourtBooking | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Helper: Dapatkan tanggal transaksi / uang masuk
-  const getTxDate = (b: CourtBooking) =>
-    b.bookingDate || (b.dpPaidAt ? b.dpPaidAt.split('T')[0] : (b.createdAt ? b.createdAt.split('T')[0] : b.date));
-
-  const getSettleDate = (b: CourtBooking) =>
-    b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : getTxDate(b);
 
   // Financial Summary (menyesuaikan dengan tanggal yang dipilih jika ada)
   const activeBookings = bookings.filter((b) => {
@@ -96,43 +98,27 @@ export default function HistoryBookingPage() {
     return true;
   });
 
+  const isPlayFilter = dateFilterMode === 'PLAY';
+  const isDateActive = Boolean(selectedDate && !isPlayFilter);
+
   const totalRevenue = activeBookings.reduce((sum, b) => {
     if (!selectedDate) return sum + b.amountPaidTotal;
-    const totalPaid = b.amountPaidTotal || 0;
-    const dpAmt = b.dpAmount || 0;
-    const realDp = Math.min(dpAmt, totalPaid);
-    const realSettle = Math.max(0, totalPaid - realDp);
-    const txDate = getTxDate(b);
-    const settleDate = getSettleDate(b);
-
-    if (dateFilterMode === 'SETTLE') {
-      if (settleDate === selectedDate) {
-        // jika lunas langsung dan tanggal DP sama, masukkan total
-        return sum + (settleDate === txDate ? totalPaid : realSettle);
-      }
-      return sum;
+    if (isPlayFilter) {
+      return sum + (b.date === selectedDate ? b.amountPaidTotal : 0);
     }
-    if (dateFilterMode === 'ORDER') {
-      return sum + (txDate === selectedDate ? realDp + (settleDate === txDate ? realSettle : 0) : 0);
-    }
-    if (dateFilterMode === 'PLAY') {
-      return sum + (b.date === selectedDate ? totalPaid : 0);
-    }
-
-    let amt = 0;
-    if (txDate === selectedDate) {
-      amt += realDp;
-      if (settleDate === txDate) {
-        amt += realSettle;
-      }
-    } else if (settleDate === selectedDate) {
-      amt += realSettle;
-    }
-    return sum + amt;
+    return sum + getBookingAmountInPeriod(b, selectedDate, selectedDate);
   }, 0);
 
-  const lunasCount = activeBookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
-  const pendingDpCount = activeBookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
+  // Jumlah transaksi lunas / pelunasan
+  const lunasCount = isDateActive
+    ? activeBookings.filter((b) => getSettleDate(b) === selectedDate && (b.status === 'SETTLED' || b.remainingBalance === 0)).length
+    : activeBookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
+
+  // Jumlah transaksi DP
+  const pendingDpCount = isDateActive
+    ? activeBookings.filter((b) => getTxDate(b) === selectedDate && (b.dpAmount || 0) > 0).length
+    : activeBookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
+
   const totalPiutang = activeBookings.reduce((sum, b) => sum + b.remainingBalance, 0);
 
   // Filtered List
@@ -159,9 +145,20 @@ export default function HistoryBookingPage() {
         if (statusFilter === 'CANCELLED') {
           if (bkg.status !== 'CANCELLED') return false;
         } else if (statusFilter === 'SETTLED') {
-          if (bkg.status !== 'SETTLED' && bkg.remainingBalance > 0) return false;
+          if (isDateActive) {
+            const settleDate = getSettleDate(bkg);
+            const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
+            if (!isLunas || settleDate !== selectedDate) return false;
+          } else {
+            if (bkg.status !== 'SETTLED' && bkg.remainingBalance > 0) return false;
+          }
         } else if (statusFilter === 'DP_PAID') {
-          if (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0) return false;
+          if (isDateActive) {
+            const txDate = getTxDate(bkg);
+            if (txDate !== selectedDate || (bkg.dpAmount || 0) <= 0) return false;
+          } else {
+            if (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0) return false;
+          }
         }
       }
 
@@ -298,27 +295,31 @@ export default function HistoryBookingPage() {
 
         <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-1">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] uppercase font-bold">Lunas / Selesai</span>
+            <span className="text-[10px] uppercase font-bold">
+              {isDateActive ? 'Pelunasan di Tgl Ini' : 'Lunas / Selesai'}
+            </span>
             <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
           </div>
           <div className="text-base sm:text-lg font-black text-blue-700">
             {lunasCount} Nota
           </div>
           <span className="text-[10px] text-slate-400 block font-medium">
-            Pembayaran penuh 100%
+            {isDateActive ? 'Pelunasan diterima tgl ini' : 'Pembayaran penuh 100%'}
           </span>
         </div>
 
         <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-1">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] uppercase font-bold">Belum Lunas (DP)</span>
+            <span className="text-[10px] uppercase font-bold">
+              {isDateActive ? 'DP di Tgl Ini' : 'Belum Lunas (DP)'}
+            </span>
             <Clock className="w-3.5 h-3.5 text-amber-600" />
           </div>
           <div className="text-base sm:text-lg font-black text-amber-600">
             {pendingDpCount} Booking
           </div>
           <span className="text-[10px] text-slate-400 block font-medium">
-            Sisa tagihan: {formatRupiah(totalPiutang)}
+            {isDateActive ? `Dari ${activeBookings.length} transaksi aktif` : `Sisa tagihan: ${formatRupiah(totalPiutang)}`}
           </span>
         </div>
       </div>
@@ -497,7 +498,24 @@ export default function HistoryBookingPage() {
             const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
             const isDP = !isLunas && !isCancelled && (bkg.status === 'DP_PAID' || bkg.dpAmount > 0);
             const sportName = bkg.communityName?.includes('Pickleball') ? 'Pickleball' : 'Badminton';
-            const paymentMethodUsed = bkg.settlementPaymentMethod || bkg.dpPaymentMethod || 'Cash';
+            const isPlayFilter = dateFilterMode === 'PLAY';
+            const amountOnDate = (selectedDate && !isPlayFilter) ? getBookingAmountInPeriod(bkg, selectedDate, selectedDate) : bkg.amountPaidTotal;
+            const isPartialDate = Boolean(selectedDate && !isPlayFilter && amountOnDate !== bkg.amountPaidTotal);
+
+            const paymentMethodUsed = (() => {
+              if (selectedDate && !isPlayFilter) {
+                const txDate = getTxDate(bkg);
+                const settleDate = getSettleDate(bkg);
+                if (settleDate === selectedDate && settleDate !== txDate) {
+                  return bkg.settlementPaymentMethod || 'Cash';
+                }
+                if (txDate === selectedDate && settleDate !== txDate) {
+                  return bkg.dpPaymentMethod || 'Cash';
+                }
+              }
+              return bkg.settlementPaymentMethod || bkg.dpPaymentMethod || 'Cash';
+            })();
+
             const settleDateDisplay = getSettleDate(bkg);
 
             return (
@@ -517,6 +535,42 @@ export default function HistoryBookingPage() {
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-100 text-red-600">
                         VOID
                       </span>
+                    ) : isDateActive ? (
+                      (() => {
+                        const txDate = getTxDate(bkg);
+                        const settleDate = getSettleDate(bkg);
+                        const isSettleToday = settleDate === selectedDate && isLunas;
+                        const isDpToday = txDate === selectedDate && (bkg.dpAmount || 0) > 0;
+
+                        if (isSettleToday && settleDate !== txDate) {
+                          return (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Pelunasan</span>
+                            </span>
+                          );
+                        }
+                        if (isDpToday) {
+                          return (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 flex items-center gap-1">
+                              <span>DP</span>
+                            </span>
+                          );
+                        }
+                        if (isLunas) {
+                          return (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Lunas</span>
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
+                            DP
+                          </span>
+                        );
+                      })()
                     ) : isLunas ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -527,12 +581,34 @@ export default function HistoryBookingPage() {
                         DP
                       </span>
                     )}
-                    {isLunas && (
+                    {isDateActive ? (
+                      (() => {
+                        const txDate = getTxDate(bkg);
+                        const settleDate = getSettleDate(bkg);
+                        if (txDate === selectedDate && isLunas && settleDate !== txDate) {
+                          return (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 whitespace-nowrap flex items-center gap-1">
+                              <span className="text-emerald-700 font-medium">Lunas pd:</span>
+                              <strong className="text-emerald-950">{settleDateDisplay}</strong>
+                            </span>
+                          );
+                        }
+                        if (settleDate === selectedDate && isLunas && settleDate !== txDate) {
+                          return (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap flex items-center gap-1">
+                              <span className="text-amber-700 font-medium">DP tgl:</span>
+                              <strong className="text-amber-950">{txDate}</strong>
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()
+                    ) : isLunas ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 whitespace-nowrap flex items-center gap-1">
                         <span className="text-emerald-700 font-medium">Tgl Pelunasan:</span>
                         <strong className="text-emerald-950">{settleDateDisplay}</strong>
                       </span>
-                    )}
+                    ) : null}
                     {(bkg.memberType === 'MEMBER' || bkg.communityName?.includes('Member')) && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200">
                         Member
@@ -594,8 +670,13 @@ export default function HistoryBookingPage() {
                     <div className={`text-base font-black ${
                       isCancelled ? 'line-through text-slate-400' : 'text-slate-900'
                     }`}>
-                      {formatRupiah(bkg.amountPaidTotal)}
+                      {formatRupiah(amountOnDate)}
                     </div>
+                    {isPartialDate && (
+                      <div className="text-[10px] text-slate-400 font-medium">
+                        Total: {formatRupiah(bkg.amountPaidTotal)}
+                      </div>
+                    )}
                     <div className="flex items-center justify-end gap-1 mt-0.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                         {paymentMethodUsed}

@@ -21,6 +21,7 @@ import {
   Plus,
   Wallet,
   Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { PaymentMethodDetailModal } from '@/components/laporan/PaymentMethodDetailModal';
@@ -45,6 +46,12 @@ import {
   exportCourtBookingsToExcel, 
   printCourtBookingsPDF 
 } from '@/lib/exportUtils';
+import {
+  getBookingTxDate,
+  getBookingSettleDate,
+  getBookingAmountInPeriod,
+  getBookingPaymentItemsInPeriod,
+} from '@/lib/bookingUtils';
 
 type PeriodType = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
 
@@ -58,47 +65,6 @@ function formatShortDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
-}
-
-function getBookingTxDate(b: CourtBooking): string {
-  return b.bookingDate || (b.dpPaidAt ? b.dpPaidAt.split('T')[0] : (b.createdAt ? b.createdAt.split('T')[0] : b.date));
-}
-
-function getBookingSettleDate(b: CourtBooking): string {
-  return b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : getBookingTxDate(b);
-}
-
-function getBookingAmountInPeriod(b: CourtBooking, start: string, end: string): number {
-  const totalPaid = b.amountPaidTotal || 0;
-  const dpAmt = b.dpAmount || 0;
-  const realDp = Math.min(dpAmt, totalPaid);
-  const realSettle = Math.max(0, totalPaid - realDp);
-
-  const txDate = getBookingTxDate(b);
-  const settleDate = getBookingSettleDate(b);
-
-  let amt = 0;
-  const isDpInPeriod = txDate >= start && txDate <= end;
-  const isSettleInPeriod = settleDate >= start && settleDate <= end;
-
-  // Uang DP dihitung pada tanggal DP (txDate)
-  if (isDpInPeriod) {
-    amt += realDp;
-  }
-
-  // Uang pelunasan dihitung pada tanggal pelunasan (settleDate)
-  // Jika tanggal sama dengan DP (misal sewa langsung), cukup satu kali masuk via isDpInPeriod
-  if (realSettle > 0) {
-    if (settleDate !== txDate && isSettleInPeriod) {
-      // Pelunasan di tanggal berbeda — masuk ke tanggal pelunasan
-      amt += realSettle;
-    } else if (settleDate === txDate && isDpInPeriod) {
-      // Sewa langsung (bayar penuh sekaligus) — masuk bersama DP
-      amt += realSettle;
-    }
-  }
-
-  return amt;
 }
 
 function getDateRange(period: PeriodType, customDate?: string): { start: string; end: string; label: string } {
@@ -171,6 +137,7 @@ export default function LaporanPenjualanPage() {
   const dateInputRef = React.useRef<HTMLInputElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; amount: number } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
+  const [isRoleChecked, setIsRoleChecked] = useState(false);
   const [isOwnerRevenueModalOpen, setIsOwnerRevenueModalOpen] = useState(false);
   const [selectedPaymentMethodDetail, setSelectedPaymentMethodDetail] = useState<string | null>(null);
   const [selectedCourtDetail, setSelectedCourtDetail] = useState<string | null>(null);
@@ -230,11 +197,15 @@ export default function LaporanPenjualanPage() {
       if (session) {
         try {
           const parsed = JSON.parse(session);
-          setIsOwner(parsed.role === 'owner');
-        } catch {}
+          const role = (parsed.role || '').toLowerCase();
+          setIsOwner(role === 'owner' || role === 'admin');
+        } catch {
+          setIsOwner(false);
+        }
       } else {
-        setIsOwner(true);
+        setIsOwner(false);
       }
+      setIsRoleChecked(true);
     }
   }, [loadTransactions, loadBookings, loadCourts]);
 
@@ -323,10 +294,12 @@ export default function LaporanPenjualanPage() {
     const chartPoints = buildKantinChartPoints(filtered, period, start, end);
 
     // Growth vs previous period
+    const prevRange = getPrevDateRange(period, customDate);
     const prevFiltered = transactions.filter(
       (t) =>
         t.status === 'COMPLETED' &&
-        isInPrevPeriod(t.createdAt.split('T')[0], period, customDate)
+        t.createdAt.split('T')[0] >= prevRange.start &&
+        t.createdAt.split('T')[0] <= prevRange.end
     );
     const prevSales = prevFiltered.reduce((s, t) => s + t.grandTotal, 0);
     const growthPct =
@@ -353,37 +326,35 @@ export default function LaporanPenjualanPage() {
   const lapanganData = useMemo(() => {
     const { start, end, label } = getDateRange(period, customDate);
 
-    // Filter booking yang uangnya masuk pada periode ini (atau jadwal main jika belum ada tanggal tx)
+    // Filter booking yang ada uang masuk periode ini ATAU ada jadwal main di periode ini
     const filtered = bookings.filter((b) => {
       if (b.status === 'CANCELLED') return false;
-      const txDate = getBookingTxDate(b);
-      const settleDate = getBookingSettleDate(b);
-      return (txDate >= start && txDate <= end) || (settleDate >= start && settleDate <= end);
+      const amtInPeriod = getBookingAmountInPeriod(b, start, end);
+      const isPlayInPeriod = b.date >= start && b.date <= end;
+      return amtInPeriod > 0 || isPlayInPeriod;
     });
 
-    const totalSales = filtered.reduce((s, b) => s + (b.amountPaidTotal || 0), 0);
-    const totalBookings = filtered.length;
-    const totalHours = filtered.reduce((s, b) => s + b.durationHours, 0);
+    // Total pendapatan dihitung murni dari uang riil yang masuk pada rentang tanggal ini (DP / Pelunasan)
+    const totalSales = bookings
+      .filter((b) => b.status !== 'CANCELLED')
+      .reduce((s, b) => s + getBookingAmountInPeriod(b, start, end), 0);
+
+    const playBookings = filtered.filter((b) => b.date >= start && b.date <= end);
+    const totalBookings = playBookings.length > 0 ? playBookings.length : filtered.length;
+    const totalHours = playBookings.reduce((s, b) => s + b.durationHours, 0);
 
     // Occupancy: how many court-hour slots were used
     const totalSlots = courts.length * ((period === 'HARI_INI' || period === 'CUSTOM') ? 14 : period === 'MINGGU_INI' ? 98 : 420);
     const usedSlots = totalHours;
     const occupancyRate = totalSlots > 0 ? `${Math.min(100, Math.round((usedSlots / totalSlots) * 100))}%` : '0%';
 
-    // Payment breakdown berdasarkan metode pembayaran dari booking pada periode ini
+    // Payment breakdown berdasarkan porsi pembayaran riil (DP vs Pelunasan) yang masuk pada periode ini
     const paymentBreakdownMap: Record<string, number> = {};
-    filtered.forEach((b) => {
-      const totalPaid = b.amountPaidTotal || 0;
-      const dpAmt = b.dpAmount || 0;
-      const realDp = Math.min(dpAmt, totalPaid);
-      const realSettle = Math.max(0, totalPaid - realDp);
-
-      if (b.dpPaymentMethod && realDp > 0) {
-        paymentBreakdownMap[b.dpPaymentMethod] = (paymentBreakdownMap[b.dpPaymentMethod] || 0) + realDp;
-      }
-      if (b.settlementPaymentMethod && realSettle > 0) {
-        paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
-      }
+    bookings.filter((b) => b.status !== 'CANCELLED').forEach((b) => {
+      const items = getBookingPaymentItemsInPeriod(b, start, end);
+      items.forEach((it) => {
+        paymentBreakdownMap[it.method] = (paymentBreakdownMap[it.method] || 0) + it.amount;
+      });
     });
     const paymentColors: Record<string, string> = {
       CASH: '#f59e0b',
@@ -397,7 +368,7 @@ export default function LaporanPenjualanPage() {
       color: paymentColors[name] || '#94a3b8',
     }));
 
-    // Court breakdown
+    // Court breakdown: omset hanya uang masuk periode ini, jam main jika main di periode ini
     const courtMap: Record<string, { amount: number; hours: number }> = {};
     filtered.forEach((b) => {
       const cleanName = (b.courtName || '')
@@ -406,8 +377,10 @@ export default function LaporanPenjualanPage() {
         .trim();
       const key = cleanName || b.courtName || 'Lapangan 1';
       if (!courtMap[key]) courtMap[key] = { amount: 0, hours: 0 };
-      courtMap[key].amount += (b.amountPaidTotal || 0);
-      courtMap[key].hours += b.durationHours;
+      courtMap[key].amount += getBookingAmountInPeriod(b, start, end);
+      if (b.date >= start && b.date <= end) {
+        courtMap[key].hours += b.durationHours;
+      }
     });
     const courtList = Object.entries(courtMap).sort((a, b) => b[1].amount - a[1].amount);
     const maxCourtAmount = courtList[0]?.[1].amount || 1;
@@ -419,15 +392,13 @@ export default function LaporanPenjualanPage() {
     }));
 
     // Chart points
-    const chartPoints = buildLapanganChartPoints(filtered, period, start, end);
+    const chartPoints = buildLapanganChartPoints(bookings, period, start, end);
 
     // Growth vs prev
-    const prevFiltered = bookings.filter(
-      (b) =>
-        b.status !== 'CANCELLED' &&
-        isInPrevPeriod(getBookingTxDate(b), period, customDate)
-    );
-    const prevSales = prevFiltered.reduce((s, b) => s + b.amountPaidTotal, 0);
+    const prevRange = getPrevDateRange(period, customDate);
+    const prevSales = bookings
+      .filter((b) => b.status !== 'CANCELLED')
+      .reduce((s, b) => s + getBookingAmountInPeriod(b, prevRange.start, prevRange.end), 0);
     const growthPct =
       prevSales > 0 ? (((totalSales - prevSales) / prevSales) * 100).toFixed(1) : null;
 
@@ -486,7 +457,7 @@ export default function LaporanPenjualanPage() {
 
   const handleExportExcel = () => {
     if (isLapangan) {
-      exportCourtBookingsToExcel(lapanganData.label, lapanganData.filteredBookings);
+      exportCourtBookingsToExcel(lapanganData.label, lapanganData.filteredBookings, lapanganData.start, lapanganData.end);
       showToast('Laporan Excel Sewa Lapangan berhasil diunduh!');
     } else {
       exportKantinToExcel(kantinData.label, kantinData.filteredTransactions);
@@ -496,13 +467,43 @@ export default function LaporanPenjualanPage() {
 
   const handleExportPDF = () => {
     if (isLapangan) {
-      printCourtBookingsPDF(lapanganData.label, lapanganData.filteredBookings);
+      printCourtBookingsPDF(lapanganData.label, lapanganData.filteredBookings, lapanganData.start, lapanganData.end);
       showToast('Membuka format cetak PDF Laporan Sewa Lapangan...');
     } else {
       printKantinPDF(kantinData.label, kantinData.filteredTransactions);
       showToast('Membuka format cetak PDF Laporan Penjualan Kantin...');
     }
   };
+
+  if (isRoleChecked && !isOwner) {
+    return (
+      <div className="min-h-[75vh] flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center shadow-xs">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-lg font-black text-slate-900">Akses Laporan Dibatasi</h2>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Halaman Laporan Penjualan POS dan Sewa Lapangan hanya dapat diakses oleh akun <strong>Owner / Admin</strong>.
+          </p>
+        </div>
+        <div className="pt-2 flex flex-col gap-2 w-full">
+          <Link
+            href="/kasir"
+            className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors text-center shadow-xs"
+          >
+            Kembali ke Kasir POS
+          </Link>
+          <Link
+            href="/booking"
+            className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors text-center shadow-xs"
+          >
+            Kembali ke Booking Lapangan
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-6 max-w-md mx-auto space-y-4 pb-28">
@@ -1274,26 +1275,52 @@ function buildMonthlyPoints(
 }
 
 function buildLapanganChartPoints(
-  filtered: ReturnType<typeof useCourtBookingStore.getState>['bookings'],
+  bookings: ReturnType<typeof useCourtBookingStore.getState>['bookings'],
   period: PeriodType,
   start: string,
   end: string
 ): { day: string; x: number; y: number; amount: number }[] {
+  const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
+
   if (period === 'HARI_INI' || period === 'CUSTOM') {
     const hours = [8, 11, 14, 17, 20, 22];
     const amounts = hours.map((h, i) => {
       const nextH = hours[i + 1] ?? 24;
-      return filtered
-        .filter((b) => {
-          const txDate = getBookingTxDate(b);
-          const txHour = b.dpPaidAt
-            ? new Date(b.dpPaidAt).getHours()
-            : b.createdAt
-            ? new Date(b.createdAt).getHours()
-            : parseInt(b.startTime.split(':')[0]);
-          return txDate === start && txHour >= h && txHour < nextH;
-        })
-        .reduce((s, b) => s + getBookingAmountInPeriod(b, start, end), 0);
+      let slotAmt = 0;
+      activeBookings.forEach((b) => {
+        const totalPaid = b.amountPaidTotal || 0;
+        const dpAmt = b.dpAmount || 0;
+        const realDp = Math.min(dpAmt, totalPaid);
+        const realSettle = Math.max(0, totalPaid - realDp);
+
+        const txDate = getBookingTxDate(b);
+        const settleDate = getBookingSettleDate(b);
+
+        const dpHour = b.dpPaidAt
+          ? new Date(b.dpPaidAt).getHours()
+          : b.createdAt
+          ? new Date(b.createdAt).getHours()
+          : parseInt(b.startTime?.split(':')[0] || '8');
+
+        const settleHour = b.settlementPaidAt
+          ? new Date(b.settlementPaidAt).getHours()
+          : dpHour;
+
+        // DP masuk pada tanggal DP dan jam pembayaran DP
+        if (txDate === start && realDp > 0 && dpHour >= h && dpHour < nextH) {
+          slotAmt += realDp;
+        }
+
+        // Pelunasan masuk pada tanggal pelunasan dan jam pelunasan
+        if (settleDate === start && realSettle > 0) {
+          if (settleDate !== txDate && settleHour >= h && settleHour < nextH) {
+            slotAmt += realSettle;
+          } else if (settleDate === txDate && dpHour >= h && dpHour < nextH) {
+            slotAmt += realSettle;
+          }
+        }
+      });
+      return slotAmt;
     });
     const maxAmt = Math.max(...amounts, 1);
     const xStep = 295 / (hours.length - 1);
@@ -1312,8 +1339,7 @@ function buildLapanganChartPoints(
       const d = new Date(startDate);
       d.setDate(startDate.getDate() + i);
       const dateStr = d.toISOString().split('T')[0];
-      const amount = filtered
-        .filter((b) => getBookingTxDate(b) === dateStr || getBookingSettleDate(b) === dateStr)
+      const amount = activeBookings
         .reduce((s, b) => s + getBookingAmountInPeriod(b, dateStr, dateStr), 0);
       return { day: dayNames[d.getDay()], amount };
     });
@@ -1324,11 +1350,11 @@ function buildLapanganChartPoints(
 
   // BULAN_INI / BULAN_LALU
   const daysInMonth = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).getDate();
-  return buildMonthlyPointsBookings(filtered, start, daysInMonth);
+  return buildMonthlyPointsBookings(activeBookings, start, daysInMonth);
 }
 
 function buildMonthlyPointsBookings(
-  filtered: ReturnType<typeof useCourtBookingStore.getState>['bookings'],
+  bookings: ReturnType<typeof useCourtBookingStore.getState>['bookings'],
   start: string,
   daysInMonth: number
 ): { day: string; x: number; y: number; amount: number }[] {
@@ -1341,13 +1367,7 @@ function buildMonthlyPointsBookings(
     const dayEnd = Math.min((i + 1) * bucketSize, daysInMonth);
     const bStart = `${yr}-${pad(mo)}-${pad(dayStart)}`;
     const bEnd = `${yr}-${pad(mo)}-${pad(dayEnd)}`;
-    const amount = filtered
-      .filter((b) => {
-        const txDate = getBookingTxDate(b);
-        const settleDate = getBookingSettleDate(b);
-        // Sertakan booking jika DP atau pelunasan jatuh di bucket ini
-        return (txDate >= bStart && txDate <= bEnd) || (settleDate >= bStart && settleDate <= bEnd);
-      })
+    const amount = bookings
       .reduce((s, b) => s + getBookingAmountInPeriod(b, bStart, bEnd), 0);
     return { day: String(dayStart), amount };
   });
@@ -1356,7 +1376,7 @@ function buildMonthlyPointsBookings(
   return results.map((r, i) => ({ ...r, x: Math.round(20 + i * xStep), y: Math.round(155 - (r.amount / maxAmt) * 120) }));
 }
 
-function isInPrevPeriod(dateStr: string, period: PeriodType, customDate?: string): boolean {
+function getPrevDateRange(period: PeriodType, customDate?: string): { start: string; end: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -1364,12 +1384,14 @@ function isInPrevPeriod(dateStr: string, period: PeriodType, customDate?: string
   if (period === 'CUSTOM' && customDate) {
     const [y, m, d] = customDate.split('-').map(Number);
     const prevDate = new Date(y, m - 1, d - 1);
-    return dateStr === fmt(prevDate);
+    const s = fmt(prevDate);
+    return { start: s, end: s };
   }
   if (period === 'HARI_INI') {
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
-    return dateStr === fmt(yesterday);
+    const s = fmt(yesterday);
+    return { start: s, end: s };
   }
   if (period === 'MINGGU_INI') {
     const day = now.getDay();
@@ -1380,15 +1402,15 @@ function isInPrevPeriod(dateStr: string, period: PeriodType, customDate?: string
     prevSun.setDate(thisMon.getDate() - 1);
     const prevMon = new Date(prevSun);
     prevMon.setDate(prevSun.getDate() - 6);
-    return dateStr >= fmt(prevMon) && dateStr <= fmt(prevSun);
+    return { start: fmt(prevMon), end: fmt(prevSun) };
   }
   if (period === 'BULAN_LALU') {
     const twoMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
     const twoMonthsAgoEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
-    return dateStr >= fmt(twoMonthsAgoStart) && dateStr <= fmt(twoMonthsAgoEnd);
+    return { start: fmt(twoMonthsAgoStart), end: fmt(twoMonthsAgoEnd) };
   }
   // BULAN_INI — prev month
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-  return dateStr >= fmt(prevMonthStart) && dateStr <= fmt(prevMonthEnd);
+  return { start: fmt(prevMonthStart), end: fmt(prevMonthEnd) };
 }

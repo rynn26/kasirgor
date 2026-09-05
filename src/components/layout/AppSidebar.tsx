@@ -36,6 +36,29 @@ export const AppSidebar: React.FC = () => {
   ];
 
   const [isHandoverOpen, setIsHandoverOpen] = React.useState(false);
+  const [isOwner, setIsOwner] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkRole = () => {
+      if (typeof window !== 'undefined') {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            const role = (parsed.role || '').toLowerCase();
+            setIsOwner(role === 'owner' || role === 'admin');
+          } catch {
+            setIsOwner(false);
+          }
+        } else {
+          setIsOwner(false);
+        }
+      }
+    };
+    checkRole();
+    window.addEventListener('storage', checkRole);
+    return () => window.removeEventListener('storage', checkRole);
+  }, []);
 
   const handleLogout = () => {
     const currentName = cashierName || 'Kasir';
@@ -135,11 +158,11 @@ export const AppSidebar: React.FC = () => {
             </span>
 
             {[
-              { name: 'Dashboard Owner', href: '/dashboard', icon: LayoutDashboard },
+              ...(isOwner ? [{ name: 'Dashboard Owner', href: '/dashboard', icon: LayoutDashboard }] : []),
               { name: 'Katalog & Stok Toko', href: '/produk', icon: Package },
-              { name: 'Laporan Penjualan', href: '/laporan', icon: BarChart3 },
+              ...(isOwner ? [{ name: 'Laporan Penjualan', href: '/laporan', icon: BarChart3 }] : []),
               { name: 'Riwayat Transaksi', href: '/history', icon: HistoryIcon },
-              { name: 'Karyawan & Shift', href: '/karyawan', icon: Users },
+              ...(isOwner ? [{ name: 'Karyawan & Shift', href: '/karyawan', icon: Users }] : []),
             ].map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;

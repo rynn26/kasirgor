@@ -44,28 +44,21 @@ export default function PelunasanBookingPage() {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
-  // Counts
-  const dpCount = bookings.filter((b) => b.status === 'DP_PAID' || b.remainingBalance > 0).length;
-  const lunasCount = bookings.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
-  const allCount = bookings.length;
+  // Base Filtered List (sebelum tab filter DP / Lunas)
+  const baseFiltered = bookings.filter((bkg) => {
+    if (bkg.status === 'CANCELLED') return false;
 
-  // Filtered List
-  const filteredBookings = bookings.filter((bkg) => {
-    const isDP = bkg.status === 'DP_PAID' || bkg.remainingBalance > 0;
-    const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
-
-    // Filter Tab
-    if (activeFilterTab === 'DP' && !isDP) return false;
-    if (activeFilterTab === 'LUNAS' && !isLunas) return false;
-
-    // Date filter (matches play date, settlement date, or recurring member dates)
+    // Date filter (cocokkan tanggal main, tanggal order/DP, tanggal pelunasan, atau jadwal member)
     if (selectedDateFilter) {
-      const playDate = bkg.date || bkg.bookingDate;
+      const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
+      const playDate = bkg.date;
       const matchPlayDate = playDate === selectedDateFilter;
-      const settleDate = bkg.settlementPaidAt ? bkg.settlementPaidAt.split('T')[0] : (bkg.bookingDate || bkg.date);
+      const txDate = bkg.bookingDate || (bkg.dpPaidAt ? bkg.dpPaidAt.split('T')[0] : '');
+      const matchTxDate = txDate === selectedDateFilter;
+      const settleDate = bkg.settlementPaidAt ? bkg.settlementPaidAt.split('T')[0] : '';
       const matchSettleDate = isLunas && settleDate === selectedDateFilter;
       const matchMemberDates = Array.isArray(bkg.memberDates) && bkg.memberDates.includes(selectedDateFilter);
-      if (!matchPlayDate && !matchSettleDate && !matchMemberDates) return false;
+      if (!matchPlayDate && !matchTxDate && !matchSettleDate && !matchMemberDates) return false;
     }
 
     // Search query (name, phone, bookingCode, courtName, communityName, date)
@@ -79,6 +72,21 @@ export default function PelunasanBookingPage() {
       return matchName || matchCode || matchPhone || matchDate || matchCourt;
     }
 
+    return true;
+  });
+
+  // Dynamic Counts menyesuaikan filter tanggal dan pencarian aktif
+  const dpCount = baseFiltered.filter((b) => b.status === 'DP_PAID' || b.remainingBalance > 0).length;
+  const lunasCount = baseFiltered.filter((b) => b.status === 'SETTLED' || b.remainingBalance === 0).length;
+  const allCount = baseFiltered.length;
+
+  // Filtered List berdasarkan Tab aktif
+  const filteredBookings = baseFiltered.filter((bkg) => {
+    const isDP = bkg.status === 'DP_PAID' || bkg.remainingBalance > 0;
+    const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
+
+    if (activeFilterTab === 'DP' && !isDP) return false;
+    if (activeFilterTab === 'LUNAS' && !isLunas) return false;
     return true;
   });
 

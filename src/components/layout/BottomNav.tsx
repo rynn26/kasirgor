@@ -178,19 +178,23 @@ export const BottomNav: React.FC = () => {
     pathname.startsWith('/booking') ||
     (pathname === '/dashboard' && activeDashboardUnit === 'lapangan');
 
-  // Navigation Items specifically tailored for Lapangan vs POS Toko
+  // Navigation Items specifically tailored for Lapangan vs POS Toko (Laporan hanya untuk Owner)
+  const isOwnerUser = currentRole === 'owner';
+
   const navItems = isLapanganContext
     ? [
       { name: 'Beranda', href: '/dashboard', icon: Home },
       { name: 'Booking', href: '/booking', icon: CalendarCheck },
       { name: 'Riwayat', href: '/booking/history', icon: Repeat },
-      { name: 'Laporan', href: '/laporan', icon: BarChart3 },
+      ...(isOwnerUser ? [{ name: 'Laporan', href: '/laporan', icon: BarChart3 }] : []),
     ]
     : [
       { name: 'Beranda', href: '/dashboard', icon: Home },
       { name: 'Transaksi', href: '/kasir', icon: Store },
       { name: 'Produk', href: '/produk', icon: Package },
-      { name: 'Laporan', href: '/laporan', icon: BarChart3 },
+      ...(isOwnerUser
+        ? [{ name: 'Laporan', href: '/laporan', icon: BarChart3 }]
+        : [{ name: 'Riwayat', href: '/history', icon: Repeat }]),
     ];
 
   return (

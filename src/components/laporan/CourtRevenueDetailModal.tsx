@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { CourtBooking } from '@/types/booking';
 import { formatRupiah, formatDate } from '@/lib/utils';
+import { getBookingAmountInPeriod } from '@/lib/bookingUtils';
 
 interface CourtRevenueDetailModalProps {
   isOpen: boolean;
@@ -62,12 +63,17 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
 
   // Aggregate stats
   const stats = useMemo(() => {
-    const totalOmzet = courtBookings.reduce((sum, b) => sum + (b.amountPaidTotal || 0), 0);
+    const totalOmzet = courtBookings.reduce((sum, b) => {
+      if (startDate && endDate) {
+        return sum + getBookingAmountInPeriod(b, startDate, endDate);
+      }
+      return sum + (b.amountPaidTotal || 0);
+    }, 0);
     const totalHours = courtBookings.reduce((sum, b) => sum + (b.durationHours || 0), 0);
     const totalCount = courtBookings.length;
     const avgPerHour = totalHours > 0 ? Math.round(totalOmzet / totalHours) : 0;
     return { totalOmzet, totalHours, totalCount, avgPerHour };
-  }, [courtBookings]);
+  }, [courtBookings, startDate, endDate]);
 
   // Filtered list based on search and status chip
   const displayList = useMemo(() => {
@@ -204,6 +210,10 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
             displayList.map((b, idx) => {
               const isLunas = b.remainingBalance === 0;
               const isMember = b.memberType === 'MEMBER';
+              const amtInPeriod = (startDate && endDate)
+                ? getBookingAmountInPeriod(b, startDate, endDate)
+                : (b.amountPaidTotal || 0);
+
               return (
                 <div
                   key={b.id || idx}
@@ -231,8 +241,13 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
 
                     <div className="text-right">
                       <span className="text-xs sm:text-sm font-black text-emerald-700">
-                        {formatRupiah(b.amountPaidTotal)}
+                        {formatRupiah(amtInPeriod)}
                       </span>
+                      {amtInPeriod !== b.amountPaidTotal && (
+                        <span className="block text-[9px] text-slate-400 font-medium">
+                          Total: {formatRupiah(b.amountPaidTotal)}
+                        </span>
+                      )}
                       <span
                         className={`block text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
                           isLunas

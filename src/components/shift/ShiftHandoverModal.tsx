@@ -16,6 +16,8 @@ import {
 import { useShiftStore, SHIFT_OPTIONS } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
+import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { recordActivityLog, updateCashierPresence } from '@/lib/db/activityLogs';
 
@@ -32,6 +34,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
 }) => {
   const { cashierName, selectedShift, selectedUnit, openingCash, startTime, startShift, selectShift } = useShiftStore();
   const { transactions } = useTransactionStore();
+  const { bookings } = useCourtBookingStore();
   const { showToast } = useToastStore();
 
   const [closingCashInput, setClosingCashInput] = useState<string>('');
@@ -62,15 +65,45 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
     );
   }, [transactions, todayStr]);
 
-  const totalSales = useMemo(() => {
+  // Pendapatan lapangan (DP & Pelunasan) yang diterima hari ini
+  const todayBookingCash = useMemo(() => {
+    let sum = 0;
+    bookings.forEach((b) => {
+      if (b.status === 'CANCELLED') return;
+      const items = getBookingPaymentItemsInPeriod(b, todayStr, todayStr);
+      items.forEach((it) => {
+        if (it.method === 'CASH') {
+          sum += it.amount;
+        }
+      });
+    });
+    return sum;
+  }, [bookings, todayStr]);
+
+  const todayBookingTotal = useMemo(() => {
+    let sum = 0;
+    bookings.forEach((b) => {
+      if (b.status === 'CANCELLED') return;
+      const items = getBookingPaymentItemsInPeriod(b, todayStr, todayStr);
+      items.forEach((it) => {
+        sum += it.amount;
+      });
+    });
+    return sum;
+  }, [bookings, todayStr]);
+
+  const kantinSales = useMemo(() => {
     return todayCompletedTx.reduce((sum, t) => sum + t.grandTotal, 0);
   }, [todayCompletedTx]);
 
-  const totalCashSales = useMemo(() => {
+  const kantinCash = useMemo(() => {
     return todayCompletedTx
       .filter((t) => t.paymentMethod === 'CASH')
       .reduce((sum, t) => sum + t.grandTotal, 0);
   }, [todayCompletedTx]);
+
+  const totalSales = kantinSales + todayBookingTotal;
+  const totalCashSales = kantinCash + todayBookingCash;
 
   const expectedCashInDrawer = (openingCash || 0) + totalCashSales;
   const actualClosingCash = parseNumberInput(closingCashInput);
@@ -242,15 +275,25 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
             )}
 
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Total Omzet Transaksi Sesi Ini</span>
+              <span className="text-slate-500 font-medium">Total Pemasukan Sesi Ini</span>
               <span className="font-black text-[#eb4b2b]">
-                {formatRupiah(totalSales)} ({todayCompletedTx.length} Transaksi)
+                {formatRupiah(totalSales)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span>*Uang Masuk Tunai (Cash):</span>
-              <span className="font-semibold text-slate-600">{formatRupiah(totalCashSales)}</span>
+            <div className="space-y-1 pt-2 border-t border-slate-200/80 text-[11px]">
+              <div className="flex items-center justify-between text-slate-500">
+                <span>• Kas Masuk Toko / Kantin:</span>
+                <span className="font-semibold text-slate-700">{formatRupiah(kantinCash)}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500">
+                <span>• Kas Masuk Lapangan (DP / Lunas):</span>
+                <span className="font-semibold text-slate-700">{formatRupiah(todayBookingCash)}</span>
+              </div>
+              <div className="flex items-center justify-between font-bold text-slate-800 pt-1 border-t border-dotted border-slate-200">
+                <span>Total Uang Kas Masuk:</span>
+                <span className="text-emerald-700">{formatRupiah(totalCashSales)}</span>
+              </div>
             </div>
           </div>
 

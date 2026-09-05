@@ -34,6 +34,7 @@ import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Transaction } from '@/types/pos';
 import { fetchCashierPresence, CashierPresence } from '@/lib/db/activityLogs';
+import { getBookingAmountInPeriod } from '@/lib/bookingUtils';
 
 type TimeFilter = 'HARI' | 'MINGGU' | 'BULAN';
 
@@ -303,24 +304,12 @@ export default function DashboardUnifiedPage() {
   const bookingsPendingSettlement = todayCourtBookings.filter((b) => b.status === 'DP_PAID').length;
 
   // Revenue dihitung berdasarkan tanggal uang masuk (DP date & settle date), BUKAN tanggal main
-  // Misal: DP tgl 1 = masuk ke tgl 1, Pelunasan tgl 2 = masuk ke tgl 2
+  // Misal: DP tgl 31 = masuk ke tgl 31, Pelunasan tgl 4 = masuk ke tgl 4
   const totalBookingRevenue = useMemo(() => {
     let total = 0;
     bookings.forEach((b) => {
       if (b.status === 'CANCELLED') return;
-      const totalPaid = b.amountPaidTotal || 0;
-      const dpAmt = b.dpAmount || 0;
-      const realDp = Math.min(dpAmt, totalPaid);
-      const realSettle = Math.max(0, totalPaid - realDp);
-
-      const bookingDateStr = b.bookingDate || (b.createdAt ? b.createdAt.split('T')[0] : b.date);
-      const dpDate = b.dpPaidAt ? b.dpPaidAt.split('T')[0] : bookingDateStr;
-      const settleDate = b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : bookingDateStr;
-
-      // DP masuk ke tanggal booking/DP
-      if (dpDate === activeDate && realDp > 0) total += realDp;
-      // Pelunasan masuk ke tanggal pelunasan (hanya jika berbeda hari dari DP agar tidak double-count lunas langsung)
-      if (realSettle > 0 && settleDate === activeDate && settleDate !== dpDate) total += realSettle;
+      total += getBookingAmountInPeriod(b, activeDate, activeDate);
     });
     return total;
   }, [bookings, activeDate]);

@@ -103,6 +103,17 @@ Terima kasih telah bermain di ${shopName}!`;
     const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0);
     const settleDateStr = booking.settlementPaidAt || booking.dpPaidAt || booking.createdAt;
 
+    const paymentDetails = isDirectLunas
+      ? `💳 *Bayar Lunas*: ${formatRupiah(booking.amountPaidTotal || booking.totalAmount)} (${booking.dpPaymentMethod || 'CASH'})\n` +
+        `✅ *Status*: LUNAS\n`
+      : isLunas
+      ? `💳 *DP Terbayar*: ${formatRupiah(booking.dpAmount)} (${booking.dpPaymentMethod || 'CASH'})\n` +
+        `💵 *Pelunasan*: ${formatRupiah(booking.settlementAmount || Math.max(0, (booking.amountPaidTotal || 0) - (booking.dpAmount || 0)))} (${booking.settlementPaymentMethod || 'CASH'})\n` +
+        `✅ *Status*: LUNAS\n` +
+        `🏁 *Tgl Pelunasan*: ${formatDate(settleDateStr)}\n`
+      : `💳 *DP Diterima*: ${formatRupiah(booking.dpAmount)} (${booking.dpPaymentMethod || 'CASH'})\n` +
+        `⚠️ *Sisa Tagihan*: ${formatRupiah(booking.remainingBalance)} (Harap dilunasi di lokasi sebelum main)\n`;
+
     const message = encodeURIComponent(
       `Halo Kak *${booking.customerName}*, berikut bukti reservasi lapangan di *${shopName}*:\n\n` +
       `👤 *Nama*: ${booking.customerName}\n` +
@@ -111,12 +122,9 @@ Terima kasih telah bermain di ${shopName}!`;
       (bookingDateStr ? `📝 *Tgl Booking*: ${bookingDateStr}\n` : '') +
       `📅 *Tgl Main*: ${booking.date}\n` +
       `⏰ *Waktu*: ${booking.startTime} - ${booking.endTime} WIB (${booking.durationHours} Jam)\n` +
-      `💰 *Total*: ${formatRupiah(booking.totalAmount)}\n` +
-      `💳 *${isDirectLunas ? 'Pembayaran Diterima' : 'DP Diterima'}*: ${formatRupiah(booking.amountPaidTotal || booking.dpAmount)}\n` +
-      (isLunas 
-        ? `✅ *Status*: LUNAS\n🏁 *Tgl Pelunasan*: ${formatDate(settleDateStr)}` 
-        : `⚠️ *Sisa Pembayaran*: ${formatRupiah(booking.remainingBalance)} (Pelunasan di lokasi sebelum main)`) +
-      `\n\nTerima kasih! Ditunggu kehadirannya ya kak.`
+      `💰 *Total Biaya*: ${formatRupiah(booking.totalAmount)}\n` +
+      paymentDetails +
+      `\nTerima kasih! Ditunggu kehadirannya ya kak.`
     );
 
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');

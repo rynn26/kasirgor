@@ -19,6 +19,7 @@ import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah } from '@/lib/utils';
+import { getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
 
 interface OwnerDailyRevenueModalProps {
   isOpen: boolean;
@@ -80,46 +81,38 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 
     bookings.forEach((b) => {
       if (b.status === 'CANCELLED') return;
-
-      const totalPaid = b.amountPaidTotal || 0;
-      const dpAmt = b.dpAmount || 0;
-
-      // Porsi DP yang sesungguhnya dibayarkan
-      const realDp = Math.min(dpAmt, totalPaid);
-      // Porsi Pelunasan yang sesungguhnya dibayarkan setelah DP
-      const realSettle = Math.max(0, totalPaid - realDp);
-
-      const bookingDateStr = b.bookingDate || (b.createdAt ? b.createdAt.split('T')[0] : b.date);
-
-      // Tanggal DP diterima
-      const dpDate = b.dpPaidAt ? b.dpPaidAt.split('T')[0] : bookingDateStr;
-      if (dpDate === selectedDate && realDp > 0) {
-        dpCount += 1;
-        if (b.dpPaymentMethod === 'CASH') {
-          dpCash += realDp;
-        } else {
-          dpQris += realDp;
+      const items = getBookingPaymentItemsInPeriod(b, selectedDate, selectedDate);
+      items.forEach((it) => {
+        if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
+          dpCount += 1;
+          if (it.method === 'CASH') {
+            dpCash += it.amount;
+          } else {
+            dpQris += it.amount;
+          }
+        } else if (it.type === 'PELUNASAN') {
+          settleCount += 1;
+          if (it.method === 'CASH') {
+            settleCash += it.amount;
+          } else {
+            settleQris += it.amount;
+          }
         }
-      }
-
-      // Tanggal Pelunasan diterima (jika langsung lunas saat booking, pelunasan jatuh di tanggal booking)
-      const settleDate = b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : bookingDateStr;
-      if (settleDate === selectedDate && realSettle > 0) {
-        settleCount += 1;
-        if (b.settlementPaymentMethod === 'CASH') {
-          settleCash += realSettle;
-        } else {
-          settleQris += realSettle;
-        }
-      }
+      });
     });
 
     const dpTotal = dpCash + dpQris;
     const settleTotal = settleCash + settleQris;
 
+    // Gabungan Lapangan (DP + Pelunasan)
+    const lapanganCash = dpCash + settleCash;
+    const lapanganQris = dpQris + settleQris;
+    const lapanganTotal = dpTotal + settleTotal;
+    const lapanganTxCount = dpCount + settleCount;
+
     // 3. REKAP TOTAL CASH & QRIS
-    const totalCash = kantinCash + dpCash + settleCash;
-    const totalQris = kantinQris + dpQris + settleQris;
+    const totalCash = kantinCash + lapanganCash;
+    const totalQris = kantinQris + lapanganQris;
     const grandTotal = totalCash + totalQris;
 
     return {
@@ -127,6 +120,11 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       kantinQris,
       kantinTotal,
       kantinTxCount,
+
+      lapanganCash,
+      lapanganQris,
+      lapanganTotal,
+      lapanganTxCount,
 
       dpCash,
       dpQris,
@@ -169,15 +167,12 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 - QRIS: ${formatRupiah(revenueSummary.kantinQris)}
 👉 Subtotal Kantin: ${formatRupiah(revenueSummary.kantinTotal)} (${revenueSummary.kantinTxCount} nota)
 
-*2. DP BOOKING LAPANGAN*
-- Cash (Tunai): ${formatRupiah(revenueSummary.dpCash)}
-- QRIS: ${formatRupiah(revenueSummary.dpQris)}
-👉 Subtotal DP: ${formatRupiah(revenueSummary.dpTotal)} (${revenueSummary.dpCount} tim)
-
-*3. PELUNASAN SEWA LAPANGAN*
-- Cash (Tunai): ${formatRupiah(revenueSummary.settleCash)}
-- QRIS: ${formatRupiah(revenueSummary.settleQris)}
-👉 Subtotal Pelunasan: ${formatRupiah(revenueSummary.settleTotal)} (${revenueSummary.settleCount} tim)
+*2. SEWA LAPANGAN GOR (DP & PELUNASAN)*
+- Cash (Tunai): ${formatRupiah(revenueSummary.lapanganCash)}
+- QRIS: ${formatRupiah(revenueSummary.lapanganQris)}
+👉 Subtotal Lapangan: ${formatRupiah(revenueSummary.lapanganTotal)} (${revenueSummary.lapanganTxCount} transaksi)
+  • DP Masuk: ${formatRupiah(revenueSummary.dpTotal)} (${revenueSummary.dpCount} tim)
+  • Pelunasan: ${formatRupiah(revenueSummary.settleTotal)} (${revenueSummary.settleCount} tim)
 
 ━━━━━━━━━━━━━━━━━━━━
 💰 *TOTAL PER METODE PEMBAYARAN:*
@@ -213,7 +208,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                Kantin + DP Booking + Pelunasan Lapangan
+                Kantin + Sewa Lapangan (DP & Pelunasan)
               </p>
             </div>
           </div>
@@ -323,7 +318,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
               </div>
             </div>
 
-            {/* 2. DP BOOKING LAPANGAN */}
+            {/* 2. SEWA LAPANGAN GOR (DP & PELUNASAN GABUNGAN) */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                 <div className="flex items-center gap-2">
@@ -331,20 +326,21 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                     <CalendarCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">2. DP Booking Lapangan</h4>
+                    <h4 className="text-xs font-bold text-slate-900">2. Sewa Lapangan GOR</h4>
                     <span className="text-[10px] text-slate-400 font-medium">
-                      {revenueSummary.dpCount} tim bayar DP
+                      {revenueSummary.lapanganTxCount} transaksi masuk (DP & Pelunasan)
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-black text-slate-900 block">
-                    {formatRupiah(revenueSummary.dpTotal)}
+                    {formatRupiah(revenueSummary.lapanganTotal)}
                   </span>
-                  <span className="text-[10px] text-slate-400">Subtotal</span>
+                  <span className="text-[10px] text-slate-400">Subtotal Lapangan</span>
                 </div>
               </div>
 
+              {/* Grid Metode Bayar Lapangan */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -352,7 +348,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                     <span className="text-slate-600 text-[11px] font-medium">Cash (Tunai)</span>
                   </div>
                   <span className="font-bold text-slate-900 text-xs">
-                    {formatRupiah(revenueSummary.dpCash)}
+                    {formatRupiah(revenueSummary.lapanganCash)}
                   </span>
                 </div>
 
@@ -362,53 +358,20 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                     <span className="text-slate-600 text-[11px] font-medium">QRIS</span>
                   </div>
                   <span className="font-bold text-slate-900 text-xs">
-                    {formatRupiah(revenueSummary.dpQris)}
+                    {formatRupiah(revenueSummary.lapanganQris)}
                   </span>
                 </div>
               </div>
-            </div>
 
-            {/* 3. PELUNASAN LAPANGAN */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">3. Pelunasan Sewa Lapangan</h4>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      {revenueSummary.settleCount} tim lunas
-                    </span>
-                  </div>
+              {/* Rincian Ringkas DP & Pelunasan */}
+              <div className="pt-2 border-t border-dashed border-slate-200/80 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>DP Masuk: <strong className="text-slate-800 font-bold">{formatRupiah(revenueSummary.dpTotal)}</strong> ({revenueSummary.dpCount} tim)</span>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-black text-slate-900 block">
-                    {formatRupiah(revenueSummary.settleTotal)}
-                  </span>
-                  <span className="text-[10px] text-slate-400">Subtotal</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Banknote className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span className="text-slate-600 text-[11px] font-medium">Cash (Tunai)</span>
-                  </div>
-                  <span className="font-bold text-slate-900 text-xs">
-                    {formatRupiah(revenueSummary.settleCash)}
-                  </span>
-                </div>
-
-                <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <QrCode className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                    <span className="text-slate-600 text-[11px] font-medium">QRIS</span>
-                  </div>
-                  <span className="font-bold text-slate-900 text-xs">
-                    {formatRupiah(revenueSummary.settleQris)}
-                  </span>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span>Pelunasan: <strong className="text-slate-800 font-bold">{formatRupiah(revenueSummary.settleTotal)}</strong> ({revenueSummary.settleCount} tim)</span>
                 </div>
               </div>
             </div>

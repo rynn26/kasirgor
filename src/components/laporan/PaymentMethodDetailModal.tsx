@@ -19,6 +19,7 @@ import {
 import { CourtBooking } from '@/types/booking';
 import { Transaction } from '@/types/pos';
 import { formatRupiah, formatDate } from '@/lib/utils';
+import { getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
 
 interface PaymentMethodDetailModalProps {
   isOpen: boolean;
@@ -67,33 +68,19 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
       filteredBookings.forEach((b) => {
         if (b.status === 'CANCELLED') return;
 
-        const totalPaid = b.amountPaidTotal || 0;
-        const dpAmt = b.dpAmount || 0;
-        const realDp = Math.min(dpAmt, totalPaid);
-        const realSettle = Math.max(0, totalPaid - realDp);
+        const sDate = startDate || '2000-01-01';
+        const eDate = endDate || '2099-12-31';
+        const items = getBookingPaymentItemsInPeriod(b, sDate, eDate);
 
-        const isDpMatch = b.dpPaymentMethod === targetMethod && realDp > 0;
-        const isSettleMatch = b.settlementPaymentMethod === targetMethod && realSettle > 0;
-
-        if (isDpMatch && isSettleMatch) {
-          list.push({
-            booking: b,
-            paidAmount: realDp + realSettle,
-            paymentType: b.remainingBalance === 0 ? 'LUNAS_LANGSUNG' : 'PELUNASAN',
-          });
-        } else if (isDpMatch) {
-          list.push({
-            booking: b,
-            paidAmount: realDp,
-            paymentType: b.remainingBalance === 0 ? 'LUNAS_LANGSUNG' : 'DP',
-          });
-        } else if (isSettleMatch) {
-          list.push({
-            booking: b,
-            paidAmount: realSettle,
-            paymentType: 'PELUNASAN',
-          });
-        }
+        items.forEach((it) => {
+          if (it.method === targetMethod && it.amount > 0) {
+            list.push({
+              booking: b,
+              paidAmount: it.amount,
+              paymentType: it.type,
+            });
+          }
+        });
       });
 
       return list;
