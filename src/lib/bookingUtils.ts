@@ -113,18 +113,18 @@ export function getBookingPaymentItemsInPeriod(
     date: string;
   }> = [];
 
-  // Jika sewa langsung (pelunasan pada hari yang sama dengan DP)
-  if (settleDate === txDate) {
-    if (isDpInPeriod && totalPaid > 0) {
+  // Jika tidak ada pelunasan terpisah (hanya 1 kali bayar penuh di awal atau hanya DP belum lunas)
+  if (realSettle === 0) {
+    if (isDpInPeriod && realDp > 0) {
       results.push({
         type: b.remainingBalance === 0 ? 'LUNAS_LANGSUNG' : 'DP',
-        amount: totalPaid,
-        method: b.settlementPaymentMethod || b.dpPaymentMethod || 'CASH',
+        amount: realDp,
+        method: b.dpPaymentMethod || b.settlementPaymentMethod || 'CASH',
         date: txDate,
       });
     }
   } else {
-    // DP di tanggal tertentu
+    // Ada 2 porsi pembayaran: DP dan Pelunasan (bisa di hari yang sama atau berbeda)
     if (isDpInPeriod && realDp > 0) {
       results.push({
         type: 'DP',
@@ -133,7 +133,6 @@ export function getBookingPaymentItemsInPeriod(
         date: txDate,
       });
     }
-    // Pelunasan di tanggal berbeda
     if (isSettleInPeriod && realSettle > 0) {
       results.push({
         type: 'PELUNASAN',

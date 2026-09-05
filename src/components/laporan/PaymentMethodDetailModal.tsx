@@ -137,10 +137,11 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
 
   const handleNavigateToFullHistory = () => {
     onClose();
+    const dateParam = startDate && startDate === endDate ? `&date=${startDate}` : '';
     if (isLapangan) {
-      router.push(`/booking/history?method=${targetMethod}`);
+      router.push(`/booking/history?method=${targetMethod}${dateParam}`);
     } else {
-      router.push(`/history?method=${targetMethod}`);
+      router.push(`/history?method=${targetMethod}${dateParam}`);
     }
   };
 

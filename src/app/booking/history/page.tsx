@@ -64,6 +64,10 @@ export default function HistoryBookingPage() {
       } else if (isCustomActive && globalSelectedDate) {
         setSelectedDate(globalSelectedDate);
       }
+      const m = params.get('method');
+      if (m === 'CASH' || m === 'QRIS') {
+        setMethodFilter(m);
+      }
     }
   }, [loadBookings, isCustomActive, globalSelectedDate, setGlobalDate]);
 
