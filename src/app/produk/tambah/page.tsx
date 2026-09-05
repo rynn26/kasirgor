@@ -12,7 +12,7 @@ export default function TambahProdukOwnerPage() {
   const { addProduct } = useProductStore();
   const { showToast } = useToastStore();
 
-  const [isOwner, setIsOwner] = useState<boolean | null>(true);
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -31,9 +31,9 @@ export default function TambahProdukOwnerPage() {
       if (session) {
         try {
           const parsed = JSON.parse(session);
-          setIsOwner(parsed.role !== 'kasir');
+          setIsOwner(parsed.role === 'owner');
         } catch {
-          setIsOwner(true);
+          setIsOwner(false);
         }
       } else {
         setIsOwner(true);
@@ -43,6 +43,11 @@ export default function TambahProdukOwnerPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOwner) {
+      showToast('Akses ditolak: Hanya Owner yang berhak menambah produk');
+      return;
+    }
+
     if (!name.trim()) {
       showToast('Silakan masukkan nama produk');
       return;
@@ -51,7 +56,7 @@ export default function TambahProdukOwnerPage() {
     const numPrice = Number(sellingPrice) || 0;
     const numCostPrice = Number(costPrice) || 0;
 
-    if (isOwner && numPrice <= 0) {
+    if (numPrice <= 0) {
       showToast('Silakan masukkan harga jual yang valid');
       return;
     }
@@ -74,10 +79,7 @@ export default function TambahProdukOwnerPage() {
         isAvailable: numStock > 0,
       });
 
-      showToast(isOwner 
-        ? `Produk "${name}" berhasil disimpan ke database` 
-        : `Produk "${name}" berhasil diinput! Penetapan harga akan ditentukan oleh Owner.`
-      );
+      showToast(`Produk "${name}" berhasil disimpan ke database`);
       router.push('/produk');
     } catch (err: any) {
       console.error('Gagal simpan produk:', err);
@@ -87,6 +89,37 @@ export default function TambahProdukOwnerPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Tampilan jika role kasir mencoba mengakses halaman ini
+  if (isOwner === false) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-xl text-center space-y-5 animate-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center mx-auto shadow-xs">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+              Akses Dibatasi
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              Role kasir tidak memiliki izin untuk menambah produk jualan baru. Fitur penambahan produk hanya dapat diakses oleh akun <strong>Owner</strong>.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => router.push('/produk')}
+              className="w-full py-3 px-4 rounded-2xl bg-[#eb4b2b] hover:bg-[#d43a1c] text-white font-bold text-xs sm:text-sm shadow-md shadow-[#eb4b2b]/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Katalog Produk</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8fafc] pb-24 max-w-2xl mx-auto">
@@ -105,7 +138,7 @@ export default function TambahProdukOwnerPage() {
         </button>
 
         <h1 className="text-base font-bold text-[#eb4b2b] tracking-tight">
-          {isOwner ? 'Tambah Produk (Owner)' : 'Tambah Produk Baru (Kasir)'}
+          Tambah Produk Baru (Owner)
         </h1>
 
         <div className="w-7" />

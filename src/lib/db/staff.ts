@@ -87,9 +87,51 @@ function mapDbToShiftLog(row: DbShiftLog): ShiftLog {
   };
 }
 
+export async function ensureDefaultStaffExist(): Promise<void> {
+  try {
+    const { data } = await supabase.from('staff').select('email, name');
+    const emails = (data || []).map((s: any) => (s.email || '').toLowerCase());
+    const names = (data || []).map((s: any) => (s.name || '').toLowerCase());
+
+    if (!emails.includes('yulibadminton11@gmail.com') && !names.includes('yuli')) {
+      await supabase.from('staff').insert({
+        name: 'Yuli',
+        role: 'Kasir',
+        phone: '0812-1111-2222',
+        email: 'yulibadminton11@gmail.com',
+        assigned_shift: 'Shift Pagi (08:00 - 17:00)',
+        assigned_unit: 'Semua Unit',
+        status: 'AKTIF',
+        avatar_color: 'from-orange-500 to-red-600',
+      });
+    }
+
+    if (!emails.includes('asfiapickleball99@gmail.com') && !names.includes('asfia')) {
+      await supabase.from('staff').insert({
+        name: 'Asfia',
+        role: 'Kasir',
+        phone: '0813-3333-4444',
+        email: 'asfiapickleball99@gmail.com',
+        assigned_shift: 'Shift Sore (17:00 - 23:00)',
+        assigned_unit: 'Semua Unit',
+        status: 'AKTIF',
+        avatar_color: 'from-emerald-500 to-teal-600',
+      });
+    }
+  } catch (err) {
+    console.warn('Auto-sync default staff to DB:', err);
+  }
+}
+
 export async function fetchStaff(): Promise<staffMember[]> {
+  // Try ensuring Yuli and Asfia exist in DB table non-blockingly
+  ensureDefaultStaffExist().catch(() => {});
+
   const { data, error } = await supabase.from('staff').select('*').order('name');
-  if (error) throw error;
+  if (error) {
+    console.warn('fetchStaff db error, using fallback:', error);
+    return [];
+  }
   return (data as DbStaff[]).map(mapDbToStaff);
 }
 

@@ -66,6 +66,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
   const [dpAmount, setDpAmount] = useState<number>(0);
   const [dpPaymentMethod, setDpPaymentMethod] = useState<PaymentMethod>('QRIS');
   const [settlementPaymentMethod, setSettlementPaymentMethod] = useState<PaymentMethod>('QRIS');
+  const [settlementPaidDate, setSettlementPaidDate] = useState<string>('');
   const [status, setStatus] = useState<BookingStatus>('DP_PAID');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,7 +75,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
     if (booking && isOpen) {
       setCustomerName(booking.customerName || '');
       setPhone(booking.phone || '');
-      const isPickleball = booking.communityName?.includes('Pickleball') || booking.courtName.toLowerCase().includes('pickleball');
+      const isPickleball = booking.communityName?.toLowerCase().includes('pickleball');
       const sport = isPickleball ? 'Pickleball' : 'Badminton';
       setSelectedSport(sport);
       const isMem = booking.memberType === 'MEMBER' || booking.communityName?.toLowerCase().includes('member');
@@ -87,6 +88,10 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       setDpAmount(booking.dpAmount || 0);
       setDpPaymentMethod(booking.dpPaymentMethod || 'QRIS');
       setSettlementPaymentMethod(booking.settlementPaymentMethod || 'QRIS');
+      const initSettle = booking.settlementPaidAt
+        ? booking.settlementPaidAt.split('T')[0]
+        : (booking.status === 'SETTLED' ? (booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : booking.date)) : new Date().toISOString().split('T')[0]);
+      setSettlementPaidDate(initSettle);
       setStatus(booking.status);
       setNotes(booking.notes || '');
 
@@ -189,6 +194,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         dpAmount: dpAmount,
         dpPaymentMethod: dpPaymentMethod,
         settlementPaymentMethod: status === 'SETTLED' ? settlementPaymentMethod : undefined,
+        settlementPaidAt: status === 'SETTLED' ? `${settlementPaidDate}T12:00:00.000Z` : undefined,
         amountPaidTotal: finalAmountPaid,
         remainingBalance: finalRemaining,
         status: status,
@@ -196,6 +202,29 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       });
 
       showToast('Data booking berhasil diperbarui!');
+
+      // Record Activity Log
+      import('@/lib/db/activityLogs').then(({ recordActivityLog }) => {
+        const { useShiftStore } = require('@/lib/store/useShiftStore');
+        const activeCashier = useShiftStore.getState().cashierName || 'Yuli';
+        recordActivityLog({
+          staffName: activeCashier,
+          role: 'Kasir',
+          actionType: 'EDIT_BOOKING',
+          title: 'Edit Data Booking Lapangan',
+          details: `Kasir ${activeCashier} mengubah booking #${booking.id.slice(0, 8)} (${customerName.trim()} - ${selectedSport}). Tgl Main: ${date}, Jam: ${startTime}-${endTime}, Lapangan: ${selectedCourtsNames}, Total: ${formatRupiah(totalSewa)}, Status: ${status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
+          metadata: {
+            bookingId: booking.id,
+            customerName: customerName.trim(),
+            sport: selectedSport,
+            totalSewa,
+            dpAmount,
+            status,
+            date,
+          }
+        });
+      });
+
       if (onSuccess) onSuccess(updated);
       onClose();
     } catch {
@@ -525,6 +554,29 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
               <div className="flex items-center justify-between text-[11px] pt-1 text-amber-700 font-bold">
                 <span>Sisa Pelunasan:</span>
                 <span>{formatRupiah(remainingBalance)}</span>
+              </div>
+            )}
+
+            {status === 'SETTLED' && (
+              <div className="space-y-1.5 pt-2 border-t border-slate-100 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+                <label className="font-bold text-emerald-950 text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Tanggal Pelunasan</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Lunas
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  value={settlementPaidDate}
+                  onChange={(e) => setSettlementPaidDate(e.target.value)}
+                  className="w-full py-2 px-2.5 bg-white border border-emerald-200 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:border-emerald-700 cursor-pointer"
+                />
+                <p className="text-[10px] text-emerald-700 font-medium">
+                  Tanggal pelunasan ini akan tercatat pada laporan kasir & omset harian.
+                </p>
               </div>
             )}
           </div>

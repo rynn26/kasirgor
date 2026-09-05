@@ -17,6 +17,7 @@ import {
   CircleDot,
   Repeat
 } from 'lucide-react';
+import { ShiftHandoverModal } from '@/components/shift/ShiftHandoverModal';
 
 export const AppSidebar: React.FC = () => {
   const pathname = usePathname();
@@ -34,7 +35,24 @@ export const AppSidebar: React.FC = () => {
     { name: 'Booking Lapangan', href: '/booking', icon: CalendarCheck },
   ];
 
+  const [isHandoverOpen, setIsHandoverOpen] = React.useState(false);
+
   const handleLogout = () => {
+    const currentName = cashierName || 'Kasir';
+    import('@/lib/db/activityLogs').then(({ recordActivityLog, updateCashierPresence }) => {
+      recordActivityLog({
+        staffName: currentName,
+        role: 'Kasir',
+        actionType: 'LOGOUT',
+        title: 'Kasir Logout',
+        details: `${currentName} keluar dari sistem aplikasi.`,
+      });
+      updateCashierPresence({
+        staffName: currentName,
+        status: 'OFFLINE',
+      });
+    });
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('kasir_session');
     }
@@ -42,7 +60,7 @@ export const AppSidebar: React.FC = () => {
   };
 
   const handleSwitchShift = () => {
-    router.push('/shift');
+    setIsHandoverOpen(true);
   };
 
   return (
@@ -179,6 +197,11 @@ export const AppSidebar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ShiftHandoverModal
+        isOpen={isHandoverOpen}
+        onClose={() => setIsHandoverOpen(false)}
+      />
     </aside>
   );
 };

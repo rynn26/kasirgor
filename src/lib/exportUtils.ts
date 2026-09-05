@@ -342,6 +342,7 @@ export function exportCourtBookingsToExcel(
       'Kode Booking',
       'Tgl Booking',
       'Tgl Main',
+      'Tgl Pelunasan',
       'Nama Pemesan',
       'No. WhatsApp',
       'Kategori',
@@ -357,19 +358,24 @@ export function exportCourtBookingsToExcel(
   ];
 
   if (activeBookings.length === 0) {
-    data.push(['-', 'Belum ada data sewa lapangan pada periode ini', '-', '-', '-', '-', '-', '-', '-', 0, 0, 0, 0, '-', '-']);
+    data.push(['-', 'Belum ada data sewa lapangan pada periode ini', '-', '-', '-', '-', '-', '-', '-', '-', 0, 0, 0, 0, '-', '-']);
   } else {
     activeBookings.forEach((b, idx) => {
       const isMember = b.memberType === 'MEMBER' || b.communityName?.includes('Member');
       const kategori = isMember ? 'Member' : 'Insidentil';
-      const statusLabel = b.status === 'SETTLED' ? 'LUNAS' : b.status === 'DP_PAID' ? 'DP' : b.status;
+      const isLunas = b.status === 'SETTLED' || b.remainingBalance === 0;
+      const statusLabel = isLunas ? 'LUNAS' : b.status === 'DP_PAID' ? 'DP' : b.status;
       const paymentMethod = b.settlementPaymentMethod || b.dpPaymentMethod || '-';
+      const tglPelunasan = isLunas
+        ? (b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date))
+        : '-';
 
       data.push([
         idx + 1,
         b.bookingCode,
         b.bookingDate || b.date,
         b.date,
+        tglPelunasan,
         b.customerName,
         b.phone,
         kategori,
@@ -395,6 +401,7 @@ export function exportCourtBookingsToExcel(
     '',
     '',
     '',
+    '',
     totalHours,
     totalOmset,
     totalPaid,
@@ -408,6 +415,8 @@ export function exportCourtBookingsToExcel(
   ws['!cols'] = [
     { wch: 6 },
     { wch: 18 },
+    { wch: 14 },
+    { wch: 14 },
     { wch: 14 },
     { wch: 22 },
     { wch: 16 },
@@ -533,7 +542,7 @@ export function printCourtBookingsPDF(
               </td>
               <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center;">
                 <span style="font-weight: 700; font-size: 9.5px; color: ${isLunas ? '#059669' : '#d97706'};">
-                  ${isLunas ? '✓ LUNAS' : `DP (Sisa Rp ${b.remainingBalance.toLocaleString('id-ID')})`}
+                  ${isLunas ? `✓ LUNAS<br><span style="font-size: 8px; font-weight: 600; color: #065f46;">Pelunasan: ${b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}</span>` : `DP (Sisa Rp ${b.remainingBalance.toLocaleString('id-ID')})`}
                 </span>
               </td>
             </tr>

@@ -58,12 +58,14 @@ export default function PelunasanBookingPage() {
     if (activeFilterTab === 'DP' && !isDP) return false;
     if (activeFilterTab === 'LUNAS' && !isLunas) return false;
 
-    // Date filter (matches play date or recurring member dates)
+    // Date filter (matches play date, settlement date, or recurring member dates)
     if (selectedDateFilter) {
       const playDate = bkg.date || bkg.bookingDate;
       const matchPlayDate = playDate === selectedDateFilter;
+      const settleDate = bkg.settlementPaidAt ? bkg.settlementPaidAt.split('T')[0] : (bkg.bookingDate || bkg.date);
+      const matchSettleDate = isLunas && settleDate === selectedDateFilter;
       const matchMemberDates = Array.isArray(bkg.memberDates) && bkg.memberDates.includes(selectedDateFilter);
-      if (!matchPlayDate && !matchMemberDates) return false;
+      if (!matchPlayDate && !matchSettleDate && !matchMemberDates) return false;
     }
 
     // Search query (name, phone, bookingCode, courtName, communityName, date)
@@ -271,6 +273,11 @@ export default function PelunasanBookingPage() {
                   <span>Main: {bkg.date} ({bkg.startTime} - {bkg.endTime})</span>
                   {bkg.bookingDate && bkg.bookingDate !== bkg.date && (
                     <span className="text-[11px] font-normal text-slate-500">· Booking: {bkg.bookingDate}</span>
+                  )}
+                  {isLunas && (
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Tgl Pelunasan: {bkg.settlementPaidAt ? bkg.settlementPaidAt.split('T')[0] : (bkg.bookingDate || bkg.date)}
+                    </span>
                   )}
                 </div>
 

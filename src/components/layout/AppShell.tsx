@@ -1,15 +1,67 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { BottomNav } from './BottomNav';
 import { ToastNotification } from '@/components/common/ToastNotification';
+import { useShiftStore } from '@/lib/store/useShiftStore';
+import { updateCashierPresence } from '@/lib/db/activityLogs';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const isAuthOrShiftPage = pathname === '/login' || pathname === '/shift' || pathname === '/';
+  const { cashierName, selectedShift, selectedUnit } = useShiftStore();
+
+  // Presence Heartbeat Effect: Keeps cashier online status updated every 30s
+  useEffect(() => {
+    let currentName = cashierName || 'Yuli';
+    let currentEmail = '';
+    let currentUnit = selectedUnit === 'BOOKING_LAPANGAN' ? 'Booking Lapangan' : 'Kasir Toko & F&B';
+    let currentShift = selectedShift?.name || 'Shift Pagi (08:00 - 17:00)';
+    let currentRole = 'Kasir';
+
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed.name) currentName = parsed.name;
+          if (parsed.email) currentEmail = parsed.email;
+          if (parsed.role) currentRole = parsed.role === 'owner' ? 'Owner' : 'Kasir';
+          if (parsed.shift) currentShift = parsed.shift;
+          if (parsed.unit) currentUnit = parsed.unit;
+        } catch {}
+      }
+    }
+
+    // Ping presence on mount
+    updateCashierPresence({
+      staffName: currentName,
+      email: currentEmail,
+      role: currentRole,
+      unit: currentUnit,
+      shift: currentShift,
+      status: 'ONLINE',
+      lastActiveAt: new Date().toISOString(),
+    });
+
+    // Send heartbeat every 30 seconds
+    const interval = setInterval(() => {
+      updateCashierPresence({
+        staffName: currentName,
+        email: currentEmail,
+        role: currentRole,
+        unit: currentUnit,
+        shift: currentShift,
+        status: 'ONLINE',
+        lastActiveAt: new Date().toISOString(),
+      });
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [cashierName, selectedShift, selectedUnit]);
 
   if (isAuthOrShiftPage) {
     return <main className="min-h-screen w-full bg-[#f8fafc]">{children}</main>;
@@ -38,3 +90,4 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     </div>
   );
 };
+

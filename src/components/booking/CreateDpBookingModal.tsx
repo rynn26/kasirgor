@@ -54,6 +54,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Form State
+  const [selectedSport, setSelectedSport] = useState<'Badminton' | 'Pickleball'>('Badminton');
   const [courtId, setCourtId] = useState(initialCourtId || courts[0]?.id || 'court-00001');
   const [courtCount, setCourtCount] = useState(1);
   const [bookingDate, setBookingDate] = useState(todayStr);
@@ -74,6 +75,14 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const memberSchedule = React.useMemo(() => {
     return getMemberDatesInMonth(date, selectedMemberDayIndex);
   }, [date, selectedMemberDayIndex]);
+
+  const handleSelectSport = (sport: 'Badminton' | 'Pickleball') => {
+    setSelectedSport(sport);
+    if (sport === 'Pickleball') {
+      if (courtCount > 2) setCourtCount(2);
+      setMemberType('INSIDENTIL');
+    }
+  };
 
   const handleSelectMemberDay = (dayIdx: number) => {
     setSelectedMemberDayIndex(dayIdx);
@@ -106,7 +115,17 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   // Sync props if modal re-opens
   useEffect(() => {
     if (isOpen) {
-      if (initialCourtId) setCourtId(initialCourtId);
+      if (initialCourtId) {
+        setCourtId(initialCourtId);
+        const match = courts.find((c) => c.id === initialCourtId);
+        if (match && (match.type.toLowerCase().includes('pickleball') || match.name.toLowerCase().includes('pickleball'))) {
+          setSelectedSport('Pickleball');
+        } else {
+          setSelectedSport('Badminton');
+        }
+      } else {
+        setSelectedSport('Badminton');
+      }
       if (initialStartTime) setStartTime(initialStartTime);
       setDate(initialDate || todayStr);
       setDurationHours(initialDuration || 1);
@@ -114,7 +133,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       setDiscountAmount(0);
       setCashReceived(0);
     }
-  }, [initialCourtId, initialStartTime, initialDate, initialDuration, isOpen, todayStr]);
+  }, [initialCourtId, initialStartTime, initialDate, initialDuration, isOpen, todayStr, courts]);
 
   // Sync courtId when courts load from database
   useEffect(() => {
@@ -125,10 +144,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
   const selectedCourt = courts.find((c) => c.id === courtId) || courts[0];
 
-  // Determine if selected court is for Pickleball (derived early for use in useEffect)
-  const isPickleball = selectedCourt
-    ? (selectedCourt.type.toLowerCase().includes('pickleball') || selectedCourt.name.toLowerCase().includes('pickleball'))
-    : false;
+  const isPickleball = selectedSport === 'Pickleball';
 
   // Auto calculate fee dynamically based on court, date, startTime, duration, sport and memberType
   useEffect(() => {
@@ -153,7 +169,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         setCourtFee(calc.totalFee);
       }
     }
-  }, [selectedCourt?.id, date, startTime, durationHours, courtCount, memberType, memberSchedule.sessionCount, isPickleball, isManualFee, calculateBookingFee]);
+  }, [selectedCourt, date, startTime, durationHours, courtCount, memberType, isPickleball, calculateBookingFee, isManualFee]);
 
   if (!isOpen) return null;
 
@@ -188,9 +204,11 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       setCashReceived(finalTotal);
     }
 
-    const courtNameLabel = courtCount === 1 
-      ? selectedCourt?.name || 'Lapangan 1'
-      : `${courtCount} Lapangan (${courts.slice(0, courtCount).map(c => c.name.split(' ')[0] + ' ' + c.name.split(' ')[1]).join(', ')})`;
+    const courtNameLabel = isPickleball
+      ? (courtCount === 1 ? 'Lapangan 1 (Pickleball)' : '2 Lapangan (Lap 1 & Lap 2 - Pickleball)')
+      : (courtCount === 1 
+          ? selectedCourt?.name || 'Lapangan 1'
+          : `${courtCount} Lapangan (${courts.slice(0, courtCount).map(c => c.name.split(' ')[0] + ' ' + c.name.split(' ')[1]).join(', ')})`);
 
     const finalCommunityName = isPickleball 
       ? 'Pickleball (Insidentil)' 
@@ -206,6 +224,8 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       ? memberSchedule.dates[0]
       : date;
 
+    const settleTimeIso = bookingDate ? `${bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : new Date().toISOString();
+
     const newBooking = await addBooking({
       customerName: finalCustomerName,
       phone: finalPhone,
@@ -218,7 +238,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       date: firstDate,
       courtId: selectedCourt?.id || courtId || '',
       courtName: courtNameLabel,
-      courtType: selectedCourt?.type || 'Karpet',
+      courtType: isPickleball ? 'Pickleball' : (selectedCourt?.type || 'Karpet'),
       courtPricePerHour: Math.round(finalTotal / (durationHours * courtCount || 1)),
       startTime,
       endTime,
@@ -228,16 +248,36 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       totalAmount: finalTotal,
       dpAmount: finalTotal,
       dpPaymentMethod: paymentMethod,
-      dpPaidAt: bookingDate ? `${bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : new Date().toISOString(),
+      dpPaidAt: settleTimeIso,
       dpCashier: cashierName || 'Yuli',
-      settlementAmount: undefined,
-      settlementPaymentMethod: undefined,
-      settlementPaidAt: undefined,
-      settlementCashier: undefined,
+      settlementAmount: finalTotal,
+      settlementPaymentMethod: paymentMethod,
+      settlementPaidAt: settleTimeIso,
+      settlementCashier: cashierName || 'Yuli',
       amountPaidTotal: finalTotal,
       remainingBalance: 0,
       status: 'SETTLED',
       notes: finalNotes,
+    });
+
+    // Record Activity Log
+    import('@/lib/db/activityLogs').then(({ recordActivityLog }) => {
+      const activeCashier = cashierName || 'Yuli';
+      recordActivityLog({
+        staffName: activeCashier,
+        role: 'Kasir',
+        actionType: 'CREATE_BOOKING',
+        title: 'Input Booking Sewa Lapangan',
+        details: `Kasir ${activeCashier} mencatat sewa lunas #${newBooking.id.slice(0, 8)} untuk ${finalCustomerName} (${courtNameLabel}). Tgl: ${firstDate} (${startTime}-${endTime}), Total: ${formatRupiah(finalTotal)} via ${paymentMethod}.`,
+        metadata: {
+          bookingId: newBooking.id,
+          customerName: finalCustomerName,
+          court: courtNameLabel,
+          sport: isPickleball ? 'Pickleball' : 'Badminton',
+          total: finalTotal,
+          paymentMethod,
+        },
+      });
     });
 
     showToast('Sewa lapangan LUNAS berhasil dicatat!');
@@ -251,15 +291,24 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         {/* Header Modal */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#b92b10] to-[#e64a19] text-white flex items-center justify-center shadow-md shadow-[#b92b10]/20">
+            <div className={`w-10 h-10 rounded-2xl text-white flex items-center justify-center shadow-md transition-colors ${
+              isPickleball
+                ? 'bg-gradient-to-tr from-emerald-600 to-teal-700 shadow-emerald-700/20'
+                : 'bg-gradient-to-tr from-[#b92b10] to-[#e64a19] shadow-[#b92b10]/20'
+            }`}>
               <CalendarCheck2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight">
-                Sewa Langsung (Bayar Lunas)
+              <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight flex items-center gap-2">
+                <span>Sewa Langsung (Bayar Lunas)</span>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  isPickleball ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {isPickleball ? '🏓 Pickleball' : '🏸 Badminton'}
+                </span>
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Pilih lapangan, waktu main, dan penerimaan pembayaran
+                Pilih cabang olahraga, lapangan, waktu main, dan penerimaan pembayaran
               </p>
             </div>
           </div>
@@ -275,6 +324,38 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           
+          {/* Pilihan Cabang Olahraga: Badminton vs Pickleball */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+              Pilihan Cabang Olahraga
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => handleSelectSport('Badminton')}
+                className={`py-2.5 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  selectedSport === 'Badminton'
+                    ? 'bg-[#b92b10] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🏸 Badminton (4 Lapangan)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectSport('Pickleball')}
+                className={`py-2.5 px-3 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  selectedSport === 'Pickleball'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🏓 Pickleball (2 Lapangan)</span>
+              </button>
+            </div>
+          </div>
+
           {/* Section 1: Schedule & Duration */}
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -288,7 +369,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                   Tanggal Booking
                 </label>
                 <span className="text-[10px] text-slate-400">
-                  (Tgl pesan / bayar DP)
+                  (Tgl pesan / bayar Lunas)
                 </span>
               </div>
               <div className="relative">
@@ -338,18 +419,25 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             {/* Jumlah Lapangan & Durasi Sewa */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
               <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                  Jumlah Lapangan
-                </label>
-                <div className="grid grid-cols-4 gap-1">
-                  {[1, 2, 3, 4].map((cnt) => (
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-slate-600">
+                    Jumlah Lapangan
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {isPickleball ? 'Maks. 2 Lapangan' : 'Maks. 4 Lapangan'}
+                  </span>
+                </div>
+                <div className={`grid gap-1 ${isPickleball ? 'grid-cols-2' : 'grid-cols-4'}`}>
+                  {(isPickleball ? [1, 2] : [1, 2, 3, 4]).map((cnt) => (
                     <button
                       key={cnt}
                       type="button"
                       onClick={() => setCourtCount(cnt)}
                       className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         courtCount === cnt
-                          ? 'bg-[#b92b10] text-white shadow-xs'
+                          ? isPickleball
+                            ? 'bg-emerald-700 text-white shadow-xs'
+                            : 'bg-[#b92b10] text-white shadow-xs'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                       }`}
                     >
@@ -374,7 +462,9 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                       }}
                       className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         durationHours === hrs
-                          ? 'bg-[#b92b10] text-white shadow-xs'
+                          ? isPickleball
+                            ? 'bg-emerald-700 text-white shadow-xs'
+                            : 'bg-[#b92b10] text-white shadow-xs'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                       }`}
                     >
@@ -386,25 +476,31 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             </div>
 
             {/* Schedule Highlight Banner */}
-            <div className="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80 space-y-2 text-xs">
+            <div className={`p-3 rounded-2xl border space-y-2 text-xs ${
+              isPickleball ? 'bg-emerald-50/80 border-emerald-200/80' : 'bg-amber-50/80 border-amber-200/80'
+            }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-700" />
-                  <span className="font-semibold text-amber-900">
-                    {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan
+                  <Clock className={`w-4 h-4 ${isPickleball ? 'text-emerald-700' : 'text-amber-700'}`} />
+                  <span className={`font-semibold ${isPickleball ? 'text-emerald-900' : 'text-amber-900'}`}>
+                    {startTime} - {endTime} WIB ({durationHours} Jam) • {courtCount} Lapangan ({selectedSport})
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-amber-700 block">{selectedCourt?.name.split(' ')[0]} {selectedCourt?.name.split(' ')[1]}</span>
-                  <span className="font-black text-[#b92b10]">{formatRupiah(courtFee)}</span>
+                  <span className={`text-[10px] block ${isPickleball ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {isPickleball ? `Pickleball (${courtCount} Lap)` : `${selectedCourt?.name.split(' ')[0]} ${selectedCourt?.name.split(' ')[1]}`}
+                  </span>
+                  <span className={`font-black ${isPickleball ? 'text-emerald-700' : 'text-[#b92b10]'}`}>
+                    {formatRupiah(courtFee)}
+                  </span>
                 </div>
               </div>
-              {/* Breakdown tarif per jam — tampil jika ada >1 slot atau beda tarif */}
+              {/* Breakdown tarif per jam */}
               {!isManualFee && feeBreakdown.length > 0 && (
-                <div className="border-t border-amber-200/60 pt-1.5 space-y-0.5">
+                <div className={`border-t pt-1.5 space-y-0.5 ${isPickleball ? 'border-emerald-200/60' : 'border-amber-200/60'}`}>
                   {feeBreakdown.map((b, i) => (
                     <div key={i} className="flex items-center justify-between text-[10px]">
-                      <span className={`font-medium ${b.period === 'Malam' ? 'text-indigo-700' : 'text-amber-800'}`}>
+                      <span className={`font-medium ${b.period === 'Malam' ? 'text-indigo-700' : isPickleball ? 'text-emerald-800' : 'text-amber-800'}`}>
                         {b.period === 'Malam' ? '🌙' : '☀️'} {b.hour} ({b.period})
                         {courtCount > 1 ? ` × ${courtCount} lapangan` : ''}
                       </span>
@@ -424,44 +520,25 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
               <span>2. Informasi Penyewa</span>
             </label>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                  Nama Pemesan <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Budi Santoso"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                  No. WhatsApp / HP <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="0812-xxxx-xxxx"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
-                  />
-                </div>
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Nama Pemesan <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Budi Santoso"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
+                />
               </div>
             </div>
 
-            {/* Kategori Sewa Khusus Badminton (Member vs Insidentil) */}
-            {!isPickleball && (
+            {/* Kategori Sewa: Badminton (Member vs Insidentil) ATAU Pickleball */}
+            {!isPickleball ? (
               <div className="pt-1 space-y-2">
                 <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl">
                   <button
@@ -486,7 +563,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span>⚡ Insidentil (Sekali Main)</span>
+                    <span>⚡ Insidentil (Sewa Lepas)</span>
                     {memberType === 'INSIDENTIL' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </button>
                 </div>
@@ -535,6 +612,19 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <div>
+                    <span className="font-bold text-emerald-950 block">Kategori Sewa Pickleball</span>
+                    <span className="text-[11px] text-emerald-700">Tersedia 2 Lapangan · Tarif insidentil per jam</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300 whitespace-nowrap">
+                  2 Lapangan
+                </span>
               </div>
             )}
           </div>
@@ -721,7 +811,11 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
 
             <button
               type="submit"
-              className="flex-2 py-3 px-4 rounded-2xl bg-[#b92b10] hover:bg-[#a3250d] text-white font-bold text-xs shadow-lg shadow-[#b92b10]/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+              className={`flex-2 py-3 px-4 rounded-2xl text-white font-bold text-xs shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                isPickleball
+                  ? 'bg-emerald-700 hover:bg-emerald-800 shadow-emerald-700/25'
+                  : 'bg-[#b92b10] hover:bg-[#a3250d] shadow-[#b92b10]/25'
+              }`}
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>Simpan & Cetak Nota Lunas</span>

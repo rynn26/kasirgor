@@ -66,6 +66,119 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      // 1. Check Predefined Cashier Credentials directly (Yuli & Asfia)
+      const lowerUser = targetUser.toLowerCase();
+      const isYuliMatch = lowerUser === 'yulibadminton11@gmail.com' || lowerUser === 'yuli';
+      const isAsfiaMatch = lowerUser === 'asfiapickleball99@gmail.com' || lowerUser === 'asfia';
+
+      if (isYuliMatch) {
+        if (password !== 'sinyoyuli11' && password !== '123456') {
+          setErrorMsg('Password salah untuk akun Yuli. Gunakan password yang benar.');
+          return;
+        }
+
+        const sessionData = {
+          user: 'yulibadminton11@gmail.com',
+          role: 'kasir',
+          name: 'Yuli',
+          id: 'staff-yuli-11',
+          email: 'yulibadminton11@gmail.com',
+          shift: 'Shift Pagi (08:00 - 17:00)',
+          unit: 'Semua Unit',
+        };
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('kasir_session', JSON.stringify(sessionData));
+        }
+
+        // Auto-sync into Supabase staff table & attempt background auth signup
+        import('@/lib/db/staff').then(({ ensureDefaultStaffExist }) => {
+          ensureDefaultStaffExist().catch(() => {});
+        });
+        supabase.auth.signUp({
+          email: 'yulibadminton11@gmail.com',
+          password: 'sinyoyuli11',
+          options: { data: { name: 'Yuli', role: 'Kasir' } }
+        }).catch(() => {});
+
+        // Record Activity Log and Online Presence
+        import('@/lib/db/activityLogs').then(({ recordActivityLog, updateCashierPresence }) => {
+          recordActivityLog({
+            staffName: 'Yuli',
+            staffEmail: 'yulibadminton11@gmail.com',
+            role: 'Kasir',
+            actionType: 'LOGIN',
+            title: 'Kasir Yuli Login',
+            details: 'Kasir Yuli (yulibadminton11@gmail.com) berhasil masuk ke sistem operasional.',
+          });
+          updateCashierPresence({
+            staffName: 'Yuli',
+            email: 'yulibadminton11@gmail.com',
+            role: 'Kasir',
+            unit: 'Semua Unit (POS & Lapangan)',
+            shift: 'Shift Pagi (08:00 - 17:00)',
+            status: 'ONLINE',
+          });
+        });
+
+        router.push('/shift');
+        return;
+      }
+
+      if (isAsfiaMatch) {
+        if (password !== 'sinyoasfia99' && password !== '123456') {
+          setErrorMsg('Password salah untuk akun Asfia. Gunakan password yang benar.');
+          return;
+        }
+
+        const sessionData = {
+          user: 'asfiapickleball99@gmail.com',
+          role: 'kasir',
+          name: 'Asfia',
+          id: 'staff-asfia-99',
+          email: 'asfiapickleball99@gmail.com',
+          shift: 'Shift Sore (17:00 - 23:00)',
+          unit: 'Semua Unit',
+        };
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('kasir_session', JSON.stringify(sessionData));
+        }
+
+        // Auto-sync into Supabase staff table & attempt background auth signup
+        import('@/lib/db/staff').then(({ ensureDefaultStaffExist }) => {
+          ensureDefaultStaffExist().catch(() => {});
+        });
+        supabase.auth.signUp({
+          email: 'asfiapickleball99@gmail.com',
+          password: 'sinyoasfia99',
+          options: { data: { name: 'Asfia', role: 'Kasir' } }
+        }).catch(() => {});
+
+        // Record Activity Log and Online Presence
+        import('@/lib/db/activityLogs').then(({ recordActivityLog, updateCashierPresence }) => {
+          recordActivityLog({
+            staffName: 'Asfia',
+            staffEmail: 'asfiapickleball99@gmail.com',
+            role: 'Kasir',
+            actionType: 'LOGIN',
+            title: 'Kasir Asfia Login',
+            details: 'Kasir Asfia (asfiapickleball99@gmail.com) berhasil masuk ke sistem operasional.',
+          });
+          updateCashierPresence({
+            staffName: 'Asfia',
+            email: 'asfiapickleball99@gmail.com',
+            role: 'Kasir',
+            unit: 'Semua Unit (POS & Lapangan)',
+            shift: 'Shift Sore (17:00 - 23:00)',
+            status: 'ONLINE',
+          });
+        });
+
+        router.push('/shift');
+        return;
+      }
+
       // If user inputs an email, attempt official Supabase Auth signInWithPassword first
       if (targetUser.includes('@')) {
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -75,7 +188,6 @@ export default function LoginPage() {
 
         if (!authError && authData?.user) {
           // Authentication with Supabase Auth succeeded!
-          // Check if this user exists in the staff table, if not -> auto-create profile
           const { data: existingStaff } = await supabase
             .from('staff')
             .select('*')
@@ -85,7 +197,6 @@ export default function LoginPage() {
           let staffProfile = existingStaff;
 
           if (!staffProfile) {
-            // Auto-sync into staff table
             const newRole = targetRole === 'OWNER' ? 'Owner' : 'Kasir';
             const displayName = authData.user.user_metadata?.name || targetUser.split('@')[0];
             const { data: createdStaff, error: createError } = await supabase
@@ -127,6 +238,28 @@ export default function LoginPage() {
             );
           }
 
+          // Record Log
+          import('@/lib/db/activityLogs').then(({ recordActivityLog, updateCashierPresence }) => {
+            recordActivityLog({
+              staffName: userName,
+              staffEmail: authData.user.email,
+              role: userRole === 'owner' ? 'Owner' : 'Kasir',
+              actionType: 'LOGIN',
+              title: `${userName} Login`,
+              details: `${userName} berhasil masuk ke aplikasi sebagai ${userRole}.`,
+            });
+            if (userRole === 'kasir') {
+              updateCashierPresence({
+                staffName: userName,
+                email: authData.user.email,
+                role: 'Kasir',
+                unit: staffProfile?.assigned_unit || 'Semua Unit',
+                shift: staffProfile?.assigned_shift || 'Shift Pagi',
+                status: 'ONLINE',
+              });
+            }
+          });
+
           if (userRole === 'owner' || targetRole === 'OWNER') {
             router.push('/dashboard');
           } else {
@@ -135,8 +268,8 @@ export default function LoginPage() {
           return;
         }
 
-        // If authError was invalid credentials, show clear message
-        if (authError && authError.message.toLowerCase().includes('invalid login credentials')) {
+        // If authError was invalid credentials, check if owner fallback
+        if (targetRole !== 'OWNER') {
           setErrorMsg('Email atau password salah.');
           return;
         }
@@ -152,7 +285,7 @@ export default function LoginPage() {
       const staffList: any[] = dbStaff || [];
 
       if (targetRole === 'OWNER') {
-        const isDefaultOwner = targetUser.toLowerCase() === 'owner' || targetUser.toLowerCase() === 'owner@kasirgor.com';
+        const isDefaultOwner = targetUser.toLowerCase() === 'owner' || targetUser.toLowerCase() === 'owner@kasirgor.com' || targetUser.toLowerCase() === 'wilson';
         const foundOwnerInDb = staffList.find(
           (s) =>
             s.role?.toLowerCase() === 'owner' &&
@@ -180,13 +313,24 @@ export default function LoginPage() {
               role: 'owner',
               name: sessionName,
               id: foundOwnerInDb?.id || 'owner-default',
+              email: foundOwnerInDb?.email || 'owner@kasirgor.com',
             })
           );
         }
 
+        import('@/lib/db/activityLogs').then(({ recordActivityLog }) => {
+          recordActivityLog({
+            staffName: sessionName,
+            role: 'Owner',
+            actionType: 'LOGIN',
+            title: 'Owner Login',
+            details: `${sessionName} masuk ke Dashboard Pemilik GOR.`,
+          });
+        });
+
         router.push('/dashboard');
       } else {
-        // Role KASIR: Must exist in staff database
+        // Role KASIR
         const foundStaff = staffList.find(
           (s) =>
             s.email?.toLowerCase() === targetUser.toLowerCase() ||
@@ -194,26 +338,19 @@ export default function LoginPage() {
             s.phone === targetUser
         );
 
-        const isDefaultKasir =
-          targetUser.toLowerCase() === 'yuli' ||
-          targetUser.toLowerCase() === 'asfia' ||
-          targetUser.toLowerCase() === 'andi' ||
-          targetUser.toLowerCase() === 'kasir';
-
-        if (!foundStaff && !isDefaultKasir) {
-          setErrorMsg(`Akun "${targetUser}" tidak ditemukan di database staf. Silakan tambahkan staf di menu Karyawan terlebih dahulu.`);
+        if (!foundStaff) {
+          setErrorMsg(`Akun "${targetUser}" tidak ditemukan. Silakan periksa nama/email atau hubungi Owner.`);
           return;
         }
 
-        if (foundStaff && foundStaff.status !== 'AKTIF') {
+        if (foundStaff.status !== 'AKTIF') {
           setErrorMsg(`Akun "${foundStaff.name}" tidak dapat login karena berstatus ${foundStaff.status}.`);
           return;
         }
 
-        const sessionName = foundStaff?.name || targetUser || 'Yuli';
-        const sessionRole = foundStaff?.role?.toLowerCase() === 'owner' ? 'owner' : 'kasir';
-        const isAsfia = sessionName.toLowerCase() === 'asfia' || targetUser.toLowerCase() === 'asfia';
-        const defaultShift = isAsfia ? 'Shift Sore (17:00 - 23:00)' : 'Shift Pagi (08:00 - 17:00)';
+        const sessionName = foundStaff.name;
+        const sessionRole = foundStaff.role?.toLowerCase() === 'owner' ? 'owner' : 'kasir';
+        const defaultShift = foundStaff.assigned_shift || 'Shift Pagi (08:00 - 17:00)';
 
         if (typeof window !== 'undefined') {
           localStorage.setItem(
@@ -222,12 +359,32 @@ export default function LoginPage() {
               user: targetUser,
               role: sessionRole,
               name: sessionName,
-              id: foundStaff?.id || 'staff-default',
-              shift: foundStaff?.assigned_shift || defaultShift,
-              unit: foundStaff?.assigned_unit || 'Semua Unit',
+              id: foundStaff.id,
+              email: foundStaff.email || '',
+              shift: defaultShift,
+              unit: foundStaff.assigned_unit || 'Semua Unit',
             })
           );
         }
+
+        import('@/lib/db/activityLogs').then(({ recordActivityLog, updateCashierPresence }) => {
+          recordActivityLog({
+            staffName: sessionName,
+            staffEmail: foundStaff.email,
+            role: 'Kasir',
+            actionType: 'LOGIN',
+            title: `Kasir ${sessionName} Login`,
+            details: `Kasir ${sessionName} berhasil masuk ke aplikasi.`,
+          });
+          updateCashierPresence({
+            staffName: sessionName,
+            email: foundStaff.email || '',
+            role: 'Kasir',
+            unit: foundStaff.assigned_unit || 'Semua Unit',
+            shift: defaultShift,
+            status: 'ONLINE',
+          });
+        });
 
         router.push('/shift');
       }
@@ -244,11 +401,14 @@ export default function LoginPage() {
       setUsernameOrEmail('Wilson');
       setPassword('123456');
       handleLogin(undefined, 'OWNER', 'Wilson');
+    } else if (customName === 'Asfia') {
+      setUsernameOrEmail('asfiapickleball99@gmail.com');
+      setPassword('sinyoasfia99');
+      handleLogin(undefined, 'KASIR', 'asfiapickleball99@gmail.com');
     } else {
-      const name = customName || 'Yuli';
-      setUsernameOrEmail(name);
-      setPassword('123456');
-      handleLogin(undefined, 'KASIR', name);
+      setUsernameOrEmail('yulibadminton11@gmail.com');
+      setPassword('sinyoyuli11');
+      handleLogin(undefined, 'KASIR', 'yulibadminton11@gmail.com');
     }
   };
 
@@ -438,9 +598,12 @@ export default function LoginPage() {
 
         {/* Quick Demo Login Badges */}
         <div className="w-full mt-5 pt-4 border-t border-slate-100 space-y-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-            Akses Cepat 1-Klik (Demo)
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Akses Cepat 1-Klik Kasir
+            </span>
+            <span className="text-[10px] text-emerald-600 font-bold">Auto-Fill & Login</span>
+          </div>
 
           <div className="grid grid-cols-3 gap-1.5">
             <button
@@ -449,25 +612,30 @@ export default function LoginPage() {
               className="p-2 rounded-xl bg-orange-50 hover:bg-orange-100/80 border border-orange-200/60 text-[#eb4b2b] text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Wilson (Owner)</span>
+              <span>Wilson</span>
+              <span className="text-[8px] text-slate-400 font-normal">Owner</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickLogin('KASIR', 'Yuli')}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-red-50 hover:border-red-200 border border-slate-200 text-slate-800 text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
+              title="yulibadminton11@gmail.com (sinyoyuli11)"
             >
-              <Store className="w-3.5 h-3.5" />
-              <span>Yuli (Kasir)</span>
+              <Store className="w-3.5 h-3.5 text-[#eb4b2b]" />
+              <span>Yuli</span>
+              <span className="text-[8px] text-slate-400 font-normal">Shift Pagi</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickLogin('KASIR', 'Asfia')}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 text-slate-800 text-[10px] font-bold flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer"
+              title="asfiapickleball99@gmail.com (sinyoasfia99)"
             >
-              <Store className="w-3.5 h-3.5" />
-              <span>Asfia (Kasir)</span>
+              <Store className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Asfia</span>
+              <span className="text-[8px] text-slate-400 font-normal">Shift Sore</span>
             </button>
           </div>
         </div>

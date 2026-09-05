@@ -25,6 +25,8 @@ interface CourtRevenueDetailModalProps {
   onClose: () => void;
   courtName: string;
   periodLabel: string;
+  startDate?: string;
+  endDate?: string;
   filteredBookings: CourtBooking[];
   onOpenBookingReceipt?: (booking: CourtBooking) => void;
 }
@@ -40,6 +42,8 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
   onClose,
   courtName,
   periodLabel,
+  startDate,
+  endDate,
   filteredBookings,
   onOpenBookingReceipt,
 }) => {
@@ -242,16 +246,24 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <div className="flex items-center gap-2 line-clamp-1">
+                    <div className="flex items-center gap-2 line-clamp-1 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{formatDate(b.date, false)}</span>
+                        <span>Main: {formatDate(b.date, false)}</span>
                       </span>
                       <span className="text-slate-300">•</span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{b.startTime}-{b.endTime} ({b.durationHours} jam)</span>
                       </span>
+                      {isLunas && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Lunas: {b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}
+                          </span>
+                        </>
+                      )}
                     </div>
                     
                     <div className="flex items-center gap-1 text-slate-400 group-hover:text-emerald-700 font-bold text-[11px] transition-colors shrink-0">

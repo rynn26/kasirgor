@@ -334,6 +334,8 @@ export default function LaporanPenjualanPage() {
 
     return {
       label,
+      start,
+      end,
       totalSales,
       totalTx,
       totalItems,
@@ -359,7 +361,7 @@ export default function LaporanPenjualanPage() {
       return (txDate >= start && txDate <= end) || (settleDate >= start && settleDate <= end);
     });
 
-    const totalSales = filtered.reduce((s, b) => s + getBookingAmountInPeriod(b, start, end), 0);
+    const totalSales = filtered.reduce((s, b) => s + (b.amountPaidTotal || 0), 0);
     const totalBookings = filtered.length;
     const totalHours = filtered.reduce((s, b) => s + b.durationHours, 0);
 
@@ -368,25 +370,19 @@ export default function LaporanPenjualanPage() {
     const usedSlots = totalHours;
     const occupancyRate = totalSlots > 0 ? `${Math.min(100, Math.round((usedSlots / totalSlots) * 100))}%` : '0%';
 
-    // Payment breakdown berdasarkan uang yang masuk pada periode ini
+    // Payment breakdown berdasarkan metode pembayaran dari booking pada periode ini
     const paymentBreakdownMap: Record<string, number> = {};
     filtered.forEach((b) => {
       const totalPaid = b.amountPaidTotal || 0;
       const dpAmt = b.dpAmount || 0;
       const realDp = Math.min(dpAmt, totalPaid);
       const realSettle = Math.max(0, totalPaid - realDp);
-      const txDate = getBookingTxDate(b);
-      const settleDate = getBookingSettleDate(b);
 
-      if (b.dpPaymentMethod && realDp > 0 && txDate >= start && txDate <= end) {
+      if (b.dpPaymentMethod && realDp > 0) {
         paymentBreakdownMap[b.dpPaymentMethod] = (paymentBreakdownMap[b.dpPaymentMethod] || 0) + realDp;
       }
       if (b.settlementPaymentMethod && realSettle > 0) {
-        if (settleDate === txDate && txDate >= start && txDate <= end) {
-          paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
-        } else if (settleDate >= start && settleDate <= end) {
-          paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
-        }
+        paymentBreakdownMap[b.settlementPaymentMethod] = (paymentBreakdownMap[b.settlementPaymentMethod] || 0) + realSettle;
       }
     });
     const paymentColors: Record<string, string> = {
@@ -410,7 +406,7 @@ export default function LaporanPenjualanPage() {
         .trim();
       const key = cleanName || b.courtName || 'Lapangan 1';
       if (!courtMap[key]) courtMap[key] = { amount: 0, hours: 0 };
-      courtMap[key].amount += getBookingAmountInPeriod(b, start, end);
+      courtMap[key].amount += (b.amountPaidTotal || 0);
       courtMap[key].hours += b.durationHours;
     });
     const courtList = Object.entries(courtMap).sort((a, b) => b[1].amount - a[1].amount);
@@ -437,6 +433,8 @@ export default function LaporanPenjualanPage() {
 
     return {
       label,
+      start,
+      end,
       totalSales,
       totalBookings,
       totalHours,
@@ -1069,6 +1067,8 @@ export default function LaporanPenjualanPage() {
         methodName={selectedPaymentMethodDetail || ''}
         isLapangan={isLapangan}
         periodLabel={current.label}
+        startDate={current.start}
+        endDate={current.end}
         filteredBookings={lapanganData.filteredBookings}
         filteredTransactions={kantinData.filteredTransactions}
         onOpenBookingReceipt={(bkg) => setSelectedBookingForReceipt(bkg)}
@@ -1081,6 +1081,8 @@ export default function LaporanPenjualanPage() {
         onClose={() => setSelectedCourtDetail(null)}
         courtName={selectedCourtDetail || ''}
         periodLabel={current.label}
+        startDate={current.start}
+        endDate={current.end}
         filteredBookings={lapanganData.filteredBookings}
         onOpenBookingReceipt={(bkg) => setSelectedBookingForReceipt(bkg)}
       />

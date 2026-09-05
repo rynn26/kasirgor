@@ -15,7 +15,8 @@ import {
   Store,
   CalendarCheck,
   CheckCircle2,
-  Coffee
+  Coffee,
+  ChevronRight
 } from 'lucide-react';
 
 export default function ShiftSelectionPage() {
@@ -89,9 +90,8 @@ export default function ShiftSelectionPage() {
   // Step 3 handler
   const handleStartShiftSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const cashNum = Number(openingCashInput.replace(/\D/g, '')) || 0;
     selectShift(chosenShift);
-    startShift(cashierName, cashNum);
+    startShift(cashierName, 0);
 
     if (typeof window !== 'undefined') {
       const session = localStorage.getItem('kasir_session');
@@ -126,7 +126,7 @@ export default function ShiftSelectionPage() {
         </span>
         <span>&rarr;</span>
         <span className={step === 'START_SHIFT' ? 'text-[#eb4b2b] font-black' : 'text-slate-400'}>
-          3. Kas Awal
+          3. Konfirmasi Mulai
         </span>
       </div>
 
@@ -158,105 +158,129 @@ export default function ShiftSelectionPage() {
                   <p className="text-[10px] text-slate-400">Kasir Bertugas</p>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-red-50 text-[#eb4b2b] font-bold text-xs flex items-center justify-center">
-                  {cashierName.slice(0, 2).toUpperCase()}
+                  <User className="w-4 h-4" />
                 </div>
               </div>
             </div>
 
-            {/* Title & Description */}
-            <div className="text-center space-y-1 pt-1">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                Pilih Shift Kerja Anda
-              </h3>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
-                Silakan pilih jadwal shift operasional yang akan Anda jalankan hari ini.
-              </p>
+            {/* Quick Helper Banner */}
+            <div className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/70 flex items-start space-x-2.5">
+              <Calendar className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="text-xs text-amber-800 leading-relaxed">
+                <p className="font-bold">Penugasan Shift Kasir</p>
+                <p className="text-[11px] text-amber-700 mt-0.5">
+                  <strong>Yuli</strong> ditugaskan pada Shift Pagi (08:00 - 17:00), sedangkan <strong>Asfia</strong> pada Shift Sore (17:00 - 23:00).
+                </p>
+              </div>
             </div>
 
-            {/* Shift Cards List */}
-            <div className="space-y-3.5 pt-1">
+            {/* Shift List Cards */}
+            <div className="space-y-3">
               {SHIFT_OPTIONS.map((shift) => {
+                const isSelected = chosenShift.id === shift.id;
                 const isMorning = shift.id === 'SHIFT_PAGI';
-                const Icon = isMorning ? Sun : Moon;
 
                 return (
-                  <div
+                  <button
                     key={shift.id}
-                    className="p-4 rounded-2xl border border-slate-200 hover:border-[#eb4b2b]/60 bg-white shadow-2xs space-y-3 transition-all"
+                    type="button"
+                    onClick={() => handleChooseShift(shift)}
+                    className={`w-full p-4 rounded-2xl border-2 text-left transition-all flex items-center justify-between cursor-pointer group shadow-xs hover:shadow-md ${
+                      isSelected
+                        ? 'border-[#eb4b2b] bg-red-50/30'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#eb4b2b] border border-orange-100 flex items-center justify-center">
-                          <Icon className="w-5 h-5 stroke-2" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-sm text-slate-900">
-                            {shift.name}
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {shift.timeRange} WIB
-                          </p>
-                        </div>
+                    <div className="flex items-center space-x-3.5">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
+                        isSelected
+                          ? 'bg-[#eb4b2b] text-white shadow-md shadow-[#eb4b2b]/20'
+                          : isMorning 
+                            ? 'bg-amber-50 text-amber-600 group-hover:bg-amber-100'
+                            : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100'
+                      }`}>
+                        {isMorning ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
                       </div>
 
-                      <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-semibold">
-                        Tersedia
-                      </span>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-black text-sm text-slate-900 group-hover:text-[#eb4b2b] transition-colors">
+                            {shift.name}
+                          </h4>
+                          {isMorning && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-md">
+                              Pagi
+                            </span>
+                          )}
+                          {!isMorning && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-100 text-indigo-800 rounded-md">
+                              Malam
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 font-semibold mt-0.5 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          {shift.timeRange} WIB
+                        </p>
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleChooseShift(shift)}
-                      className="w-full py-3 px-4 rounded-xl bg-[#eb4b2b] hover:bg-[#d43a1c] active:scale-[0.99] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-[#eb4b2b]/20 transition-all cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>Pilih {shift.name}</span>
-                    </button>
-                  </div>
+                    <ChevronRight className={`w-5 h-5 transition-transform group-hover:translate-x-1 ${
+                      isSelected ? 'text-[#eb4b2b]' : 'text-slate-300'
+                    }`} />
+                  </button>
                 );
               })}
+            </div>
+
+            {/* Direct Switch to Previous / Active Session */}
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => router.push(selectedUnit === 'BOOKING_LAPANGAN' ? '/booking' : '/kasir')}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer inline-flex items-center gap-1"
+              >
+                <span>Sudah punya shift aktif? Lewati pemilihan</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         )}
 
         {/* ============================================================ */}
-        {/* STEP 2: BARU PILIH KANTIN (POS JUALAN) / BOOKING LAPANGAN */}
+        {/* STEP 2: PILIH UNIT LAYANAN (UNIT SELECTION) */}
         {/* ============================================================ */}
         {step === 'SELECT_UNIT' && (
           <div className="space-y-5 animate-in fade-in duration-200">
-            {/* Header */}
+            {/* Top Bar with Back Button to Step 1 */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
                   onClick={() => setStep('SELECT_SHIFT')}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                  title="Kembali ke Pilih Shift"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h2 className="font-bold text-base text-slate-900">
-                  Pilih Unit Tugas
-                </h2>
+                <div>
+                  <h2 className="font-bold text-base text-slate-900 tracking-tight">
+                    Pilih Unit Kerja Kasir
+                  </h2>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold text-slate-800">{chosenShift.name}</p>
-                <p className="text-[10px] text-slate-400">{chosenShift.timeRange}</p>
-              </div>
+              <span className="text-xs font-bold px-2 py-1 bg-red-50 text-[#eb4b2b] rounded-lg">
+                {chosenShift.name}
+              </span>
             </div>
 
-            <div className="text-center space-y-1 pt-1">
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                Pilih Layanan Kasir
-              </h3>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                Tentukan apakah Anda bertugas di Kantin / Kasir Toko atau di Layanan Booking Lapangan.
-              </p>
-            </div>
+            <p className="text-xs text-slate-500">
+              Pilih menu utama yang akan dibuka kasir saat memulai sesi tugas:
+            </p>
 
-            {/* 2 Big Unit Selection Cards */}
-            <div className="space-y-3 pt-1">
-              {/* Unit 1: Kantin / Kasir POS Jualan */}
+            {/* Units Cards List */}
+            <div className="space-y-3">
+              {/* Unit 1: POS Toko & Kantin */}
               <button
                 type="button"
                 onClick={() => handleChooseUnit('POS_TOKO')}
@@ -298,7 +322,7 @@ export default function ShiftSelectionPage() {
         )}
 
         {/* ============================================================ */}
-        {/* STEP 3: START SHIFT & MODAL AWAL */}
+        {/* STEP 3: START SHIFT & KONFIRMASI MULAI */}
         {/* ============================================================ */}
         {step === 'START_SHIFT' && (
           <form onSubmit={handleStartShiftSubmit} className="space-y-5 animate-in fade-in duration-200">
@@ -308,7 +332,7 @@ export default function ShiftSelectionPage() {
                 Mulai Sesi Shift
               </h3>
               <p className="text-xs text-slate-500">
-                Konfirmasi rincian tugas dan masukkan modal kas awal.
+                Konfirmasi rincian tugas sebelum memulai pelayanan kasir.
               </p>
             </div>
 
@@ -316,28 +340,7 @@ export default function ShiftSelectionPage() {
             <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2.5 text-xs">
               <div className="flex justify-between items-center text-slate-600">
                 <span>Nama Kasir Jaga</span>
-                <div className="flex items-center gap-1.5">
-                  {['Yuli', 'Asfia'].map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => {
-                        setCashierName(name);
-                        if (name.toLowerCase() === 'asfia') {
-                          setChosenShift(SHIFT_OPTIONS[1]);
-                          selectShift(SHIFT_OPTIONS[1]);
-                        }
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        cashierName === name
-                          ? 'bg-[#eb4b2b] text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
+                <span className="font-bold text-slate-900">{cashierName}</span>
               </div>
 
               <div className="flex justify-between items-center text-slate-600">
@@ -350,12 +353,7 @@ export default function ShiftSelectionPage() {
 
               <div className="flex justify-between items-center text-slate-600">
                 <span>Tanggal</span>
-                <span className="font-bold text-slate-900">{currentDateStr || '01 Sep 2026'}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-slate-600">
-                <span>Jam Mulai</span>
-                <span className="font-bold text-slate-900">{currentTimeStr || '08:00 WIB'}</span>
+                <span className="font-bold text-slate-900">{currentDateStr}</span>
               </div>
 
               <div className="flex justify-between items-center text-slate-600 pt-1.5 border-t border-slate-200/80">
@@ -364,33 +362,6 @@ export default function ShiftSelectionPage() {
                   {chosenUnit === 'BOOKING_LAPANGAN' ? '🏸 Booking Lapangan' : '🛍️ Kantin & Kasir POS'}
                 </span>
               </div>
-            </div>
-
-            {/* Modal Awal Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-800 block">
-                Modal Kas Awal di Laci (Rp)
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
-                  Rp
-                </span>
-                <input
-                  type="text"
-                  required
-                  value={
-                    openingCashInput
-                      ? Number(openingCashInput.replace(/\D/g, '')).toLocaleString('id-ID')
-                      : ''
-                  }
-                  onChange={(e) => setOpeningCashInput(e.target.value.replace(/\D/g, ''))}
-                  placeholder="500.000"
-                  className="w-full pl-10 pr-3.5 py-3 bg-white border border-slate-300 rounded-2xl text-sm font-bold text-slate-900 focus:outline-none focus:border-[#eb4b2b] focus:ring-2 focus:ring-[#eb4b2b]/15"
-                />
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Hitung uang fisik di laci kasir sebelum memulai transaksi.
-              </p>
             </div>
 
             {/* Action Buttons */}

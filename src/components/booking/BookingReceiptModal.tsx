@@ -59,18 +59,31 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
     const bookingDateStr = booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : '');
 
     const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0);
+    const settleDateStr = booking.settlementPaidAt || booking.dpPaidAt || booking.createdAt;
+
+    // Format tanggal dengan jam realtime sekarang (WIB)
+    const now = new Date();
+    const realtimeTime = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(now);
+
+    const formattedTanggal = `${formatDate(booking.date, false)}, ${realtimeTime}`;
 
     const text = `*BUKTI RESERVASI LAPANGAN - ${shopName.toUpperCase()}*
 ----------------------------------------
 Nama: *${booking.customerName}*
 Kategori: *${booking.communityName || 'Umum'}*
-Tanggal: *${formatDate(booking.date)}*
+Tanggal: *${formattedTanggal}*
 Waktu: *${booking.startTime} - ${booking.endTime} WIB* (${booking.durationHours} Jam)
 ----------------------------------------
 Total Biaya Sewa: ${formatRupiah(booking.courtFee)}
 ${booking.additionalItems.length > 0 ? `Tambahan: ${booking.additionalItems.map(i => `${i.name} (${i.qty}x)`).join(', ')}\n` : ''}Total Tagihan: ${formatRupiah(booking.totalAmount)}
 ${isDirectLunas ? `Bayar Lunas: ${formatRupiah(booking.amountPaidTotal || booking.totalAmount)} (${booking.dpPaymentMethod || 'TUNAI'})` : `DP Terbayar: ${formatRupiah(booking.dpAmount)} (${booking.dpPaymentMethod || 'TUNAI'})\nPelunasan: ${formatRupiah(booking.settlementAmount || 0)} (${booking.settlementPaymentMethod || 'TUNAI'})`}
-${isLunas ? `*STATUS: SUDAH LUNAS* ✅` : `*SISA PELUNASAN: ${formatRupiah(booking.remainingBalance)}* ⚠️\n(Harap dilunasi sebelum bermain)`}
+${isLunas ? `*STATUS: SUDAH LUNAS* ✅\nTanggal Pelunasan: *${formatDate(settleDateStr)}*` : `*SISA PELUNASAN: ${formatRupiah(booking.remainingBalance)}* ⚠️\n(Harap dilunasi sebelum bermain)`}
 ----------------------------------------
 Harap hadir 10 menit sebelum jadwal bermain.
 Terima kasih telah bermain di ${shopName}!`;
@@ -88,6 +101,7 @@ Terima kasih telah bermain di ${shopName}!`;
     const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
     const bookingDateStr = booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : '');
     const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0);
+    const settleDateStr = booking.settlementPaidAt || booking.dpPaidAt || booking.createdAt;
 
     const message = encodeURIComponent(
       `Halo Kak *${booking.customerName}*, berikut bukti reservasi lapangan di *${shopName}*:\n\n` +
@@ -100,7 +114,7 @@ Terima kasih telah bermain di ${shopName}!`;
       `💰 *Total*: ${formatRupiah(booking.totalAmount)}\n` +
       `💳 *${isDirectLunas ? 'Pembayaran Diterima' : 'DP Diterima'}*: ${formatRupiah(booking.amountPaidTotal || booking.dpAmount)}\n` +
       (isLunas 
-        ? `✅ *Status*: LUNAS` 
+        ? `✅ *Status*: LUNAS\n🏁 *Tgl Pelunasan*: ${formatDate(settleDateStr)}` 
         : `⚠️ *Sisa Pembayaran*: ${formatRupiah(booking.remainingBalance)} (Pelunasan di lokasi sebelum main)`) +
       `\n\nTerima kasih! Ditunggu kehadirannya ya kak.`
     );
@@ -161,12 +175,18 @@ Terima kasih telah bermain di ${shopName}!`;
             <div className="space-y-1 text-[10px] py-1 border-b border-dashed border-gray-300">
               <div className="flex justify-between">
                 <span className="text-gray-600">Tgl/Jam Booking:</span>
-                <span>{formatDate(booking.dpPaidAt || booking.createdAt)}</span>
+                <span>{formatDate(booking.dpPaidAt || booking.createdAt || booking.date)}</span>
               </div>
-              {isLunas && booking.settlementPaidAt && booking.settlementPaidAt !== booking.dpPaidAt && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Jam Pelunasan:</span>
-                  <span>{formatDate(booking.settlementPaidAt)}</span>
+              {isLunas && (
+                <div className="flex justify-between font-bold text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded">
+                  <span>Tgl Pelunasan:</span>
+                  <span>{formatDate(booking.settlementPaidAt || booking.dpPaidAt || booking.createdAt)}</span>
+                </div>
+              )}
+              {isLunas && booking.settlementCashier && (
+                <div className="flex justify-between text-gray-600">
+                  <span>Kasir Pelunasan:</span>
+                  <span>{booking.settlementCashier}</span>
                 </div>
               )}
               <div className="flex justify-between">

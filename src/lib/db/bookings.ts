@@ -417,6 +417,8 @@ export async function updateBooking(
     dpPaidAt: string;
     settlementAmount: number;
     settlementPaymentMethod: PaymentMethod;
+    settlementPaidAt: string;
+    settlementCashier: string;
     amountPaidTotal: number;
     remainingBalance: number;
     status: BookingStatus;
@@ -443,6 +445,8 @@ export async function updateBooking(
   if (data.dpPaymentMethod !== undefined) updatePayload.dp_payment_method = data.dpPaymentMethod;
   if (data.settlementAmount !== undefined) updatePayload.settlement_amount = data.settlementAmount;
   if (data.settlementPaymentMethod !== undefined) updatePayload.settlement_payment_method = data.settlementPaymentMethod;
+  if (data.settlementPaidAt !== undefined) updatePayload.settlement_paid_at = data.settlementPaidAt;
+  if (data.settlementCashier !== undefined) updatePayload.settlement_cashier = data.settlementCashier;
   if (data.amountPaidTotal !== undefined) updatePayload.amount_paid_total = data.amountPaidTotal;
   if (data.remainingBalance !== undefined) updatePayload.remaining_balance = data.remainingBalance;
   if (data.status !== undefined) updatePayload.status = data.status;

@@ -1,18 +1,21 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { 
   Maximize2,
   ShoppingBag,
-  ArrowLeft
+  ArrowLeft,
+  Repeat
 } from 'lucide-react';
+import { ShiftHandoverModal } from '@/components/shift/ShiftHandoverModal';
 
 export const AppHeader: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { cashierName, selectedShift } = useShiftStore();
+  const [isHandoverOpen, setIsHandoverOpen] = useState(false);
 
   const getPageTitle = () => {
     if (pathname === '/kasir' || pathname === '/') return 'Kasir POS Toko & F&B';
@@ -83,6 +86,17 @@ export const AppHeader: React.FC = () => {
 
       {/* Right controls */}
       <div className="flex items-center space-x-2">
+        {/* Quick Shift Handover Button */}
+        <button
+          type="button"
+          onClick={() => setIsHandoverOpen(true)}
+          className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#eb4b2b] border border-orange-200/80 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+          title="Pergantian Shift / Serah Terima Kasir"
+        >
+          <Repeat className="w-3.5 h-3.5" />
+          <span>Ganti Shift</span>
+        </button>
+
         {/* Fullscreen shortcut for POS */}
         <button
           onClick={handleToggleFullscreen}
@@ -92,6 +106,13 @@ export const AppHeader: React.FC = () => {
           <Maximize2 className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Shift Handover Modal */}
+      <ShiftHandoverModal
+        isOpen={isHandoverOpen}
+        onClose={() => setIsHandoverOpen(false)}
+      />
     </header>
   );
 };
+

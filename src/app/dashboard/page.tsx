@@ -21,6 +21,7 @@ import {
   Calendar,
   Repeat,
   Wallet,
+  Radio,
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
@@ -32,6 +33,7 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Transaction } from '@/types/pos';
+import { fetchCashierPresence, CashierPresence } from '@/lib/db/activityLogs';
 
 type TimeFilter = 'HARI' | 'MINGGU' | 'BULAN';
 
@@ -53,6 +55,7 @@ export default function DashboardUnifiedPage() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [greeting, setGreeting] = useState('Selamat sore');
   const [isMounted, setIsMounted] = useState(false);
+  const [cashierPresences, setCashierPresences] = useState<CashierPresence[]>([]);
 
   // Global Active Date Store (Prioritas Tanggal)
   const { selectedDate, isCustomActive, resetToToday } = useAppDateStore();
@@ -66,6 +69,16 @@ export default function DashboardUnifiedPage() {
     loadCourts();
     loadBookings();
     setIsMounted(true);
+    fetchCashierPresence().then(setCashierPresences).catch(() => {});
+
+    const onPresence = () => {
+      fetchCashierPresence().then(setCashierPresences).catch(() => {});
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('kasir_presence_updated', onPresence);
+    }
+    const interval = setInterval(onPresence, 10000);
+
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 11) {
       setGreeting('Selamat pagi');
@@ -836,6 +849,58 @@ export default function DashboardUnifiedPage() {
                   <div className="text-2xl font-black text-[#f59e0b] tracking-tight mt-2">
                     {lowStockCount}
                   </div>
+                </div>
+              </div>
+
+              {/* 3B. MONITORING KASIR BERTUGAS SAAT INI */}
+              <div className="bg-white rounded-[24px] p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                      Kasir Sedang Bertugas (Live)
+                    </h2>
+                  </div>
+
+                  <Link
+                    href="/karyawan"
+                    className="text-[11px] text-[#eb4b2b] hover:underline font-bold flex items-center gap-1"
+                  >
+                    <span>Audit & Log Lengkap</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {cashierPresences.slice(0, 2).map((cp) => {
+                    const isOnline = cp.status === 'ONLINE';
+                    return (
+                      <div
+                        key={cp.staffName}
+                        className={`p-3 rounded-2xl border transition-all ${
+                          isOnline
+                            ? 'bg-emerald-50/40 border-emerald-200'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">{cp.staffName}</span>
+                          <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-0.5 truncate">{cp.shift.split('(')[0]}</p>
+                        <div className="mt-1.5 flex items-center justify-between">
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                            isOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {isOnline ? 'Online' : 'Offline'}
+                          </span>
+                          <span className="text-[9px] text-slate-400">
+                            {cp.lastActiveAt ? new Date(cp.lastActiveAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

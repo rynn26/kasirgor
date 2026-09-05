@@ -26,7 +26,34 @@ export function parseNumberInput(val: string): number {
   return clean ? parseInt(clean, 10) : 0;
 }
 
-export function formatDate(dateString: string | Date, includeTime: boolean = true): string {
+export function formatDate(dateString: string | Date | undefined | null, includeTime: boolean = true): string {
+  if (!dateString) return "-";
+
+  // Jika input berupa string tanggal saja (YYYY-MM-DD) tanpa jam
+  if (typeof dateString === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateString.trim())) {
+    const dateOnly = new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(dateString));
+
+    if (!includeTime) {
+      return dateOnly;
+    }
+
+    // Gunakan jam realtime saat ini untuk melengkapi tanggal
+    const timeNow = new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date());
+
+    return `${dateOnly}, ${timeNow}`;
+  }
+
   const date = typeof dateString === "string" ? new Date(dateString) : dateString;
   
   if (isNaN(date.getTime())) return "-";

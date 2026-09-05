@@ -26,6 +26,8 @@ interface PaymentMethodDetailModalProps {
   methodName: string; // 'QRIS' | 'Cash (Tunai)' | string
   isLapangan: boolean;
   periodLabel: string;
+  startDate?: string;
+  endDate?: string;
   filteredBookings: CourtBooking[];
   filteredTransactions: Transaction[];
   onOpenBookingReceipt?: (booking: CourtBooking) => void;
@@ -38,6 +40,8 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
   methodName,
   isLapangan,
   periodLabel,
+  startDate,
+  endDate,
   filteredBookings,
   filteredTransactions,
   onOpenBookingReceipt,
@@ -241,11 +245,12 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                 booking: CourtBooking;
                 paidAmount: number;
                 paymentType: 'DP' | 'PELUNASAN' | 'LUNAS_LANGSUNG';
+                dateNote?: string;
               }>).map((item, idx) => {
                 const b = item.booking;
                 return (
                   <div
-                    key={b.id || idx}
+                    key={`${b.id || idx}-${item.paymentType}-${idx}`}
                     onClick={() => onOpenBookingReceipt?.(b)}
                     className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-emerald-500 hover:shadow-xs transition-all cursor-pointer group space-y-2"
                   >
@@ -273,9 +278,19 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                      <div className="flex items-center gap-1.5 line-clamp-1">
+                      <div className="flex items-center gap-1.5 line-clamp-1 flex-wrap">
                         <CalendarCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{b.courtName} • {b.bookingDate && b.bookingDate !== b.date ? `Booking ${b.bookingDate} · ` : ''}Main {b.date} ({b.startTime}-{b.endTime})</span>
+                        {item.paymentType === 'PELUNASAN' && (
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                            Tgl Pelunasan: {b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}
+                          </span>
+                        )}
+                        {item.paymentType === 'DP' && (
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                            Tgl DP: {b.bookingDate || (b.dpPaidAt ? b.dpPaidAt.split('T')[0] : b.date)}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex items-center gap-1 text-slate-400 group-hover:text-emerald-700 font-bold text-[11px] transition-colors shrink-0">

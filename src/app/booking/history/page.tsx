@@ -62,6 +62,7 @@ export default function HistoryBookingPage() {
   const [methodFilter, setMethodFilter] = useState<'ALL' | 'CASH' | 'QRIS'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SETTLED' | 'DP_PAID' | 'CANCELLED'>('ALL');
   const [selectedDate, setSelectedDate] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'ALL' | 'SETTLE' | 'ORDER' | 'PLAY'>('ALL');
   const [selectedBooking, setSelectedBooking] = useState<CourtBooking | null>(null);
   const [editingBooking, setEditingBooking] = useState<CourtBooking | null>(null);
   const [deletingBooking, setDeletingBooking] = useState<CourtBooking | null>(null);
@@ -80,6 +81,16 @@ export default function HistoryBookingPage() {
     if (selectedDate) {
       const txDate = getTxDate(b);
       const settleDate = getSettleDate(b);
+      if (dateFilterMode === 'SETTLE') {
+        const isLunas = b.status === 'SETTLED' || b.remainingBalance === 0;
+        return isLunas && settleDate === selectedDate;
+      }
+      if (dateFilterMode === 'ORDER') {
+        return txDate === selectedDate;
+      }
+      if (dateFilterMode === 'PLAY') {
+        return b.date === selectedDate;
+      }
       return txDate === selectedDate || settleDate === selectedDate;
     }
     return true;
@@ -93,6 +104,20 @@ export default function HistoryBookingPage() {
     const realSettle = Math.max(0, totalPaid - realDp);
     const txDate = getTxDate(b);
     const settleDate = getSettleDate(b);
+
+    if (dateFilterMode === 'SETTLE') {
+      if (settleDate === selectedDate) {
+        // jika lunas langsung dan tanggal DP sama, masukkan total
+        return sum + (settleDate === txDate ? totalPaid : realSettle);
+      }
+      return sum;
+    }
+    if (dateFilterMode === 'ORDER') {
+      return sum + (txDate === selectedDate ? realDp + (settleDate === txDate ? realSettle : 0) : 0);
+    }
+    if (dateFilterMode === 'PLAY') {
+      return sum + (b.date === selectedDate ? totalPaid : 0);
+    }
 
     let amt = 0;
     if (txDate === selectedDate) {
@@ -144,16 +169,33 @@ export default function HistoryBookingPage() {
       if (selectedDate) {
         const txDate = getTxDate(bkg);
         const settleDate = getSettleDate(bkg);
-        if (txDate !== selectedDate && settleDate !== selectedDate) return false;
+        if (dateFilterMode === 'SETTLE') {
+          const isLunas = bkg.status === 'SETTLED' || bkg.remainingBalance === 0;
+          if (!isLunas || settleDate !== selectedDate) return false;
+        } else if (dateFilterMode === 'ORDER') {
+          if (txDate !== selectedDate) return false;
+        } else if (dateFilterMode === 'PLAY') {
+          if (bkg.date !== selectedDate) return false;
+        } else {
+          if (txDate !== selectedDate && settleDate !== selectedDate) return false;
+        }
       }
 
       return true;
     })
     .sort((a, b) => {
-      const dateA = getTxDate(a);
-      const dateB = getTxDate(b);
-      if (dateA !== dateB) {
-        return dateB.localeCompare(dateA); // Tanggal transaksi terbaru di atas
+      if (dateFilterMode === 'SETTLE') {
+        const sA = getSettleDate(a);
+        const sB = getSettleDate(b);
+        if (sA !== sB) return sB.localeCompare(sA);
+      } else if (dateFilterMode === 'PLAY') {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+      } else {
+        const dateA = getTxDate(a);
+        const dateB = getTxDate(b);
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA); // Tanggal transaksi terbaru di atas
+        }
       }
       return (b.startTime || '').localeCompare(a.startTime || '');
     });
@@ -354,18 +396,44 @@ export default function HistoryBookingPage() {
 
         {/* Date Filter Active Indicator */}
         {selectedDate && (
-          <div className="flex items-center justify-between px-1 text-xs pt-0.5">
-            <span className="text-slate-500 font-medium flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-              Tanggal: <strong className="text-slate-900 font-bold">{selectedDate}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedDate('')}
-              className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
-            >
-              Semua Tanggal
-            </button>
+          <div className="space-y-2 pt-1 border-t border-slate-100">
+            <div className="flex items-center justify-between px-1 text-xs">
+              <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                Tanggal: <strong className="text-slate-900 font-bold">{selectedDate}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedDate('')}
+                className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+              >
+                Reset Tanggal
+              </button>
+            </div>
+
+            {/* Date filter mode selector */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+              <span className="text-slate-400 font-medium shrink-0 text-[10px] uppercase tracking-wider">Filter Berdasarkan:</span>
+              {[
+                { id: 'ALL', label: 'Semua Transaksi Masuk' },
+                { id: 'SETTLE', label: '🎯 Khusus Tgl Pelunasan' },
+                { id: 'ORDER', label: 'Tgl Booking/Order' },
+                { id: 'PLAY', label: 'Tgl Main' },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setDateFilterMode(mode.id as 'ALL' | 'SETTLE' | 'ORDER' | 'PLAY')}
+                  className={`px-2.5 py-1 rounded-xl font-bold whitespace-nowrap transition-all cursor-pointer ${
+                    dateFilterMode === mode.id
+                      ? 'bg-emerald-700 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -430,6 +498,7 @@ export default function HistoryBookingPage() {
             const isDP = !isLunas && !isCancelled && (bkg.status === 'DP_PAID' || bkg.dpAmount > 0);
             const sportName = bkg.communityName?.includes('Pickleball') ? 'Pickleball' : 'Badminton';
             const paymentMethodUsed = bkg.settlementPaymentMethod || bkg.dpPaymentMethod || 'Cash';
+            const settleDateDisplay = getSettleDate(bkg);
 
             return (
               <div
@@ -449,12 +518,19 @@ export default function HistoryBookingPage() {
                         VOID
                       </span>
                     ) : isLunas ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                        Lunas
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Lunas</span>
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
                         DP
+                      </span>
+                    )}
+                    {isLunas && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 whitespace-nowrap flex items-center gap-1">
+                        <span className="text-emerald-700 font-medium">Tgl Pelunasan:</span>
+                        <strong className="text-emerald-950">{settleDateDisplay}</strong>
                       </span>
                     )}
                     {(bkg.memberType === 'MEMBER' || bkg.communityName?.includes('Member')) && (
