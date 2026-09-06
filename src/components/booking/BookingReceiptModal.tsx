@@ -232,7 +232,7 @@ Terima kasih telah bermain di ${shopName}!`;
               </div>
               <div className="flex justify-between text-[10px] text-gray-700">
                 <span>Durasi:</span>
-                <span>{booking.durationHours} Jam @ {formatRupiah(booking.courtPricePerHour)}</span>
+                <span>{booking.durationHours} Jam</span>
               </div>
               <div className="flex justify-between text-[10px] font-bold text-gray-900 pt-0.5">
                 <span>Subtotal Lapangan:</span>
