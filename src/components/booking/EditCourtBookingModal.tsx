@@ -7,7 +7,7 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { DAY_NAMES, getMemberDatesInMonth } from '@/lib/memberUtils';
-import { getBookingTxDate, getBookingSettleDate } from '@/lib/bookingUtils';
+import { getBookingTxDate, getBookingSettleDate, getJakartaToday } from '@/lib/bookingUtils';
 import {
   X,
   User,
@@ -131,12 +131,12 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
 
   // Calculate member schedule dynamically
   const memberSchedule = React.useMemo(() => {
-    return getMemberDatesInMonth(date || new Date().toISOString().split('T')[0], selectedMemberDayIndex);
+    return getMemberDatesInMonth(date || getJakartaToday(), selectedMemberDayIndex);
   }, [date, selectedMemberDayIndex]);
 
   const handleSelectMemberDay = (dayIdx: number) => {
     setSelectedMemberDayIndex(dayIdx);
-    const schedule = getMemberDatesInMonth(date || new Date().toISOString().split('T')[0], dayIdx);
+    const schedule = getMemberDatesInMonth(date || getJakartaToday(), dayIdx);
     if (schedule.dates.length > 0) {
       setDate(schedule.dates[0]);
     }

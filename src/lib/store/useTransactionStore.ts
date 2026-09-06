@@ -8,6 +8,7 @@ import {
   deleteTransaction as dbDeleteTransaction,
   updateTransaction as dbUpdateTransaction
 } from '@/lib/db/transactions';
+import { getJakartaToday } from '@/lib/bookingUtils';
 
 interface TransactionState {
   transactions: Transaction[];
@@ -182,7 +183,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
 
   getDailySummary: (targetDate?: string) => {
     const { transactions } = get();
-    const dateToFilter = targetDate || new Date().toISOString().split('T')[0];
+    const dateToFilter = targetDate || getJakartaToday();
     const completed = transactions.filter(
       (t) => t.status === 'COMPLETED' && t.createdAt.startsWith(dateToFilter)
     );

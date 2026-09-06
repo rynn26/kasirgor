@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
+import { getJakartaToday } from '@/lib/bookingUtils';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useProductStore } from '@/lib/store/useProductStore';
 import { useCartStore } from '@/lib/store/useCartStore';
@@ -151,7 +152,7 @@ export default function DashboardUnifiedPage() {
 
   // Global Active Date Store (Prioritas Tanggal)
   const { selectedDate, isCustomActive, resetToToday } = useAppDateStore();
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getJakartaToday(), []);
   const activeDate = isCustomActive && selectedDate ? selectedDate : todayStr;
 
   // Load data from Supabase on mount

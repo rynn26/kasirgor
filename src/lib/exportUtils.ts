@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { CourtBooking } from '@/types/booking';
 import { useProductStore } from '@/lib/store/useProductStore';
-import { getBookingAmountInPeriod, getBookingPaymentItemsInPeriod, getBookingSettleDate } from '@/lib/bookingUtils';
+import { getBookingAmountInPeriod, getBookingPaymentItemsInPeriod, getBookingSettleDate, getJakartaToday } from '@/lib/bookingUtils';
 
 export interface KantinSalesItemRow {
   no: number;
@@ -846,7 +846,7 @@ export function printCombinedReportPDF(
       if (b.date) allDates.push(b.date);
     });
     allDates.sort();
-    s = allDates[0] || new Date().toISOString().split('T')[0];
+    s = allDates[0] || getJakartaToday();
     e = allDates[allDates.length - 1] || s;
   }
 
@@ -1181,7 +1181,7 @@ export function exportCombinedReportToExcel(
     validTx.forEach((t) => { if (t.createdAt) allDates.push(t.createdAt.split('T')[0]); });
     activeBookings.forEach((b) => { if (b.date) allDates.push(b.date); });
     allDates.sort();
-    s = allDates[0] || new Date().toISOString().split('T')[0];
+    s = allDates[0] || getJakartaToday();
     e = allDates[allDates.length - 1] || s;
   }
 

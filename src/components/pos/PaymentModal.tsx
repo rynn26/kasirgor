@@ -7,6 +7,7 @@ import { useProductStore } from '@/lib/store/useProductStore';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { PaymentMethod, Transaction } from '@/types/pos';
 import { formatRupiah, generateInvoiceNumber } from '@/lib/utils';
+import { getJakartaToday } from '@/lib/bookingUtils';
 import { 
   X, 
   Banknote, 
@@ -44,7 +45,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const subtotal = getSubtotal();
   const discountTotal = getDiscountTotal();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getJakartaToday();
   const [transactionDate, setTransactionDate] = useState(todayStr);
   const [isOwner, setIsOwner] = useState(false);
 

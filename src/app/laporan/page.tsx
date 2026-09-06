@@ -56,6 +56,7 @@ import {
   getBookingSettleDate,
   getBookingAmountInPeriod,
   getBookingPaymentItemsInPeriod,
+  getJakartaToday,
 } from '@/lib/bookingUtils';
 
 type PeriodType = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
@@ -800,14 +801,12 @@ export default function LaporanPenjualanPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const now = new Date();
-                    const pad = (n: number) => String(n).padStart(2, '0');
-                    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+                    const todayStr = getJakartaToday();
                     setDateRange(todayStr, todayStr);
                     setHoveredPoint(null);
                   }}
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                    customStartDate === new Date().toISOString().split('T')[0]
+                    customStartDate === getJakartaToday()
                       ? 'bg-[#a62512] text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
@@ -817,10 +816,11 @@ export default function LaporanPenjualanPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const y = new Date();
-                    y.setDate(y.getDate() - 1);
+                    const today = getJakartaToday();
+                    const d = new Date(`${today}T12:00:00+07:00`);
+                    d.setDate(d.getDate() - 1);
                     const pad = (n: number) => String(n).padStart(2, '0');
-                    const yStr = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+                    const yStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
                     setDateRange(yStr, yStr);
                     setHoveredPoint(null);
                   }}
@@ -837,7 +837,7 @@ export default function LaporanPenjualanPage() {
               </label>
               <input
                 type="date"
-                value={customStartDate || new Date().toISOString().split('T')[0]}
+                value={customStartDate || getJakartaToday()}
                 onChange={(e) => {
                   if (e.target.value) {
                     setDateRange(e.target.value, e.target.value);

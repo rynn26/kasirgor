@@ -17,7 +17,7 @@ import { useShiftStore, SHIFT_OPTIONS } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
-import { getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
+import { getBookingPaymentItemsInPeriod, getJakartaToday } from '@/lib/bookingUtils';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { recordActivityLog, updateCashierPresence } from '@/lib/db/activityLogs';
 
@@ -58,7 +58,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
   }, [isOpen, cashierName]);
 
   // Compute total sales today for this cashier / shift
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getJakartaToday(), []);
   const todayCompletedTx = useMemo(() => {
     return transactions.filter(
       (t) => t.status === 'COMPLETED' && t.createdAt.startsWith(todayStr)

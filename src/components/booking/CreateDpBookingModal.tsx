@@ -7,6 +7,7 @@ import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { PaymentMethod } from '@/types/pos';
 import { CourtBooking } from '@/types/booking';
+import { getJakartaToday } from '@/lib/bookingUtils';
 import {
   X,
   Clock,
@@ -51,7 +52,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const { calculateBookingFee, loadFromDb: loadPricingFromDb } = useCourtPricingStore();
   const { showToast } = useToastStore();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getJakartaToday();
 
   // Form State
   const [selectedSport, setSelectedSport] = useState<'Badminton' | 'Pickleball'>('Badminton');

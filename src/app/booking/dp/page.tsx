@@ -9,6 +9,7 @@ import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { CourtBooking } from '@/types/booking';
 import { PaymentMethod } from '@/types/pos';
+import { getJakartaToday } from '@/lib/bookingUtils';
 import {
   ArrowLeft,
   Calendar,
@@ -52,7 +53,7 @@ export default function InputDpBookingPage() {
     loadPricingFromDb();
   }, []);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getJakartaToday();
 
   // Form State
   const [customerName, setCustomerName] = useState('');

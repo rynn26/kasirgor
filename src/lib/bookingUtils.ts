@@ -29,6 +29,13 @@ export function toJakartaDateString(isoOrDate?: string | Date | null): string {
 }
 
 /**
+ * Dapatkan tanggal hari ini (YYYY-MM-DD) dalam zona waktu Asia/Jakarta (WIB).
+ */
+export function getJakartaToday(): string {
+  return toJakartaDateString(new Date());
+}
+
+/**
  * Tanggal uang DP diterima (tanggal order/booking kasir).
  */
 export function getBookingTxDate(b: CourtBooking): string {

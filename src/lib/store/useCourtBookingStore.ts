@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Court, CourtBooking, BookingStatus, AdditionalItem } from '@/types/booking';
 import { PaymentMethod } from '@/types/pos';
 import { fetchCourts, fetchBookings, createBooking, settleBooking as dbSettleBooking, cancelBooking, deleteBooking as dbDeleteBooking, updateBooking as dbUpdateBooking, updateCourt as dbUpdateCourt, repairBookingDates } from '@/lib/db/bookings';
+import { getJakartaToday } from '@/lib/bookingUtils';
 
 interface CourtBookingState {
   courts: Court[];
@@ -40,7 +41,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
   courts: [],
   bookings: [],
   selectedBooking: null,
-  selectedDate: new Date().toISOString().split('T')[0],
+  selectedDate: getJakartaToday(),
   isLoading: false,
   error: null,
 
