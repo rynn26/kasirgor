@@ -561,34 +561,32 @@ export default function LaporanPenjualanPage() {
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-6 max-w-md mx-auto space-y-4 pb-28">
 
-      {/* 1. UNIT SWITCHER (Khusus Owner) */}
-      {isOwner && (
-        <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-bold text-slate-500 pl-2">Layanan Unit:</span>
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl gap-1">
-            <button
-              type="button"
-              onClick={() => handleSwitchUnit('kantin')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                !isLapangan ? 'bg-white text-[#a62512] shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              <span>Kantin / Kasir</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSwitchUnit('lapangan')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                isLapangan ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-emerald-700'
-              }`}
-            >
-              <CalendarCheck className="w-3.5 h-3.5" />
-              <span>Lapangan</span>
-            </button>
-          </div>
+      {/* 1. UNIT SWITCHER (Bisa diakses Kasir & Owner untuk input data manual) */}
+      <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs">
+        <span className="text-[11px] font-bold text-slate-500 pl-2">Layanan Unit:</span>
+        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl gap-1">
+          <button
+            type="button"
+            onClick={() => handleSwitchUnit('kantin')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              !isLapangan ? 'bg-white text-[#a62512] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Store className="w-3.5 h-3.5" />
+            <span>Kantin / Kasir</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchUnit('lapangan')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              isLapangan ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-emerald-700'
+            }`}
+          >
+            <CalendarCheck className="w-3.5 h-3.5" />
+            <span>Lapangan</span>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* 2. TITLE & EXPORT */}
       <div className="space-y-3">
@@ -601,8 +599,8 @@ export default function LaporanPenjualanPage() {
               {isLapangan ? 'Arena Lapangan GOR' : 'Kasir Toko & F&B'}
             </p>
           </div>
-          {isOwner && (
-            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
+          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
+            {isOwner && (
               <button
                 type="button"
                 onClick={() => setIsOwnerRevenueModalOpen(true)}
@@ -612,55 +610,59 @@ export default function LaporanPenjualanPage() {
                 <Wallet className="w-3.5 h-3.5" />
                 <span>Rekap Omset</span>
               </button>
+            )}
 
-              {!isLapangan && (
-                <button
-                  type="button"
-                  onClick={() => setIsInputManualOpen(true)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
-                  title="Input Penjualan Kemarin / Manual"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Input Data Manual</span>
-                </button>
-              )}
-
-              {isLapangan && (
-                <button
-                  type="button"
-                  onClick={() => setIsInputManualBookingOpen(true)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
-                  title="Input Sewa Lapangan Kemarin / Manual"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Input Sewa Manual</span>
-                </button>
-              )}
-
+            {!isLapangan && (
               <button
                 type="button"
-                onClick={handleExportExcel}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200"
-                title="Unduh Excel"
+                onClick={() => setIsInputManualOpen(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
+                title="Input Penjualan Kemarin / Manual"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Excel</span>
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Input Data Manual</span>
               </button>
+            )}
+
+            {isLapangan && (
               <button
                 type="button"
-                onClick={handleExportPDF}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border ${
-                  isLapangan
-                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
-                    : 'bg-red-50 hover:bg-red-100 text-[#a62512] border-red-200'
-                }`}
-                title="Cetak PDF"
+                onClick={() => setIsInputManualBookingOpen(true)}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
+                title="Input Sewa Lapangan Kemarin / Manual"
               >
-                <Printer className="w-3.5 h-3.5" />
-                <span>PDF</span>
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Input Sewa Manual</span>
               </button>
-            </div>
-          )}
+            )}
+
+            {isOwner && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200"
+                  title="Unduh Excel"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPDF}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border ${
+                    isLapangan
+                      ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                      : 'bg-red-50 hover:bg-red-100 text-[#a62512] border-red-200'
+                  }`}
+                  title="Cetak PDF"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>PDF</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {isOwner ? (
