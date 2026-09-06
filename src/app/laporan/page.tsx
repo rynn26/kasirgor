@@ -30,10 +30,13 @@ import { CategorySalesDetailModal } from '@/components/laporan/CategorySalesDeta
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { EditCourtBookingModal } from '@/components/booking/EditCourtBookingModal';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
+import { DeleteConfirmationModal, DeleteInfoItem } from '@/components/common/DeleteConfirmationModal';
+import { logActivity } from '@/lib/db/activityLogs';
 import { CourtBooking } from '@/types/booking';
 import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { InputManualSaleModal } from '@/components/laporan/InputManualSaleModal';
 import { InputManualBookingModal } from '@/components/laporan/InputManualBookingModal';
+import { DateRangeModal } from '@/components/laporan/DateRangeModal';
 import { formatRupiah } from '@/lib/utils';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
@@ -44,7 +47,9 @@ import {
   exportKantinToExcel, 
   printKantinPDF, 
   exportCourtBookingsToExcel, 
-  printCourtBookingsPDF 
+  printCourtBookingsPDF,
+  printCombinedReportPDF,
+  exportCombinedReportToExcel,
 } from '@/lib/exportUtils';
 import {
   getBookingTxDate,
@@ -67,20 +72,43 @@ function formatShortDate(dateStr: string): string {
   }
 }
 
-function getDateRange(period: PeriodType, customDate?: string): { start: string; end: string; label: string } {
+function formatDateRange(startStr: string, endStr?: string): string {
+  if (!startStr) return 'Pilih Periode';
+  if (!endStr || startStr === endStr) {
+    return formatShortDate(startStr);
+  }
+  const [y1, m1, d1] = startStr.split('-').map(Number);
+  const [y2, m2, d2] = endStr.split('-').map(Number);
+  const date1 = new Date(y1, m1 - 1, d1);
+  const date2 = new Date(y2, m2 - 1, d2);
+
+  if (y1 === y2 && m1 === m2) {
+    return `${d1} - ${d2} ${date2.toLocaleString('id-ID', { month: 'short' })} ${y2}`;
+  }
+  if (y1 === y2) {
+    return `${d1} ${date1.toLocaleString('id-ID', { month: 'short' })} - ${d2} ${date2.toLocaleString('id-ID', { month: 'short' })} ${y2}`;
+  }
+  return `${d1} ${date1.toLocaleString('id-ID', { month: 'short' })} ${y1} - ${d2} ${date2.toLocaleString('id-ID', { month: 'short' })} ${y2}`;
+}
+
+function getDateRange(
+  period: PeriodType,
+  customStartDate?: string,
+  customEndDate?: string
+): { start: string; end: string; label: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const fmt = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  if (period === 'CUSTOM' && customDate) {
-    const [y, m, d] = customDate.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d);
-    const dateFormatted = `${pad(d)} ${dateObj.toLocaleString('id-ID', { month: 'long' })} ${y}`;
+  if (period === 'CUSTOM') {
+    const s = customStartDate || fmt(now);
+    const e = customEndDate || customStartDate || fmt(now);
+    const [realStart, realEnd] = s <= e ? [s, e] : [e, s];
     return {
-      start: customDate,
-      end: customDate,
-      label: `Tanggal ${dateFormatted}`,
+      start: realStart,
+      end: realEnd,
+      label: realStart === realEnd ? `Tanggal ${formatDateRange(realStart, realEnd)}` : `Periode ${formatDateRange(realStart, realEnd)}`,
     };
   }
   if (period === 'HARI_INI') {
@@ -130,10 +158,14 @@ export default function LaporanPenjualanPage() {
   const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan'>('kantin');
   const {
     selectedDate: customDate,
+    customStartDate = customDate,
+    customEndDate = customDate,
     period,
     setSelectedDate,
+    setDateRange,
     setPeriod,
   } = useAppDateStore();
+  const [isDateRangeModalOpen, setIsDateRangeModalOpen] = useState(false);
   const dateInputRef = React.useRef<HTMLInputElement>(null);
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; amount: number } | null>(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -150,10 +182,41 @@ export default function LaporanPenjualanPage() {
   const [isInputManualOpen, setIsInputManualOpen] = useState(false);
   const [isInputManualBookingOpen, setIsInputManualBookingOpen] = useState(false);
 
-  const handleConfirmDeleteBooking = async () => {
+  const handleConfirmDeleteBooking = async (reason: string) => {
     if (!deletingBooking) return;
     setIsDeletingBookingProcess(true);
     try {
+      let staffName = 'Kasir';
+      let staffRole = 'Kasir';
+      if (typeof window !== 'undefined') {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            staffName = parsed.name || (parsed.role === 'kasir' ? 'Yuli' : 'Owner');
+            staffRole = parsed.role === 'kasir' ? 'Kasir' : 'Owner';
+          } catch {}
+        }
+      }
+
+      const paymentMethodStr = deletingBooking.settlementPaymentMethod || deletingBooking.dpPaymentMethod || 'CASH';
+
+      await logActivity({
+        staffName,
+        role: staffRole,
+        actionType: 'DELETE_BOOKING',
+        title: `Hapus Booking Lapangan oleh ${staffName}`,
+        details: `Alasan: "${reason}". Booking: ${deletingBooking.customerName || 'Penyewa'} (${deletingBooking.courtName || 'Lapangan'}, ${deletingBooking.startTime}-${deletingBooking.endTime}, Total: ${formatRupiah(deletingBooking.totalAmount)}).`,
+        metadata: {
+          bookingId: deletingBooking.id,
+          reason,
+          customerName: deletingBooking.customerName,
+          courtName: deletingBooking.courtName,
+          totalAmount: deletingBooking.totalAmount,
+          paymentMethod: paymentMethodStr,
+        },
+      });
+
       await deleteBooking(deletingBooking.id);
       showToast('🗑️ Data booking berhasil dihapus!');
       setDeletingBooking(null);
@@ -164,6 +227,17 @@ export default function LaporanPenjualanPage() {
       setIsDeletingBookingProcess(false);
     }
   };
+
+  const laporanBookingDeleteInfoItems: DeleteInfoItem[] = deletingBooking
+    ? [
+        { label: 'Tanggal', value: deletingBooking.date || '-' },
+        { label: 'Penyewa', value: deletingBooking.customerName || '-' },
+        { label: 'Lapangan', value: deletingBooking.courtName || '-' },
+        { label: 'Jam Main', value: `${deletingBooking.startTime} - ${deletingBooking.endTime}` },
+        { label: 'Total', value: formatRupiah(deletingBooking.totalAmount) },
+        { label: 'Metode Pembayaran', value: (deletingBooking.settlementPaymentMethod || deletingBooking.dpPaymentMethod || 'CASH') === 'CASH' ? 'Cash' : (deletingBooking.settlementPaymentMethod || deletingBooking.dpPaymentMethod || 'Cash') },
+      ]
+    : [];
 
   const handleManualSuccess = (inputDate?: string) => {
     loadTransactions();
@@ -198,12 +272,18 @@ export default function LaporanPenjualanPage() {
         try {
           const parsed = JSON.parse(session);
           const role = (parsed.role || '').toLowerCase();
-          setIsOwner(role === 'owner' || role === 'admin');
+          const userIsOwner = role === 'owner' || role === 'admin';
+          setIsOwner(userIsOwner);
+          if (!userIsOwner) {
+            setActiveUnit('kantin');
+          }
         } catch {
           setIsOwner(false);
+          setActiveUnit('kantin');
         }
       } else {
         setIsOwner(false);
+        setActiveUnit('kantin');
       }
       setIsRoleChecked(true);
     }
@@ -236,7 +316,7 @@ export default function LaporanPenjualanPage() {
   // DERIVED DATA: KANTIN / POS TOKO
   // =============================================
   const kantinData = useMemo(() => {
-    const { start, end, label } = getDateRange(period, customDate);
+    const { start, end, label } = getDateRange(period, customStartDate, customEndDate);
 
     const filtered = transactions.filter(
       (t) =>
@@ -294,7 +374,7 @@ export default function LaporanPenjualanPage() {
     const chartPoints = buildKantinChartPoints(filtered, period, start, end);
 
     // Growth vs previous period
-    const prevRange = getPrevDateRange(period, customDate);
+    const prevRange = getPrevDateRange(period, customStartDate, customEndDate);
     const prevFiltered = transactions.filter(
       (t) =>
         t.status === 'COMPLETED' &&
@@ -318,13 +398,13 @@ export default function LaporanPenjualanPage() {
       growthPct,
       filteredTransactions: filtered,
     };
-  }, [transactions, period, customDate]);
+  }, [transactions, period, customStartDate, customEndDate]);
 
   // =============================================
   // DERIVED DATA: ARENA LAPANGAN GOR
   // =============================================
   const lapanganData = useMemo(() => {
-    const { start, end, label } = getDateRange(period, customDate);
+    const { start, end, label } = getDateRange(period, customStartDate, customEndDate);
 
     // Filter booking yang ada uang masuk periode ini ATAU ada jadwal main di periode ini
     const filtered = bookings.filter((b) => {
@@ -344,7 +424,10 @@ export default function LaporanPenjualanPage() {
     const totalHours = playBookings.reduce((s, b) => s + b.durationHours, 0);
 
     // Occupancy: how many court-hour slots were used
-    const totalSlots = courts.length * ((period === 'HARI_INI' || period === 'CUSTOM') ? 14 : period === 'MINGGU_INI' ? 98 : 420);
+    const dStart = new Date(start);
+    const dEnd = new Date(end);
+    const daysInPeriod = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 3600 * 24)) + 1);
+    const totalSlots = courts.length * 14 * daysInPeriod;
     const usedSlots = totalHours;
     const occupancyRate = totalSlots > 0 ? `${Math.min(100, Math.round((usedSlots / totalSlots) * 100))}%` : '0%';
 
@@ -395,7 +478,7 @@ export default function LaporanPenjualanPage() {
     const chartPoints = buildLapanganChartPoints(bookings, period, start, end);
 
     // Growth vs prev
-    const prevRange = getPrevDateRange(period, customDate);
+    const prevRange = getPrevDateRange(period, customStartDate, customEndDate);
     const prevSales = bookings
       .filter((b) => b.status !== 'CANCELLED')
       .reduce((s, b) => s + getBookingAmountInPeriod(b, prevRange.start, prevRange.end), 0);
@@ -416,7 +499,7 @@ export default function LaporanPenjualanPage() {
       growthPct,
       filteredBookings: filtered,
     };
-  }, [bookings, courts, period, customDate]);
+  }, [bookings, courts, period, customStartDate, customEndDate]);
 
   const current = isLapangan ? lapanganData : kantinData;
 
@@ -457,97 +540,69 @@ export default function LaporanPenjualanPage() {
 
   const handleExportExcel = () => {
     if (isLapangan) {
-      exportCourtBookingsToExcel(lapanganData.label, lapanganData.filteredBookings, lapanganData.start, lapanganData.end);
+      exportCourtBookingsToExcel(current.label, bookings, current.start, current.end);
       showToast('Laporan Excel Sewa Lapangan berhasil diunduh!');
     } else {
-      exportKantinToExcel(kantinData.label, kantinData.filteredTransactions);
-      showToast('Laporan Excel Penjualan Toko & Kantin berhasil diunduh!');
+      exportKantinToExcel(current.label, kantinData.filteredTransactions);
+      showToast('Laporan Excel Penjualan Kantin berhasil diunduh!');
     }
   };
 
   const handleExportPDF = () => {
     if (isLapangan) {
-      printCourtBookingsPDF(lapanganData.label, lapanganData.filteredBookings, lapanganData.start, lapanganData.end);
+      printCourtBookingsPDF(current.label, bookings, current.start, current.end);
       showToast('Membuka format cetak PDF Laporan Sewa Lapangan...');
     } else {
-      printKantinPDF(kantinData.label, kantinData.filteredTransactions);
+      printKantinPDF(current.label, kantinData.filteredTransactions);
       showToast('Membuka format cetak PDF Laporan Penjualan Kantin...');
     }
   };
 
-  if (isRoleChecked && !isOwner) {
-    return (
-      <div className="min-h-[75vh] flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto space-y-4">
-        <div className="w-16 h-16 rounded-3xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center shadow-xs">
-          <ShieldAlert className="w-8 h-8" />
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-lg font-black text-slate-900">Akses Laporan Dibatasi</h2>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Halaman Laporan Penjualan POS dan Sewa Lapangan hanya dapat diakses oleh akun <strong>Owner / Admin</strong>.
-          </p>
-        </div>
-        <div className="pt-2 flex flex-col gap-2 w-full">
-          <Link
-            href="/kasir"
-            className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors text-center shadow-xs"
-          >
-            Kembali ke Kasir POS
-          </Link>
-          <Link
-            href="/booking"
-            className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-colors text-center shadow-xs"
-          >
-            Kembali ke Booking Lapangan
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-6 max-w-md mx-auto space-y-4 pb-28">
 
-      {/* 1. UNIT SWITCHER */}
-      <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs">
-        <span className="text-[11px] font-bold text-slate-500 pl-2">Layanan Unit:</span>
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl gap-1">
-          <button
-            type="button"
-            onClick={() => handleSwitchUnit('kantin')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              !isLapangan ? 'bg-white text-[#a62512] shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Store className="w-3.5 h-3.5" />
-            <span>Kantin / Kasir</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchUnit('lapangan')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              isLapangan ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-emerald-700'
-            }`}
-          >
-            <CalendarCheck className="w-3.5 h-3.5" />
-            <span>Lapangan</span>
-          </button>
+      {/* 1. UNIT SWITCHER (Khusus Owner) */}
+      {isOwner && (
+        <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs">
+          <span className="text-[11px] font-bold text-slate-500 pl-2">Layanan Unit:</span>
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl gap-1">
+            <button
+              type="button"
+              onClick={() => handleSwitchUnit('kantin')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                !isLapangan ? 'bg-white text-[#a62512] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Kantin / Kasir</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchUnit('lapangan')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                isLapangan ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-emerald-700'
+              }`}
+            >
+              <CalendarCheck className="w-3.5 h-3.5" />
+              <span>Lapangan</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 2. TITLE & EXPORT */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              {isLapangan ? 'Laporan Sewa Lapangan' : 'Laporan Penjualan'}
+              {isOwner ? (isLapangan ? 'Laporan Sewa Lapangan' : 'Laporan Penjualan') : 'Laporan Pembayaran Kasir'}
             </h2>
             <p className="text-[11px] text-slate-400 font-medium">
               {isLapangan ? 'Arena Lapangan GOR' : 'Kasir Toko & F&B'}
             </p>
           </div>
-          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
-            {isOwner && (
+          {isOwner && (
+            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
               <button
                 type="button"
                 onClick={() => setIsOwnerRevenueModalOpen(true)}
@@ -557,55 +612,55 @@ export default function LaporanPenjualanPage() {
                 <Wallet className="w-3.5 h-3.5" />
                 <span>Rekap Omset</span>
               </button>
-            )}
 
-            {!isLapangan && (
+              {!isLapangan && (
+                <button
+                  type="button"
+                  onClick={() => setIsInputManualOpen(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
+                  title="Input Penjualan Kemarin / Manual"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Input Data Manual</span>
+                </button>
+              )}
+
+              {isLapangan && (
+                <button
+                  type="button"
+                  onClick={() => setIsInputManualBookingOpen(true)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
+                  title="Input Sewa Lapangan Kemarin / Manual"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Input Sewa Manual</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => setIsInputManualOpen(true)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white border-amber-600"
-                title="Input Penjualan Kemarin / Manual"
+                onClick={handleExportExcel}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200"
+                title="Unduh Excel"
               >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Input Data Manual</span>
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Excel</span>
               </button>
-            )}
-
-            {isLapangan && (
               <button
                 type="button"
-                onClick={() => setIsInputManualBookingOpen(true)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700"
-                title="Input Sewa Lapangan Kemarin / Manual"
+                onClick={handleExportPDF}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border ${
+                  isLapangan
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                    : 'bg-red-50 hover:bg-red-100 text-[#a62512] border-red-200'
+                }`}
+                title="Cetak PDF"
               >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Input Sewa Manual</span>
+                <Printer className="w-3.5 h-3.5" />
+                <span>PDF</span>
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200"
-              title="Unduh Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Excel</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleExportPDF}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer border ${
-                isLapangan
-                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
-                  : 'bg-red-50 hover:bg-red-100 text-[#a62512] border-red-200'
-              }`}
-              title="Cetak PDF"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>PDF</span>
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Period Pills */}
@@ -635,324 +690,126 @@ export default function LaporanPenjualanPage() {
             );
           })}
 
-          {/* Custom Date Picker Pill */}
-          <div className="relative shrink-0">
-            <input
-              ref={dateInputRef}
-              type="date"
-              value={customDate}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSelectedDate(e.target.value);
-                  setHoveredPoint(null);
-                }
-              }}
-              onClick={(e) => {
-                if (period !== 'CUSTOM') {
-                  setPeriod('CUSTOM');
-                  setHoveredPoint(null);
-                }
-                try {
-                  (e.currentTarget as HTMLInputElement).showPicker?.();
-                } catch {}
-              }}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-              title="Pilih Tanggal"
-            />
-            <button
-              type="button"
-              className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
-                period === 'CUSTOM'
-                  ? isLapangan
-                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                    : 'bg-[#a62512] text-white border-[#a62512] shadow-xs'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                {period === 'CUSTOM' && customDate
-                  ? formatShortDate(customDate)
-                  : 'Pilih Tanggal'}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. HERO CARD */}
-      <div className={`w-full rounded-[24px] p-5 text-white shadow-md space-y-2 relative overflow-hidden ${
-        isLapangan
-          ? 'bg-gradient-to-tr from-emerald-700 to-teal-800 shadow-emerald-700/20'
-          : 'bg-[#a62512] shadow-[#a62512]/20'
-      }`}>
-        <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none blur-xl" />
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/80 block">
-            {isLapangan ? 'Total Pendapatan Sewa Lapangan' : 'Total Penjualan'}
-          </span>
-          <span className="px-2 py-0.5 rounded-full bg-white/15 text-white text-[10px] font-bold">
-            {current.label}
-          </span>
-        </div>
-
-        <div className="text-[30px] sm:text-[34px] font-black tracking-tight leading-none text-white">
-          {formatRupiah(current.totalSales)}
-        </div>
-
-        <div className="pt-0.5">
-          {current.growthPct !== null ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black/20 text-[#4ade80] text-xs font-bold">
-              <span className="text-xs">{Number(current.growthPct) >= 0 ? '↗' : '↘'}</span>
-              <span>{Number(current.growthPct) >= 0 ? '+' : ''}{current.growthPct}%</span>
-              <span className="text-white/80 font-normal ml-0.5">vs periode sebelumnya</span>
+          {/* Custom Date Range Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              if (period !== 'CUSTOM') {
+                setPeriod('CUSTOM');
+              }
+              setIsDateRangeModalOpen(true);
+              setHoveredPoint(null);
+            }}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
+              period === 'CUSTOM'
+                ? isLapangan
+                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                  : 'bg-[#a62512] text-white border-[#a62512] shadow-xs'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="Pilih Periode Tanggal"
+          >
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {period === 'CUSTOM' && customStartDate
+                ? formatDateRange(customStartDate, customEndDate)
+                : 'Pilih Periode'}
             </span>
-          ) : (
-            <span className="text-white/60 text-xs">Tidak ada data periode sebelumnya</span>
-          )}
+          </button>
         </div>
+
+        {/* Quick Date Range Bar when CUSTOM is active */}
+        {period === 'CUSTOM' && (
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs space-y-2 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <Calendar className={`w-3.5 h-3.5 ${isLapangan ? 'text-emerald-700' : 'text-[#a62512]'}`} />
+                <span>Pilih Rentang Tanggal:</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDateRangeModalOpen(true)}
+                className={`text-[11px] font-bold hover:underline cursor-pointer flex items-center gap-0.5 ${
+                  isLapangan ? 'text-emerald-700' : 'text-[#a62512]'
+                }`}
+              >
+                <span>Pilihan Cepat & Presets</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Dari Tanggal
+                </label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setDateRange(e.target.value, customEndDate || e.target.value);
+                      setHoveredPoint(null);
+                    }
+                  }}
+                  className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white transition-all ${
+                    isLapangan ? 'focus:border-emerald-600' : 'focus:border-red-500'
+                  }`}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Sampai Tanggal
+                </label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setDateRange(customStartDate || e.target.value, e.target.value);
+                      setHoveredPoint(null);
+                    }
+                  }}
+                  className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white transition-all ${
+                    isLapangan ? 'focus:border-emerald-600' : 'focus:border-red-500'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 4. STATS GRID */}
-      {isLapangan ? (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <CalendarCheck className="w-4 h-4" />
-            </div>
-            <p className="text-[11px] font-medium text-slate-500 mt-2">Total Booking</p>
-            <div className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
-              {lapanganData.totalBookings} <span className="text-xs font-bold text-slate-400">Tim</span>
-            </div>
+      {/* 3. HERO CARD (Hanya untuk Arena Lapangan jika Owner) */}
+      {isLapangan && isOwner && (
+        <div className="w-full rounded-[24px] p-5 text-white shadow-md space-y-2 relative overflow-hidden bg-gradient-to-tr from-emerald-700 to-teal-800 shadow-emerald-700/20">
+          <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none blur-xl" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-white/80 block">
+              Total Pendapatan Sewa Lapangan
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-white/15 text-white text-[10px] font-bold">
+              {current.label}
+            </span>
           </div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-            <p className="text-[11px] font-medium text-slate-500 mt-2">Jam Terpakai</p>
-            <div className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
-              {lapanganData.totalHours} <span className="text-xs font-bold text-slate-400">Jam</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-            <div className="w-7 h-7 rounded-lg bg-red-50 text-[#a62512] flex items-center justify-center">
-              <Receipt className="w-4 h-4" />
-            </div>
-            <p className="text-[11px] font-medium text-slate-500 mt-2">Transaksi</p>
-            <div className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
-              {kantinData.totalTx.toLocaleString('id-ID')}
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-            <div className="w-7 h-7 rounded-lg bg-red-50 text-[#a62512] flex items-center justify-center">
-              <Package className="w-4 h-4" />
-            </div>
-            <p className="text-[11px] font-medium text-slate-500 mt-2">Produk Terjual</p>
-            <div className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
-              {kantinData.totalItems.toLocaleString('id-ID')}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* 5. OKUPANSI / INFO CARD */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center justify-between">
-        <div>
-          <p className="text-[11px] font-medium text-slate-500">
-            {isLapangan ? 'Tingkat Okupansi Lapangan' : 'Rata-rata per Transaksi'}
-          </p>
-          <div className="text-xl font-black text-slate-900 tracking-tight mt-0.5">
-            {isLapangan
-              ? lapanganData.occupancyRate
-              : formatRupiah(kantinData.totalTx > 0 ? Math.round(kantinData.totalSales / kantinData.totalTx) : 0)}
+          <div className="text-[30px] sm:text-[34px] font-black tracking-tight leading-none text-white">
+            {formatRupiah(current.totalSales)}
           </div>
-        </div>
-        <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
-          {isLapangan ? (
-            <TrendingUp className="w-5 h-5 stroke-[2.2]" />
-          ) : (
-            <Banknote className="w-5 h-5 stroke-[2.2]" />
-          )}
-        </div>
-      </div>
 
-      {/* 6. TREN CHART */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 tracking-tight">
-            {isLapangan ? 'Tren Pendapatan Lapangan' : 'Tren Penjualan'}
-          </h3>
-          <span className="text-[11px] text-slate-400 font-medium">{current.label}</span>
-        </div>
-
-        <div className="relative pt-1">
-          {hoveredPoint && (
-            <div className="absolute top-0 right-2 px-2.5 py-1 rounded-xl bg-slate-900 text-white text-[11px] font-bold shadow-md z-10">
-              <span>{hoveredPoint.day}: </span>
-              <span className={isLapangan ? 'text-emerald-400' : 'text-[#f87171]'}>
-                {formatRupiah(hoveredPoint.amount)}
+          <div className="pt-0.5">
+            {current.growthPct !== null ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black/20 text-[#4ade80] text-xs font-bold">
+                <span className="text-xs">{Number(current.growthPct) >= 0 ? '↗' : '↘'}</span>
+                <span>{Number(current.growthPct) >= 0 ? '+' : ''}{current.growthPct}%</span>
+                <span className="text-white/80 font-normal ml-0.5">vs periode sebelumnya</span>
               </span>
-            </div>
-          )}
-
-          <div className="w-full h-44 flex items-center justify-center">
-            {current.chartPoints.length > 0 ? (
-              <svg viewBox="0 0 335 180" className="w-full h-full overflow-visible">
-                <defs>
-                  <linearGradient id="trendGradientLaporan" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor={isLapangan ? '#059669' : '#a62512'} stopOpacity="0.25" />
-                    <stop offset="80%" stopColor={isLapangan ? '#059669' : '#a62512'} stopOpacity="0.05" />
-                    <stop offset="100%" stopColor={isLapangan ? '#059669' : '#a62512'} stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                <line x1="10" y1="35" x2="325" y2="35" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="10" y1="70" x2="325" y2="70" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="10" y1="105" x2="325" y2="105" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="10" y1="140" x2="325" y2="140" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="10" y1="160" x2="325" y2="160" stroke="#e2e8f0" strokeWidth="1" />
-
-                {areaPath && (
-                  <path d={areaPath} fill="url(#trendGradientLaporan)" className="transition-all duration-500 ease-out" />
-                )}
-                {linePath && (
-                  <path
-                    d={linePath}
-                    fill="none"
-                    stroke={isLapangan ? '#059669' : '#a62512'}
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="transition-all duration-500 ease-out"
-                  />
-                )}
-                {current.chartPoints.map((pt, idx) => (
-                  <g
-                    key={idx}
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredPoint({ day: pt.day, amount: pt.amount })}
-                    onClick={() => setHoveredPoint({ day: pt.day, amount: pt.amount })}
-                  >
-                    <circle cx={pt.x} cy={pt.y} r="12" fill="transparent" />
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r="4"
-                      fill="#ffffff"
-                      stroke={isLapangan ? '#059669' : '#a62512'}
-                      strokeWidth="2.5"
-                    />
-                  </g>
-                ))}
-                {current.chartPoints.map((pt, idx) => (
-                  <text
-                    key={idx}
-                    x={pt.x}
-                    y="175"
-                    textAnchor="middle"
-                    fill="#94a3b8"
-                    fontSize="10"
-                    fontWeight="500"
-                  >
-                    {pt.day}
-                  </text>
-                ))}
-              </svg>
             ) : (
-              <p className="text-xs text-slate-400">Belum ada data untuk periode ini.</p>
+              <span className="text-white/60 text-xs">Tidak ada data periode sebelumnya</span>
             )}
           </div>
         </div>
-      </div>
-
-      {/* 7. RINCIAN PER KATEGORI / LAPANGAN */}
-      {isLapangan ? (
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <Layers className="w-4 h-4 text-emerald-700" />
-              <span>Pendapatan per Lapangan</span>
-            </h3>
-            <span className="text-[11px] text-slate-400">Total Jam</span>
-          </div>
-          {lapanganData.courtBreakdown.length > 0 ? (
-            <div className="space-y-2 pt-1">
-              {lapanganData.courtBreakdown.map((court, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedCourtDetail(court.name)}
-                  className="space-y-1.5 p-2.5 -mx-2 rounded-2xl hover:bg-emerald-50/70 active:bg-emerald-100/70 transition-all cursor-pointer group border border-transparent hover:border-emerald-200/60"
-                >
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-slate-800 font-bold group-hover:text-emerald-800 transition-colors truncate">
-                        {court.name} ({court.hours} jam)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-black text-emerald-700">{formatRupiah(court.amount)}</span>
-                      <span className="text-[10px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full font-bold group-hover:bg-emerald-600 group-hover:text-white transition-all flex items-center gap-0.5">
-                        <span>Rincian</span>
-                        <ChevronRight className="w-2.5 h-2.5" />
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-500 transition-all duration-500"
-                      style={{ width: `${court.percent}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400 py-2">Belum ada data booking lapangan untuk periode ini.</p>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-[#a62512]" />
-              <span>Penjualan per Kategori</span>
-            </h3>
-            <span className="text-[11px] text-slate-400">Total Omzet</span>
-          </div>
-          {kantinData.categoriesBreakdown.length > 0 ? (
-            <div className="space-y-2 pt-1">
-              {kantinData.categoriesBreakdown.map((cat, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setSelectedCategoryDetail(cat.category)}
-                  className="w-full text-left space-y-1.5 p-2.5 rounded-xl hover:bg-slate-50 active:bg-slate-100/80 active:scale-[0.99] border border-transparent hover:border-slate-200/80 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="text-slate-800 group-hover:text-[#a62512] transition-colors flex items-center gap-1.5">
-                      <span>{cat.category} ({cat.qty} pcs)</span>
-                      <span className="text-[10px] font-normal text-slate-400 group-hover:text-[#a62512] inline-flex items-center">
-                        Lihat Rincian <ChevronRight className="w-3 h-3 ml-0.5 inline group-hover:translate-x-0.5 transition-transform" />
-                      </span>
-                    </span>
-                    <span className="font-bold text-[#a62512]">{formatRupiah(cat.amount)}</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#a62512] to-[#eb4b2b] group-hover:brightness-105 transition-all duration-500"
-                      style={{ width: `${cat.percent}%` }}
-                    />
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400 py-2">Belum ada data transaksi untuk periode ini.</p>
-          )}
-        </div>
       )}
+
 
       {/* 8. METODE PEMBAYARAN */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs space-y-3">
@@ -1114,39 +971,20 @@ export default function LaporanPenjualanPage() {
         }}
       />
 
-      {/* Konfirmasi Hapus Booking Lapangan */}
-      {deletingBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <div className="text-center space-y-1">
-              <h3 className="font-bold text-slate-900 text-base">Hapus Reservasi?</h3>
-              <p className="text-xs text-slate-500">
-                Apakah Anda yakin ingin menghapus data sewa <strong>{deletingBooking.customerName}</strong> ({deletingBooking.courtName})? Data tidak dapat dikembalikan.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeletingBooking(null)}
-                className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteBooking}
-                disabled={isDeletingBookingProcess}
-                className="py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs cursor-pointer"
-              >
-                {isDeletingBookingProcess ? 'Menghapus...' : 'Ya, Hapus'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Pop Up Alasan Penghapusan Booking Lapangan (Wajib Diisi, Tanpa Tombol Silang) */}
+      <DeleteConfirmationModal
+        isOpen={Boolean(deletingBooking)}
+        title="Hapus Booking Lapangan"
+        subtitle="Booking yang dihapus tidak akan muncul di laporan aktif, tetapi akan tetap tercatat di log sistem."
+        warningTitle="Yakin ingin menghapus booking ini?"
+        warningSubtitle="Tindakan ini tidak dapat dibatalkan."
+        infoItems={laporanBookingDeleteInfoItems}
+        reasonPlaceholder="Tulis alasan penghapusan booking lapangan..."
+        confirmButtonText="Hapus Booking"
+        isProcessing={isDeletingBookingProcess}
+        onClose={() => setDeletingBooking(null)}
+        onConfirm={handleConfirmDeleteBooking}
+      />
 
       {/* Modal Detail & Edit Transaksi Kantin */}
       <TransactionDetailModal
@@ -1173,7 +1011,20 @@ export default function LaporanPenjualanPage() {
       <OwnerDailyRevenueModal
         isOpen={isOwnerRevenueModalOpen}
         onClose={() => setIsOwnerRevenueModalOpen(false)}
-        initialDate={customDate}
+        initialDate={customStartDate || customDate}
+      />
+
+      {/* Modal Pilih Rentang Periode Tanggal */}
+      <DateRangeModal
+        isOpen={isDateRangeModalOpen}
+        onClose={() => setIsDateRangeModalOpen(false)}
+        startDate={customStartDate}
+        endDate={customEndDate}
+        onApply={(s, e) => {
+          setDateRange(s, e);
+          setHoveredPoint(null);
+        }}
+        accentColor={isLapangan ? 'emerald' : 'red'}
       />
     </div>
   );
@@ -1190,7 +1041,7 @@ function buildKantinChartPoints(
 ): { day: string; x: number; y: number; amount: number }[] {
   const daysInMonth = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).getDate();
 
-  if (period === 'HARI_INI' || period === 'CUSTOM') {
+  if (period === 'HARI_INI' || (period === 'CUSTOM' && start === end)) {
     const hours = [8, 11, 14, 17, 20, 22];
     const slotDefs = hours.map((h, i) => ({
       label: `${String(h).padStart(2, '0')}`,
@@ -1213,6 +1064,64 @@ function buildKantinChartPoints(
       x: Math.round(20 + i * xStep),
       y: Math.round(155 - (amounts[i] / maxAmt) * 120),
     }));
+  }
+
+  if (period === 'CUSTOM' && start !== end) {
+    const dStart = new Date(start + 'T00:00:00');
+    const dEnd = new Date(end + 'T00:00:00');
+    const diffDays = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 3600 * 24)) + 1);
+
+    if (diffDays <= 14) {
+      const daySlots = Array.from({ length: diffDays }, (_, i) => {
+        const d = new Date(dStart);
+        d.setDate(dStart.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        return {
+          label: `${d.getDate()}`,
+          test: (s: string) => s === dateStr,
+        };
+      });
+      const amounts = daySlots.map(({ test }) =>
+        filtered
+          .filter((t) => test(t.createdAt.split('T')[0]))
+          .reduce((s, t) => s + t.grandTotal, 0)
+      );
+      const maxAmt = Math.max(...amounts, 1);
+      const xStep = daySlots.length > 1 ? 295 / (daySlots.length - 1) : 0;
+      return daySlots.map((slot, i) => ({
+        day: slot.label,
+        amount: amounts[i],
+        x: Math.round(20 + i * xStep),
+        y: Math.round(155 - (amounts[i] / maxAmt) * 120),
+      }));
+    } else {
+      const buckets = 7;
+      const bucketSize = Math.ceil(diffDays / buckets);
+      const results = Array.from({ length: buckets }, (_, i) => {
+        const bStartDate = new Date(dStart);
+        bStartDate.setDate(dStart.getDate() + i * bucketSize);
+        const bEndDate = new Date(dStart);
+        bEndDate.setDate(dStart.getDate() + Math.min((i + 1) * bucketSize - 1, diffDays - 1));
+
+        const bStartStr = bStartDate.toISOString().split('T')[0];
+        const bEndStr = bEndDate.toISOString().split('T')[0];
+
+        const amount = filtered
+          .filter((t) => {
+            const dateStr = t.createdAt.split('T')[0];
+            return dateStr >= bStartStr && dateStr <= bEndStr;
+          })
+          .reduce((s, t) => s + t.grandTotal, 0);
+        return { day: `${bStartDate.getDate()}`, amount };
+      });
+      const maxAmt = Math.max(...results.map((r) => r.amount), 1);
+      const xStep = 295 / (buckets - 1);
+      return results.map((r, i) => ({
+        ...r,
+        x: Math.round(20 + i * xStep),
+        y: Math.round(155 - (r.amount / maxAmt) * 120),
+      }));
+    }
   }
 
   if (period === 'MINGGU_INI') {
@@ -1282,7 +1191,7 @@ function buildLapanganChartPoints(
 ): { day: string; x: number; y: number; amount: number }[] {
   const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
 
-  if (period === 'HARI_INI' || period === 'CUSTOM') {
+  if (period === 'HARI_INI' || (period === 'CUSTOM' && start === end)) {
     const hours = [8, 11, 14, 17, 20, 22];
     const amounts = hours.map((h, i) => {
       const nextH = hours[i + 1] ?? 24;
@@ -1332,6 +1241,52 @@ function buildLapanganChartPoints(
     }));
   }
 
+  if (period === 'CUSTOM' && start !== end) {
+    const dStart = new Date(start + 'T00:00:00');
+    const dEnd = new Date(end + 'T00:00:00');
+    const diffDays = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 3600 * 24)) + 1);
+
+    if (diffDays <= 14) {
+      const daySlots = Array.from({ length: diffDays }, (_, i) => {
+        const d = new Date(dStart);
+        d.setDate(dStart.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const amount = activeBookings
+          .reduce((s, b) => s + getBookingAmountInPeriod(b, dateStr, dateStr), 0);
+        return { day: `${d.getDate()}`, amount };
+      });
+      const maxAmt = Math.max(...daySlots.map((r) => r.amount), 1);
+      const xStep = daySlots.length > 1 ? 295 / (daySlots.length - 1) : 0;
+      return daySlots.map((r, i) => ({
+        ...r,
+        x: Math.round(20 + i * xStep),
+        y: Math.round(155 - (r.amount / maxAmt) * 120),
+      }));
+    } else {
+      const buckets = 7;
+      const bucketSize = Math.ceil(diffDays / buckets);
+      const results = Array.from({ length: buckets }, (_, i) => {
+        const bStartDate = new Date(dStart);
+        bStartDate.setDate(dStart.getDate() + i * bucketSize);
+        const bEndDate = new Date(dStart);
+        bEndDate.setDate(dStart.getDate() + Math.min((i + 1) * bucketSize - 1, diffDays - 1));
+
+        const bStartStr = bStartDate.toISOString().split('T')[0];
+        const bEndStr = bEndDate.toISOString().split('T')[0];
+        const amount = activeBookings
+          .reduce((s, b) => s + getBookingAmountInPeriod(b, bStartStr, bEndStr), 0);
+        return { day: `${bStartDate.getDate()}`, amount };
+      });
+      const maxAmt = Math.max(...results.map((r) => r.amount), 1);
+      const xStep = 295 / (buckets - 1);
+      return results.map((r, i) => ({
+        ...r,
+        x: Math.round(20 + i * xStep),
+        y: Math.round(155 - (r.amount / maxAmt) * 120),
+      }));
+    }
+  }
+
   if (period === 'MINGGU_INI') {
     const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     const startDate = new Date(start + 'T00:00:00');
@@ -1376,16 +1331,29 @@ function buildMonthlyPointsBookings(
   return results.map((r, i) => ({ ...r, x: Math.round(20 + i * xStep), y: Math.round(155 - (r.amount / maxAmt) * 120) }));
 }
 
-function getPrevDateRange(period: PeriodType, customDate?: string): { start: string; end: string } {
+function getPrevDateRange(
+  period: PeriodType,
+  customStartDate?: string,
+  customEndDate?: string
+): { start: string; end: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  if (period === 'CUSTOM' && customDate) {
-    const [y, m, d] = customDate.split('-').map(Number);
-    const prevDate = new Date(y, m - 1, d - 1);
-    const s = fmt(prevDate);
-    return { start: s, end: s };
+  if (period === 'CUSTOM') {
+    const s = customStartDate || fmt(now);
+    const e = customEndDate || customStartDate || fmt(now);
+    const [realStart, realEnd] = s <= e ? [s, e] : [e, s];
+    const dStart = new Date(realStart);
+    const dEnd = new Date(realEnd);
+    const diffDays = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 3600 * 24)) + 1);
+
+    const prevEnd = new Date(dStart);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - (diffDays - 1));
+
+    return { start: fmt(prevStart), end: fmt(prevEnd) };
   }
   if (period === 'HARI_INI') {
     const yesterday = new Date(now);

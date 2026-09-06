@@ -60,6 +60,28 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         transactions: [created, ...state.transactions],
         isLoading: false,
       }));
+
+      // Record Activity Log
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = useShiftStore.getState().cashierName || 'Kasir';
+        const itemCount = transaction.items.reduce((s, i) => s + i.quantity, 0);
+        recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'CREATE_TRANSACTION',
+          title: 'Transaksi Penjualan Kantin',
+          details: `Kasir ${cashier} memproses transaksi nota #${created.invoiceNumber || created.id.slice(0, 8)} senilai Rp ${created.grandTotal.toLocaleString('id-ID')} (${itemCount} item) via ${created.paymentMethod}.`,
+          metadata: {
+            transactionId: created.id,
+            invoiceNumber: created.invoiceNumber,
+            total: created.grandTotal,
+            paymentMethod: created.paymentMethod,
+          },
+        });
+      } catch {}
+
       return created;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal menyimpan transaksi', isLoading: false });
@@ -70,6 +92,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   cancelTransaction: async (id) => {
     set({ isLoading: true, error: null });
     try {
+      const target = get().transactions.find((t) => t.id === id);
       await dbCancelTransaction(id);
       set((state) => ({
         transactions: state.transactions.map((t) =>
@@ -77,6 +100,25 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         ),
         isLoading: false,
       }));
+
+      // Record Activity Log
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'CANCEL_TRANSACTION',
+          title: 'Batalkan Transaksi Kantin',
+          details: `${cashier} membatalkan transaksi nota #${target?.invoiceNumber || id.slice(0, 8)} senilai Rp ${(target?.grandTotal || 0).toLocaleString('id-ID')}.`,
+          metadata: {
+            transactionId: id,
+            invoiceNumber: target?.invoiceNumber,
+            total: target?.grandTotal,
+          },
+        });
+      } catch {}
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal membatalkan transaksi', isLoading: false });
       throw err;
@@ -86,12 +128,32 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   deleteTransaction: async (id) => {
     set({ isLoading: true, error: null });
     try {
+      const target = get().transactions.find((t) => t.id === id);
       await dbDeleteTransaction(id);
       set((state) => ({
         transactions: state.transactions.filter((t) => t.id !== id),
         selectedTransaction: state.selectedTransaction?.id === id ? null : state.selectedTransaction,
         isLoading: false,
       }));
+
+      // Record Activity Log
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'DELETE_TRANSACTION',
+          title: 'Hapus Nota Transaksi Kantin',
+          details: `${cashier} menghapus nota transaksi #${target?.invoiceNumber || id.slice(0, 8)} senilai Rp ${(target?.grandTotal || 0).toLocaleString('id-ID')}.`,
+          metadata: {
+            transactionId: id,
+            invoiceNumber: target?.invoiceNumber,
+            total: target?.grandTotal,
+          },
+        });
+      } catch {}
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal menghapus transaksi', isLoading: false });
       throw err;

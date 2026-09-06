@@ -104,6 +104,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
   cancelBooking: async (bookingId) => {
     set({ isLoading: true, error: null });
     try {
+      const target = get().bookings.find((b) => b.id === bookingId);
       await cancelBooking(bookingId);
       set((state) => ({
         bookings: state.bookings.map((b) =>
@@ -112,6 +113,26 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
         selectedBooking: state.selectedBooking?.id === bookingId ? { ...state.selectedBooking, status: 'CANCELLED' as BookingStatus } : state.selectedBooking,
         isLoading: false,
       }));
+
+      // Record Activity Log
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'CANCEL_BOOKING',
+          title: 'Batalkan Reservasi Lapangan',
+          details: `${cashier} membatalkan reservasi #${bookingId.slice(0, 8)} (${target?.customerName || 'Customer'}) - ${target?.courtName || 'Lapangan'} tgl ${target?.date || ''}.`,
+          metadata: {
+            bookingId,
+            customerName: target?.customerName,
+            courtName: target?.courtName,
+            date: target?.date,
+          },
+        });
+      } catch {}
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal membatalkan booking', isLoading: false });
       throw err;
@@ -137,12 +158,34 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
   deleteBooking: async (bookingId) => {
     set({ isLoading: true, error: null });
     try {
+      const target = get().bookings.find((b) => b.id === bookingId);
       await dbDeleteBooking(bookingId);
       set((state) => ({
         bookings: state.bookings.filter((b) => b.id !== bookingId),
         selectedBooking: state.selectedBooking?.id === bookingId ? null : state.selectedBooking,
         isLoading: false,
       }));
+
+      // Record Activity Log
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'DELETE_BOOKING',
+          title: 'Hapus Reservasi Lapangan',
+          details: `${cashier} menghapus reservasi #${bookingId.slice(0, 8)} (${target?.customerName || 'Customer'}) - ${target?.courtName || 'Lapangan'} tgl ${target?.date || ''}.`,
+          metadata: {
+            bookingId,
+            customerName: target?.customerName,
+            courtName: target?.courtName,
+            date: target?.date,
+            totalAmount: target?.totalAmount,
+          },
+        });
+      } catch {}
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal menghapus booking', isLoading: false });
       throw err;

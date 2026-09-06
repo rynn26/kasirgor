@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { BookingReceiptModal } from '@/components/booking/BookingReceiptModal';
 import { EditCourtBookingModal } from '@/components/booking/EditCourtBookingModal';
+import { DeleteConfirmationModal, DeleteInfoItem } from '@/components/common/DeleteConfirmationModal';
+import { logActivity } from '@/lib/db/activityLogs';
 import { exportCourtBookingsToExcel, printCourtBookingsPDF } from '@/lib/exportUtils';
 import {
   getBookingTxDate,
@@ -79,6 +81,7 @@ export default function HistoryBookingPage() {
   const [selectedBooking, setSelectedBooking] = useState<CourtBooking | null>(null);
   const [editingBooking, setEditingBooking] = useState<CourtBooking | null>(null);
   const [deletingBooking, setDeletingBooking] = useState<CourtBooking | null>(null);
+  const [deleteConfirmAction, setDeleteConfirmAction] = useState<'CANCEL' | 'DELETE' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Financial Summary (menyesuaikan dengan tanggal yang dipilih jika ada)
@@ -201,33 +204,70 @@ export default function HistoryBookingPage() {
       return (b.startTime || '').localeCompare(a.startTime || '');
     });
 
-  const handleCancelBooking = async () => {
-    if (!deletingBooking) return;
+  const handleConfirmBookingWithReason = async (reason: string) => {
+    if (!deletingBooking || !deleteConfirmAction) return;
     setIsDeleting(true);
     try {
-      await cancelBooking(deletingBooking.id);
-      showToast('⚠️ Transaksi booking berhasil dibatalkan (Void)');
+      let staffName = 'Kasir';
+      let staffRole = 'Kasir';
+      if (typeof window !== 'undefined') {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            staffName = parsed.name || (parsed.role === 'kasir' ? 'Yuli' : 'Owner');
+            staffRole = parsed.role === 'kasir' ? 'Kasir' : 'Owner';
+          } catch {}
+        }
+      }
+
+      const isCancel = deleteConfirmAction === 'CANCEL';
+
+      const paymentMethodStr = deletingBooking.settlementPaymentMethod || deletingBooking.dpPaymentMethod || 'CASH';
+
+      await logActivity({
+        staffName,
+        role: staffRole,
+        actionType: isCancel ? 'CANCEL_BOOKING' : 'DELETE_BOOKING',
+        title: isCancel ? `Void Booking Lapangan oleh ${staffName}` : `Hapus Booking Lapangan oleh ${staffName}`,
+        details: `Alasan: "${reason}". Booking: ${deletingBooking.customerName || 'Penyewa'} (${deletingBooking.courtName || 'Lapangan'}, ${deletingBooking.startTime}-${deletingBooking.endTime}, Total: ${formatRupiah(deletingBooking.totalAmount)}).`,
+        metadata: {
+          bookingId: deletingBooking.id,
+          reason,
+          customerName: deletingBooking.customerName,
+          courtName: deletingBooking.courtName,
+          totalAmount: deletingBooking.totalAmount,
+          paymentMethod: paymentMethodStr,
+        },
+      });
+
+      if (isCancel) {
+        await cancelBooking(deletingBooking.id);
+        showToast('⚠️ Transaksi booking berhasil dibatalkan (Void)');
+      } else {
+        await deleteBooking(deletingBooking.id);
+        showToast('🗑️ Transaksi booking berhasil dihapus permanen');
+      }
+
+      setDeleteConfirmAction(null);
       setDeletingBooking(null);
     } catch {
-      showToast('Gagal membatalkan booking');
+      showToast('Gagal memproses tindakan booking');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleDeleteBooking = async () => {
-    if (!deletingBooking) return;
-    setIsDeleting(true);
-    try {
-      await deleteBooking(deletingBooking.id);
-      showToast('🗑️ Transaksi booking berhasil dihapus permanen');
-      setDeletingBooking(null);
-    } catch {
-      showToast('Gagal menghapus booking');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  const bookingDeleteInfoItems: DeleteInfoItem[] = deletingBooking
+    ? [
+        { label: 'Tanggal', value: deletingBooking.date || '-' },
+        { label: 'Penyewa', value: deletingBooking.customerName || '-' },
+        { label: 'Lapangan', value: deletingBooking.courtName || '-' },
+        { label: 'Jam Main', value: `${deletingBooking.startTime} - ${deletingBooking.endTime}` },
+        { label: 'Total', value: formatRupiah(deletingBooking.totalAmount) },
+        { label: 'Metode Pembayaran', value: (deletingBooking.settlementPaymentMethod || deletingBooking.dpPaymentMethod || 'CASH') === 'CASH' ? 'Cash' : (deletingBooking.settlementPaymentMethod || deletingBooking.dpPaymentMethod || 'Cash') },
+      ]
+    : [];
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-5 max-w-2xl mx-auto space-y-4 pb-28">
@@ -267,7 +307,12 @@ export default function HistoryBookingPage() {
           <button
             type="button"
             onClick={() => {
-              printCourtBookingsPDF(selectedDate ? `Tanggal ${selectedDate}` : 'Semua Riwayat', filtered);
+              printCourtBookingsPDF(
+                selectedDate ? `Tanggal ${selectedDate}` : 'Semua Riwayat',
+                filtered,
+                selectedDate || undefined,
+                selectedDate || undefined
+              );
               showToast('Membuka PDF Cetak Laporan...');
             }}
             className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
@@ -751,8 +796,8 @@ export default function HistoryBookingPage() {
         }}
       />
 
-      {/* Delete / Void Confirmation Modal */}
-      {deletingBooking && (
+      {/* Step 1: Delete / Void Option Dialog */}
+      {deletingBooking && !deleteConfirmAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
             <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
@@ -772,7 +817,7 @@ export default function HistoryBookingPage() {
               <button
                 type="button"
                 disabled={isDeleting}
-                onClick={handleCancelBooking}
+                onClick={() => setDeleteConfirmAction('CANCEL')}
                 className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Ban className="w-4 h-4" />
@@ -782,7 +827,7 @@ export default function HistoryBookingPage() {
               <button
                 type="button"
                 disabled={isDeleting}
-                onClick={handleDeleteBooking}
+                onClick={() => setDeleteConfirmAction('DELETE')}
                 className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Trash2 className="w-4 h-4" />
@@ -801,6 +846,21 @@ export default function HistoryBookingPage() {
           </div>
         </div>
       )}
+
+      {/* Step 2: Pop Up Alasan Penghapusan Booking (Wajib Diisi, Tanpa Tombol Silang) */}
+      <DeleteConfirmationModal
+        isOpen={Boolean(deletingBooking && deleteConfirmAction)}
+        title={deleteConfirmAction === 'CANCEL' ? 'Batalkan Booking Lapangan' : 'Hapus Booking Lapangan'}
+        subtitle="Booking yang dihapus tidak akan muncul di riwayat aktif, tetapi akan tetap tercatat di log sistem."
+        warningTitle={deleteConfirmAction === 'CANCEL' ? 'Yakin ingin membatalkan booking ini?' : 'Yakin ingin menghapus booking ini?'}
+        warningSubtitle="Tindakan ini tidak dapat dibatalkan."
+        infoItems={bookingDeleteInfoItems}
+        reasonPlaceholder="Tulis alasan penghapusan booking lapangan..."
+        confirmButtonText={deleteConfirmAction === 'CANCEL' ? 'Batalkan Booking' : 'Hapus Booking'}
+        isProcessing={isDeleting}
+        onClose={() => setDeleteConfirmAction(null)}
+        onConfirm={handleConfirmBookingWithReason}
+      />
     </div>
   );
 }

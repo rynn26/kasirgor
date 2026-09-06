@@ -22,6 +22,7 @@ import {
   Repeat,
   Wallet,
   Radio,
+  Volume2,
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
@@ -31,10 +32,17 @@ import { useCartStore } from '@/lib/store/useCartStore';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useAppDateStore } from '@/lib/store/useAppDateStore';
+import { useToastStore } from '@/lib/store/useToastStore';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Transaction } from '@/types/pos';
 import { fetchCashierPresence, CashierPresence } from '@/lib/db/activityLogs';
 import { getBookingAmountInPeriod } from '@/lib/bookingUtils';
+import {
+  requestNotificationPermission,
+  sendWebPushNotificationToOwner,
+  getNotificationPermission,
+  isWebNotificationSupported,
+} from '@/lib/notifications/webPush';
 
 type TimeFilter = 'HARI' | 'MINGGU' | 'BULAN';
 
@@ -43,6 +51,7 @@ export default function DashboardUnifiedPage() {
   const { transactions, getDailySummary, loadTransactions } = useTransactionStore();
   const { products, loadProducts } = useProductStore();
   const { getTotalItems } = useCartStore();
+  const { showToast } = useToastStore();
   const { selectedShift, cashierName: storedCashierName } = useShiftStore();
   const { courts, bookings, loadCourts, loadBookings } = useCourtBookingStore();
 
@@ -57,6 +66,68 @@ export default function DashboardUnifiedPage() {
   const [greeting, setGreeting] = useState('Selamat sore');
   const [isMounted, setIsMounted] = useState(false);
   const [cashierPresences, setCashierPresences] = useState<CashierPresence[]>([]);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isWebNotificationSupported()) {
+      setPushPermission(getNotificationPermission());
+    }
+  }, [isNotificationOpen]);
+
+  const handleEnablePushNotification = async () => {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      setPushPermission('granted');
+      await sendWebPushNotificationToOwner({
+        title: '🏆 Notifikasi HP Owner Aktif!',
+        body: 'Selamat! Notifikasi browser HP/Desktop Anda sudah aktif. Anda akan menerima update booking, pelunasan & transaksi.',
+        url: '/dashboard',
+      });
+      showToast('Notifikasi Web HP berhasil diaktifkan!');
+    } else {
+      setPushPermission('denied');
+      showToast('Izin notifikasi belum diizinkan di browser Anda.');
+    }
+  };
+
+  const handleTestPushNotification = async (type: 'booking' | 'pelunasan' | 'void' | 'general' = 'booking') => {
+    // If not granted yet, automatically request permission first!
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        showToast('Mohon izinkan (Allow) notifikasi di browser Anda.');
+        return;
+      }
+      setPushPermission('granted');
+    }
+
+    let payload = {
+      title: '🏸 Booking Lapangan Baru',
+      body: 'Menambahkan DP sewa Lapangan Badminton 1 untuk Bpk. Hendra (Rp 80.000 via QRIS).',
+      url: '/booking',
+    };
+
+    if (type === 'pelunasan') {
+      payload = {
+        title: '💰 Pelunasan Sewa Lapangan',
+        body: 'Pelunasan sewa Lapangan Futsal A sebesar Rp 120.000 (Tunai) - Tim Garuda.',
+        url: '/booking',
+      };
+    } else if (type === 'void') {
+      payload = {
+        title: '🚨 Pembatalan Transaksi Kasir (VOID)',
+        body: 'Kasir Yuli membatalkan Transaksi #TX-1049 (Rp 150.000). Alasan: "Customer salah pesan raket".',
+        url: '/laporan',
+      };
+    }
+
+    const sent = await sendWebPushNotificationToOwner(payload);
+    if (sent) {
+      showToast('Notifikasi pop-up berhasil dimunculkan!');
+    } else {
+      showToast('Gagal memunculkan notifikasi. Pastikan izin browser diaktifkan.');
+    }
+  };
 
   // Global Active Date Store (Prioritas Tanggal)
   const { selectedDate, isCustomActive, resetToToday } = useAppDateStore();
@@ -757,6 +828,60 @@ export default function DashboardUnifiedPage() {
                 {(lowStockCount > 0 || outOfStockCount > 0 || bookingsPendingSettlement > 0) && (
                   <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-white animate-pulse" />
                 )}
+              </button>
+            </div>
+          </div>
+
+          {/* TEMPORARY TESTING BAR FOR OWNER NOTIFICATION */}
+          <div className="p-3.5 bg-white rounded-2xl border-2 border-dashed border-[#eb4b2b]/40 shadow-xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#eb4b2b] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#eb4b2b]"></span>
+                </span>
+                <span className="text-xs font-bold text-slate-800">
+                  Uji Coba Notifikasi HP (Owner)
+                </span>
+                <span className="text-[10px] bg-red-100 text-[#eb4b2b] font-bold px-1.5 py-0.2 rounded-md">
+                  Testing
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">
+                (Dapat dihapus kapan saja)
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Klik salah satu tombol di bawah untuk memunculkan notifikasi pop-up di layar HP/komputer Anda:
+            </p>
+
+            <div className="grid grid-cols-3 gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => handleTestPushNotification('booking')}
+                className="py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>🏸</span>
+                <span className="truncate">Tes Booking DP</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTestPushNotification('pelunasan')}
+                className="py-2 px-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>💰</span>
+                <span className="truncate">Tes Pelunasan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTestPushNotification('void')}
+                className="py-2 px-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>🚨</span>
+                <span className="truncate">Tes Void Kasir</span>
               </button>
             </div>
           </div>
@@ -1501,6 +1626,59 @@ export default function DashboardUnifiedPage() {
                 </>
               )}
             </div>
+
+            {/* PUSH NOTIFIKASI WEB BROWSER / HP UNTUK OWNER */}
+            {role === 'owner' && (
+              <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-[#eb4b2b] animate-pulse" />
+                    Web Push Notification HP
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      pushPermission === 'granted'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : pushPermission === 'denied'
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {pushPermission === 'granted'
+                      ? '● Aktif'
+                      : pushPermission === 'denied'
+                      ? 'Izin Ditolak'
+                      : 'Belum Aktif'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Pop-up langsung di layar HP/Desktop (seperti notifikasi Play Store) saat ada booking baru, pelunasan, atau pembatalan kasir tanpa aplikasi pihak ketiga.
+                </p>
+
+                <div className="pt-1">
+                  {pushPermission !== 'granted' ? (
+                    <button
+                      type="button"
+                      onClick={handleEnablePushNotification}
+                      className="w-full py-2 px-3 rounded-xl bg-[#eb4b2b] hover:bg-[#d93f20] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      Aktifkan Notifikasi HP Saya
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleTestPushNotification('booking')}
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    >
+                      <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                      🧪 Uji Coba Munculkan Notifikasi Pop-up
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               type="button"

@@ -300,7 +300,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             </div>
             <div>
               <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight flex items-center gap-2">
-                <span>Sewa Langsung (Bayar Lunas)</span>
+                <span>Main Langsung Bayar Lunas</span>
                 <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                   isPickleball ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                 }`}>
@@ -356,10 +356,125 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
             </div>
           </div>
 
-          {/* Section 1: Schedule & Duration */}
+          {/* Section 1: Customer Identity */}
           <div className="space-y-3">
             <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span>1. Waktu & Durasi Bermain</span>
+              <span>1. Informasi Penyewa</span>
+            </label>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                Nama Pemesan <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Budi Santoso"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
+                />
+              </div>
+            </div>
+
+            {/* Kategori Sewa: Badminton (Member vs Insidentil) ATAU Pickleball */}
+            {!isPickleball ? (
+              <div className="pt-1 space-y-2">
+                <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setMemberType('MEMBER')}
+                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      memberType === 'MEMBER'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>👤 Member (Rutin Tiap Minggu)</span>
+                    {memberType === 'MEMBER' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMemberType('INSIDENTIL')}
+                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      memberType === 'INSIDENTIL'
+                        ? 'bg-[#b92b10] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>⚡ Insidentil (Sewa Lepas)</span>
+                    {memberType === 'INSIDENTIL' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </button>
+                </div>
+
+                {/* Pengaturan Jadwal Khusus Member Badminton */}
+                {memberType === 'MEMBER' && (
+                  <div className="p-3 bg-blue-50/90 border border-blue-200/90 rounded-xl space-y-2 text-xs animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-900">Pilih Hari Main Rutin:</span>
+                      <span className="font-black text-blue-700">Setiap {memberSchedule.dayName}</span>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1">
+                      {[
+                        { idx: 1, label: 'Sen' },
+                        { idx: 2, label: 'Sel' },
+                        { idx: 3, label: 'Rab' },
+                        { idx: 4, label: 'Kam' },
+                        { idx: 5, label: 'Jum' },
+                        { idx: 6, label: 'Sab' },
+                        { idx: 0, label: 'Min' },
+                      ].map((d) => (
+                        <button
+                          key={d.idx}
+                          type="button"
+                          onClick={() => handleSelectMemberDay(d.idx)}
+                          className={`py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                            selectedMemberDayIndex === d.idx
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-white border border-blue-200 text-blue-900 hover:bg-blue-100'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="pt-1 text-[11px] text-blue-900 font-medium">
+                      <span>🏸 Paket {memberSchedule.sessionCount}x Pertemuan di Bulan <strong>{memberSchedule.monthName} {memberSchedule.year}</strong>:</span>
+                      <div className="flex flex-wrap gap-1 mt-1 font-bold">
+                        {memberSchedule.dates.map((dt, i) => (
+                          <span key={dt} className="px-1.5 py-0.5 rounded bg-white text-blue-950 border border-blue-200 text-[10px]">
+                            {i + 1}: {dt.split('-')[2]}/{dt.split('-')[1]}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <div>
+                    <span className="font-bold text-emerald-950 block">Kategori Sewa Pickleball</span>
+                    <span className="text-[11px] text-emerald-700">Tersedia 2 Lapangan · Tarif insidentil per jam</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300 whitespace-nowrap">
+                  2 Lapangan
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Schedule & Duration */}
+          <div className="space-y-3 pt-2 border-t border-slate-100">
+            <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <span>2. Waktu & Durasi Main</span>
             </label>
 
             {/* Tanggal Booking */}
@@ -512,121 +627,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Section 2: Customer Identity */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span>2. Informasi Penyewa</span>
-            </label>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                Nama Pemesan <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Budi Santoso"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b92b10]"
-                />
-              </div>
-            </div>
-
-            {/* Kategori Sewa: Badminton (Member vs Insidentil) ATAU Pickleball */}
-            {!isPickleball ? (
-              <div className="pt-1 space-y-2">
-                <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setMemberType('MEMBER')}
-                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      memberType === 'MEMBER'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>👤 Member (Rutin Tiap Minggu)</span>
-                    {memberType === 'MEMBER' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setMemberType('INSIDENTIL')}
-                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      memberType === 'INSIDENTIL'
-                        ? 'bg-[#b92b10] text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>⚡ Insidentil (Sewa Lepas)</span>
-                    {memberType === 'INSIDENTIL' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </button>
-                </div>
-
-                {/* Pengaturan Jadwal Khusus Member Badminton */}
-                {memberType === 'MEMBER' && (
-                  <div className="p-3 bg-blue-50/90 border border-blue-200/90 rounded-xl space-y-2 text-xs animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-blue-900">Pilih Hari Main Rutin:</span>
-                      <span className="font-black text-blue-700">Setiap {memberSchedule.dayName}</span>
-                    </div>
-                    <div className="grid grid-cols-7 gap-1">
-                      {[
-                        { idx: 1, label: 'Sen' },
-                        { idx: 2, label: 'Sel' },
-                        { idx: 3, label: 'Rab' },
-                        { idx: 4, label: 'Kam' },
-                        { idx: 5, label: 'Jum' },
-                        { idx: 6, label: 'Sab' },
-                        { idx: 0, label: 'Min' },
-                      ].map((d) => (
-                        <button
-                          key={d.idx}
-                          type="button"
-                          onClick={() => handleSelectMemberDay(d.idx)}
-                          className={`py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                            selectedMemberDayIndex === d.idx
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'bg-white border border-blue-200 text-blue-900 hover:bg-blue-100'
-                          }`}
-                        >
-                          {d.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="pt-1 text-[11px] text-blue-900 font-medium">
-                      <span>🏸 Paket {memberSchedule.sessionCount}x Pertemuan di Bulan <strong>{memberSchedule.monthName} {memberSchedule.year}</strong>:</span>
-                      <div className="flex flex-wrap gap-1 mt-1 font-bold">
-                        {memberSchedule.dates.map((dt, i) => (
-                          <span key={dt} className="px-1.5 py-0.5 rounded bg-white text-blue-950 border border-blue-200 text-[10px]">
-                            {i + 1}: {dt.split('-')[2]}/{dt.split('-')[1]}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <Tag className="w-4 h-4 text-emerald-700 shrink-0" />
-                  <div>
-                    <span className="font-bold text-emerald-950 block">Kategori Sewa Pickleball</span>
-                    <span className="text-[11px] text-emerald-700">Tersedia 2 Lapangan · Tarif insidentil per jam</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300 whitespace-nowrap">
-                  2 Lapangan
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Section 3: Direct Payment (Lunas) */}

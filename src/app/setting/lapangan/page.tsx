@@ -73,7 +73,26 @@ export default function SettingLapanganPage() {
   // Current month string (YYYY-MM)
   const currentMonthStr = new Date().toISOString().slice(0, 7);
 
+  const [isRoleChecked, setIsRoleChecked] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
+
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed.role === 'kasir') {
+            setIsOwner(false);
+          } else {
+            setIsOwner(true);
+          }
+        } catch {
+          setIsOwner(true);
+        }
+      }
+      setIsRoleChecked(true);
+    }
     loadCourts();
     loadFromDb(); // Fetch pricing rules from Supabase
   }, []);
@@ -242,6 +261,26 @@ export default function SettingLapanganPage() {
       showToast('Gagal mengubah status lapangan');
     }
   };
+
+  if (isRoleChecked && !isOwner) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-4 shadow-sm">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900 mb-2">Akses Khusus Pemilik (Owner)</h2>
+        <p className="text-sm text-slate-500 max-w-md mb-6 leading-relaxed">
+          Pengaturan Harga Lapangan hanya dapat diakses dan diubah oleh akun Owner.
+        </p>
+        <Link
+          href="/booking"
+          className="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-md hover:bg-black transition-colors"
+        >
+          Kembali ke Booking Lapangan
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-5 max-w-xl mx-auto space-y-4 pb-28">

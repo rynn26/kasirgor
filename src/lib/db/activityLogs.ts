@@ -10,8 +10,11 @@ export type ActivityActionType =
   | 'EDIT_BOOKING'
   | 'SETTLE_BOOKING'
   | 'CANCEL_BOOKING'
+  | 'DELETE_BOOKING'
   | 'CREATE_TRANSACTION'
   | 'VOID_TRANSACTION'
+  | 'CANCEL_TRANSACTION'
+  | 'DELETE_TRANSACTION'
   | 'CREATE_PRODUCT'
   | 'EDIT_PRODUCT'
   | 'DELETE_PRODUCT'
@@ -153,6 +156,41 @@ export async function recordActivityLog(
       window.dispatchEvent(
         new CustomEvent('kasir_activity_logged', { detail: newLog })
       );
+
+      // Trigger Web Push Notification specifically for Owner
+      if (
+        newLog.actionType === 'DELETE_BOOKING' ||
+        newLog.actionType === 'CANCEL_BOOKING' ||
+        newLog.actionType === 'DELETE_TRANSACTION' ||
+        newLog.actionType === 'VOID_TRANSACTION' ||
+        newLog.actionType === 'CREATE_BOOKING' ||
+        newLog.actionType === 'SETTLE_BOOKING' ||
+        newLog.actionType === 'CREATE_TRANSACTION'
+      ) {
+        import('@/lib/notifications/webPush').then(({ notifyOwner }) => {
+          let title = '📢 Notifikasi Kasir GOR';
+          if (
+            newLog.actionType.includes('DELETE') ||
+            newLog.actionType.includes('VOID') ||
+            newLog.actionType.includes('CANCEL')
+          ) {
+            title = '🚨 ' + newLog.title;
+          } else if (newLog.actionType === 'CREATE_BOOKING') {
+            title = '🏸 Booking Lapangan Baru';
+          } else if (newLog.actionType === 'SETTLE_BOOKING') {
+            title = '💰 Pelunasan Sewa Lapangan';
+          } else if (newLog.actionType === 'CREATE_TRANSACTION') {
+            title = '🛒 Penjualan Toko Baru Selesai';
+          }
+
+          notifyOwner({
+            title,
+            body: newLog.details,
+            tag: newLog.id,
+            url: newLog.actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+          });
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error('Failed to store activity log locally:', e);
     }
@@ -160,6 +198,8 @@ export async function recordActivityLog(
 
   return newLog;
 }
+
+export const logActivity = recordActivityLog;
 
 /**
  * Fetch all activity logs (combining Supabase + LocalStorage fallback)

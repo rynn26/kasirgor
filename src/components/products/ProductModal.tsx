@@ -179,7 +179,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 type="number"
                 required
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onFocus={(e) => {
+                  if (e.target.value === '0') setPrice('');
+                  else e.target.select();
+                }}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val.length > 1 && val.startsWith('0')) {
+                    val = val.replace(/^0+(?=\d)/, '');
+                  }
+                  setPrice(val);
+                }}
                 placeholder="25000"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 font-black focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />
@@ -192,7 +202,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               <input
                 type="number"
                 value={costPrice}
-                onChange={(e) => setCostPrice(e.target.value)}
+                onFocus={(e) => {
+                  if (e.target.value === '0') setCostPrice('');
+                  else e.target.select();
+                }}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val.length > 1 && val.startsWith('0')) {
+                    val = val.replace(/^0+(?=\d)/, '');
+                  }
+                  setCostPrice(val);
+                }}
                 placeholder="15000"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />
@@ -207,7 +227,17 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               <input
                 type="number"
                 value={stock}
-                onChange={(e) => setStock(e.target.value)}
+                onFocus={(e) => {
+                  if (e.target.value === '0') setStock('');
+                  else e.target.select();
+                }}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val.length > 1 && val.startsWith('0')) {
+                    val = val.replace(/^0+(?=\d)/, '');
+                  }
+                  setStock(val);
+                }}
                 placeholder="50"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />

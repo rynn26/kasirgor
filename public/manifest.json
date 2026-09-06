@@ -1,0 +1,17 @@
+{
+  "name": "KASIR GOR",
+  "short_name": "Kasir GOR",
+  "description": "Sistem POS & Kasir Arena Lapangan GOR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#b92b10",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { BottomNav } from './BottomNav';
 import { ToastNotification } from '@/components/common/ToastNotification';
+import { OwnerNotificationManager } from '@/components/notifications/OwnerNotificationManager';
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { updateCashierPresence } from '@/lib/db/activityLogs';
 
@@ -83,6 +84,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
         {/* Global Toast Notification */}
         <ToastNotification />
+
+        {/* Owner Web Push Notification Manager (Khusus Owner) */}
+        <OwnerNotificationManager />
 
         {/* Bottom Navigation Dock for Mobile / Tablet (< md) */}
         <BottomNav />

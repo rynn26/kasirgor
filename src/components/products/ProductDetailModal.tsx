@@ -16,7 +16,8 @@ import {
   Edit3,
   Layers,
   Lock,
-  DollarSign
+  DollarSign,
+  Check
 } from 'lucide-react';
 import { Product, ProductCategory } from '@/types/pos';
 import { useProductStore } from '@/lib/store/useProductStore';
@@ -45,10 +46,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [price, setPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState(0);
-  const [minimumStock, setMinimumStock] = useState(5);
+  const [minimumStock, setMinimumStock] = useState('5');
   const [unit, setUnit] = useState('pcs');
   const [description, setDescription] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingCustomStock, setIsEditingCustomStock] = useState(false);
+  const [customStockInput, setCustomStockInput] = useState('');
 
   useEffect(() => {
     if (product) {
@@ -61,7 +64,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setPrice(product.price ? String(product.price) : '');
       setCostPrice(product.costPrice ? String(product.costPrice) : '');
       setStock(product.stock);
-      setMinimumStock(product.minimumStock ?? 5);
+      setCustomStockInput(String(product.stock));
+      setIsEditingCustomStock(false);
+      setMinimumStock(product.minimumStock !== undefined && product.minimumStock !== null ? String(product.minimumStock) : '5');
       setUnit(product.unit || 'pcs');
       setDescription(product.description || '');
       setIsEditing(false);
@@ -78,13 +83,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      showToast('Nama produk tidak boleh kosong');
+      showToast('Nama produk wajib diisi');
       return;
     }
-    if (isOwner && numPrice <= 0) {
+    if (numPrice <= 0) {
       showToast('Harga jual harus lebih dari 0');
       return;
     }
+
+    const parsedMinStock = parseInt(minimumStock, 10);
+    const minStockToSave = !isNaN(parsedMinStock) && parsedMinStock >= 0 ? parsedMinStock : undefined;
 
     try {
       await updateProduct(product.id, {
@@ -94,7 +102,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         price: numPrice > 0 ? numPrice : product.price,
         costPrice: numCost > 0 ? numCost : (numCost === 0 ? undefined : product.costPrice),
         stock,
-        minimumStock: minimumStock > 0 ? minimumStock : undefined,
+        minimumStock: minStockToSave,
         unit,
         description: description.trim() || undefined,
         isAvailable: stock > 0,
@@ -120,14 +128,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const handleAdjustStock = async (delta: number) => {
+    setIsEditingCustomStock(false);
     const newStock = Math.max(0, stock + delta);
     setStock(newStock);
+    setCustomStockInput(String(newStock));
     try {
       await updateStock(product.id, delta);
       showToast(`Stok "${product.name}" disesuaikan menjadi ${newStock} ${unit}`);
     } catch (err) {
       setStock(stock); // revert on error
+      setCustomStockInput(String(stock));
       showToast('Gagal menyesuaikan stok. Coba lagi.');
+    }
+  };
+
+  const handleCommitCustomStock = async () => {
+    if (!isEditingCustomStock) return;
+    setIsEditingCustomStock(false);
+    const parsed = parseInt(customStockInput, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      setCustomStockInput(String(stock));
+      return;
+    }
+    if (parsed === stock) return;
+    const delta = parsed - stock;
+    setStock(parsed);
+    try {
+      await updateStock(product.id, delta);
+      showToast(`Stok "${product.name}" diubah menjadi ${parsed} ${unit}`);
+    } catch (err) {
+      setStock(product.stock);
+      setCustomStockInput(String(product.stock));
+      showToast('Gagal mengubah stok.');
     }
   };
 
@@ -175,57 +207,119 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
               stock <= 0 
                 ? 'bg-rose-50 text-rose-600 border border-rose-200' 
-                : stock <= minimumStock 
+                : stock <= (Number(minimumStock) || 0) 
                 ? 'bg-amber-50 text-amber-700 border border-amber-200' 
                 : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
             }`}>
-              {stock <= 0 ? 'Stok Habis' : stock <= minimumStock ? 'Stok Menipis' : 'Stok Tersedia'}
+              {stock <= 0 ? 'Stok Habis' : stock <= (Number(minimumStock) || 0) ? 'Stok Menipis' : 'Stok Tersedia'}
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
-            <div>
-              <span className="text-[10px] text-slate-400 block font-medium">Sisa Stok Fisik</span>
-              <div className="text-2xl font-black text-slate-900 tracking-tight">
-                {stock} <span className="text-xs font-bold text-slate-400">{unit}</span>
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+            {/* Row 1: Sisa Stok Fisik + Input Ketik Manual */}
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                    Sisa Stok Fisik
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                    Ketik Manual
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 block">
+                  Ketik angka untuk ubah stok langsung
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    min={0}
+                    value={isEditingCustomStock ? customStockInput : stock}
+                    onFocus={(e) => {
+                      setIsEditingCustomStock(true);
+                      if (stock === 0) {
+                        setCustomStockInput('');
+                      } else {
+                        setCustomStockInput(String(stock));
+                        e.target.select();
+                      }
+                    }}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (val.length > 1 && val.startsWith('0')) {
+                        val = val.replace(/^0+(?=\d)/, '');
+                      }
+                      setCustomStockInput(val);
+                    }}
+                    onBlur={handleCommitCustomStock}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCommitCustomStock();
+                      }
+                    }}
+                    className="w-18 px-2 py-1 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-300 focus:border-[#eb4b2b] rounded-xl text-lg font-black text-slate-900 focus:outline-none transition-all text-center"
+                    title="Ketik manual untuk mengubah stok"
+                  />
+                  {isEditingCustomStock && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleCommitCustomStock}
+                      className="ml-1 p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-xs"
+                      title="Terapkan Stok"
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </button>
+                  )}
+                </div>
+                <span className="text-xs font-bold text-slate-400">{unit}</span>
               </div>
             </div>
 
-            {/* Stepper Buttons */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleAdjustStock(-1)}
-                disabled={stock <= 0}
-                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer"
-                title="Kurangi 1"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustStock(1)}
-                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer"
-                title="Tambah 1"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustStock(5)}
-                className="px-2.5 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-[#eb4b2b] font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                title="Tambah 5"
-              >
-                +5
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustStock(10)}
-                className="px-2.5 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-[#eb4b2b] font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                title="Tambah 10"
-              >
-                +10
-              </button>
+            {/* Row 2: Ubah Cepat Stepper (+/-) */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Ubah Cepat:
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleAdjustStock(-1)}
+                  disabled={stock <= 0}
+                  className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer"
+                  title="Kurangi 1"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustStock(1)}
+                  className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition-colors cursor-pointer"
+                  title="Tambah 1"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustStock(5)}
+                  className="px-2.5 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-[#eb4b2b] font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
+                  title="Tambah 5"
+                >
+                  +5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustStock(10)}
+                  className="px-2.5 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-[#eb4b2b] font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
+                  title="Tambah 10"
+                >
+                  +10
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -287,8 +381,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               type="number"
               min={0}
               value={minimumStock}
-              onChange={(e) => setMinimumStock(Math.max(0, Number(e.target.value)))}
-              placeholder="5"
+              onFocus={(e) => {
+                if (e.target.value === '0') {
+                  setMinimumStock('');
+                } else {
+                  e.target.select();
+                }
+              }}
+              onChange={(e) => {
+                let val = e.target.value;
+                if (val.length > 1 && val.startsWith('0')) {
+                  val = val.replace(/^0+(?=\d)/, '');
+                }
+                setMinimumStock(val);
+              }}
+              placeholder="0"
               className="w-40 px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-amber-400"
             />
           </div>
@@ -305,7 +412,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     type="number"
                     required
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onFocus={(e) => {
+                      if (e.target.value === '0') setPrice('');
+                      else e.target.select();
+                    }}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (val.length > 1 && val.startsWith('0')) {
+                        val = val.replace(/^0+(?=\d)/, '');
+                      }
+                      setPrice(val);
+                    }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-bold focus:outline-none focus:border-[#eb4b2b]"
                   />
                 </div>
@@ -316,7 +433,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <input
                     type="number"
                     value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
+                    onFocus={(e) => {
+                      if (e.target.value === '0') setCostPrice('');
+                      else e.target.select();
+                    }}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (val.length > 1 && val.startsWith('0')) {
+                        val = val.replace(/^0+(?=\d)/, '');
+                      }
+                      setCostPrice(val);
+                    }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#eb4b2b]"
                   />
                 </div>

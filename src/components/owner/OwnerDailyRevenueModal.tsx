@@ -14,12 +14,15 @@ import {
   Layers,
   ChevronRight,
   TrendingUp,
+  Printer,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah } from '@/lib/utils';
 import { getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
+import { printCombinedReportPDF, exportCombinedReportToExcel } from '@/lib/exportUtils';
 
 interface OwnerDailyRevenueModalProps {
   isOpen: boolean;
@@ -42,21 +45,33 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   }, []);
 
+  const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || todayStr);
+  const [startDate, setStartDate] = useState<string>(initialDate || todayStr);
+  const [endDate, setEndDate] = useState<string>(initialDate || todayStr);
   const [isCopied, setIsCopied] = useState(false);
   const dateInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       setSelectedDate(initialDate || todayStr);
+      setStartDate(initialDate || todayStr);
+      setEndDate(initialDate || todayStr);
     }
   }, [isOpen, initialDate, todayStr]);
 
-  // Perhitungan Data Pendapatan Berdasarkan Tanggal yang Dipilih
+  const effectiveStart = dateMode === 'single' ? selectedDate : (startDate <= endDate ? startDate : endDate);
+  const effectiveEnd = dateMode === 'single' ? selectedDate : (startDate <= endDate ? endDate : startDate);
+
+  // Perhitungan Data Pendapatan Berdasarkan Tanggal/Rentang yang Dipilih
   const revenueSummary = useMemo(() => {
     // 1. KANTIN / TOKO & F&B
     const kantinTx = transactions.filter(
-      (t) => t.status === 'COMPLETED' && t.createdAt.split('T')[0] === selectedDate
+      (t) => {
+        if (t.status !== 'COMPLETED') return false;
+        const txDate = t.createdAt.split('T')[0];
+        return txDate >= effectiveStart && txDate <= effectiveEnd;
+      }
     );
 
     const kantinCash = kantinTx
@@ -81,7 +96,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 
     bookings.forEach((b) => {
       if (b.status === 'CANCELLED') return;
-      const items = getBookingPaymentItemsInPeriod(b, selectedDate, selectedDate);
+      const items = getBookingPaymentItemsInPeriod(b, effectiveStart, effectiveEnd);
       items.forEach((it) => {
         if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
           dpCount += 1;
@@ -140,23 +155,69 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       totalQris,
       grandTotal,
     };
-  }, [transactions, bookings, selectedDate]);
+  }, [transactions, bookings, effectiveStart, effectiveEnd]);
 
   if (!isOpen) return null;
 
   // Format label tanggal
-  const formattedDateLabel = (() => {
+  const formatIndoDate = (dStr: string) => {
     try {
-      const [y, m, d] = selectedDate.split('-').map(Number);
+      const [y, m, d] = dStr.split('-').map(Number);
       const dateObj = new Date(y, m - 1, d);
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
       const dayName = dayNames[dateObj.getDay()];
-      const isToday = selectedDate === todayStr;
-      return `${isToday ? 'Hari Ini — ' : ''}${dayName}, ${d} ${dateObj.toLocaleString('id-ID', { month: 'long' })} ${y}`;
+      return `${dayName}, ${d} ${dateObj.toLocaleString('id-ID', { month: 'long' })} ${y}`;
     } catch {
-      return selectedDate;
+      return dStr;
     }
+  };
+
+  const formatShortDate = (dStr: string) => {
+    try {
+      const [y, m, d] = dStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return `${d} ${dateObj.toLocaleString('id-ID', { month: 'short' })} ${y}`;
+    } catch {
+      return dStr;
+    }
+  };
+
+  const formattedDateLabel = (() => {
+    if (dateMode === 'single') {
+      const isToday = selectedDate === todayStr;
+      return `${isToday ? 'Hari Ini — ' : ''}${formatIndoDate(selectedDate)}`;
+    }
+    return `${formatShortDate(effectiveStart)} s/d ${formatShortDate(effectiveEnd)}`;
   })();
+
+  const periodLabelForExport = (() => {
+    if (dateMode === 'single') {
+      return `Tanggal ${formatShortDate(selectedDate)}`;
+    }
+    return `${formatShortDate(effectiveStart)} s/d ${formatShortDate(effectiveEnd)}`;
+  })();
+
+  const handleExportPDF = () => {
+    printCombinedReportPDF(
+      periodLabelForExport,
+      transactions,
+      bookings,
+      effectiveStart,
+      effectiveEnd
+    );
+    showToast('Membuka format cetak PDF Laporan Omset Keseluruhan...');
+  };
+
+  const handleExportExcel = () => {
+    exportCombinedReportToExcel(
+      periodLabelForExport,
+      transactions,
+      bookings,
+      effectiveStart,
+      effectiveEnd
+    );
+    showToast('Laporan Excel Omset Keseluruhan berhasil diunduh!');
+  };
 
   const handleCopySummary = () => {
     const text = `📊 *REKAP OMSET OWNER GOR*
@@ -171,8 +232,8 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 - Cash (Tunai): ${formatRupiah(revenueSummary.lapanganCash)}
 - QRIS: ${formatRupiah(revenueSummary.lapanganQris)}
 👉 Subtotal Lapangan: ${formatRupiah(revenueSummary.lapanganTotal)} (${revenueSummary.lapanganTxCount} transaksi)
-  • DP Masuk: ${formatRupiah(revenueSummary.dpTotal)} (${revenueSummary.dpCount} tim)
-  • Pelunasan: ${formatRupiah(revenueSummary.settleTotal)} (${revenueSummary.settleCount} tim)
+  • DP Masuk: ${formatRupiah(revenueSummary.dpTotal)} (${revenueSummary.dpCount} tim) [Cash: ${formatRupiah(revenueSummary.dpCash)} | QRIS: ${formatRupiah(revenueSummary.dpQris)}]
+  • Pelunasan: ${formatRupiah(revenueSummary.settleTotal)} (${revenueSummary.settleCount} tim) [Cash: ${formatRupiah(revenueSummary.settleCash)} | QRIS: ${formatRupiah(revenueSummary.settleQris)}]
 
 ━━━━━━━━━━━━━━━━━━━━
 💰 *TOTAL PER METODE PEMBAYARAN:*
@@ -225,46 +286,107 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
 
           {/* Date Selector Banner */}
-          <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                <Calendar className="w-4 h-4" />
+          <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode Rekap</span>
               </div>
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Periode Rekap
-                </span>
-                <span className="text-xs font-bold text-slate-900 line-clamp-1">
-                  {formattedDateLabel}
-                </span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setDateMode('single')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    dateMode === 'single'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Harian
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateMode('range')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    dateMode === 'range'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Rentang Tanggal
+                </button>
               </div>
             </div>
 
-            <div className="relative shrink-0">
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedDate(e.target.value);
-                  }
-                }}
-                onClick={(e) => {
-                  try {
-                    (e.currentTarget as HTMLInputElement).showPicker?.();
-                  } catch {}
-                }}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                title="Ganti Tanggal"
-              />
-              <button
-                type="button"
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
-              >
-                <span>Ubah Tanggal</span>
-              </button>
-            </div>
+            {dateMode === 'single' ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Periode Rekap
+                    </span>
+                    <span className="text-xs font-bold text-slate-900 line-clamp-1">
+                      {formattedDateLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="relative shrink-0">
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedDate(e.target.value);
+                      }
+                    }}
+                    onClick={(e) => {
+                      try {
+                        (e.currentTarget as HTMLInputElement).showPicker?.();
+                      } catch {}
+                    }}
+                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                    title="Ganti Tanggal"
+                  />
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border border-slate-200"
+                  >
+                    <span>Ubah Tanggal</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block">Dari Tanggal</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block">Sampai Tanggal</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-0.5">
+                  <span className="font-bold text-slate-700">Periode:</span>
+                  <span className="font-semibold text-slate-900">{formattedDateLabel}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Rincian 3 Sumber Pendapatan */}
@@ -364,14 +486,45 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
               </div>
 
               {/* Rincian Ringkas DP & Pelunasan */}
-              <div className="pt-2 border-t border-dashed border-slate-200/80 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500">
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>DP Masuk: <strong className="text-slate-800 font-bold">{formatRupiah(revenueSummary.dpTotal)}</strong> ({revenueSummary.dpCount} tim)</span>
+              <div className="pt-2.5 border-t border-dashed border-slate-200/80 space-y-2 text-[11px] text-slate-500">
+                {/* DP Masuk */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="text-slate-600">DP Masuk:</span>
+                    <strong className="text-slate-900 font-bold">{formatRupiah(revenueSummary.dpTotal)}</strong>
+                    <span className="text-[10px] text-slate-400">({revenueSummary.dpCount} tim)</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
+                      <Banknote className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span>Cash: {formatRupiah(revenueSummary.dpCash)}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200/60">
+                      <QrCode className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>QRIS: {formatRupiah(revenueSummary.dpQris)}</span>
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span>Pelunasan: <strong className="text-slate-800 font-bold">{formatRupiah(revenueSummary.settleTotal)}</strong> ({revenueSummary.settleCount} tim)</span>
+
+                {/* Pelunasan */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                    <span className="text-slate-600">Pelunasan:</span>
+                    <strong className="text-slate-900 font-bold">{formatRupiah(revenueSummary.settleTotal)}</strong>
+                    <span className="text-[10px] text-slate-400">({revenueSummary.settleCount} tim)</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold border border-amber-200/60">
+                      <Banknote className="w-3 h-3 text-amber-600 shrink-0" />
+                      <span>Cash: {formatRupiah(revenueSummary.settleCash)}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-800 font-semibold border border-blue-200/60">
+                      <QrCode className="w-3 h-3 text-blue-600 shrink-0" />
+                      <span>QRIS: {formatRupiah(revenueSummary.settleQris)}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -482,32 +635,57 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
         </div>
 
         {/* Modal Actions Footer */}
-        <div className="p-4 sm:p-5 bg-white border-t border-slate-200/80 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopySummary}
-            className="flex-1 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200"
-          >
-            {isCopied ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-                <span className="text-emerald-700">Tersalin ke Clipboard!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-slate-600" />
-                <span>Salin Ringkasan WhatsApp</span>
-              </>
-            )}
-          </button>
+        <div className="p-4 sm:p-5 bg-white border-t border-slate-200/80 space-y-2.5">
+          {/* Action Export Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              className="py-2.5 px-3 rounded-2xl bg-red-50 hover:bg-red-100 text-[#a62512] font-bold text-xs flex items-center justify-center gap-2 border border-red-200 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              title="Cetak atau Simpan Laporan sebagai PDF"
+            >
+              <Printer className="w-4 h-4 text-red-600" />
+              <span>Export PDF</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
-          >
-            Tutup
-          </button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="py-2.5 px-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 border border-emerald-200 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              title="Unduh Laporan Format Spreadsheet Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Export Excel</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopySummary}
+              className="flex-1 py-3 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200"
+            >
+              {isCopied ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+                  <span className="text-emerald-700">Tersalin ke Clipboard!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-600" />
+                  <span>Salin Ringkasan WhatsApp</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+            >
+              Tutup
+            </button>
+          </div>
         </div>
 
       </div>

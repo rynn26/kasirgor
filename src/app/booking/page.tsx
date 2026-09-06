@@ -306,10 +306,10 @@ export default function BookingLapanganPage() {
                   Walk-In / Langsung
                 </span>
                 <h3 className="text-base font-black text-slate-900 group-hover:text-orange-800 transition-colors">
-                  Sewa Langsung (100%)
+                  Main Langsung Bayar Lunas
                 </h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5 line-clamp-1">
-                  Main sekarang dan bayar lunas di kasir
+                  Pembayaran langsung lunas
                 </p>
               </div>
             </div>

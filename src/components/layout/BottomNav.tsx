@@ -186,15 +186,13 @@ export const BottomNav: React.FC = () => {
       { name: 'Beranda', href: '/dashboard', icon: Home },
       { name: 'Booking', href: '/booking', icon: CalendarCheck },
       { name: 'Riwayat', href: '/booking/history', icon: Repeat },
-      ...(isOwnerUser ? [{ name: 'Laporan', href: '/laporan', icon: BarChart3 }] : []),
+      { name: 'Laporan', href: '/laporan', icon: BarChart3 },
     ]
     : [
       { name: 'Beranda', href: '/dashboard', icon: Home },
       { name: 'Transaksi', href: '/kasir', icon: Store },
       { name: 'Produk', href: '/produk', icon: Package },
-      ...(isOwnerUser
-        ? [{ name: 'Laporan', href: '/laporan', icon: BarChart3 }]
-        : [{ name: 'Riwayat', href: '/history', icon: Repeat }]),
+      { name: 'Laporan', href: '/laporan', icon: BarChart3 },
     ];
 
   return (
@@ -410,31 +408,35 @@ export const BottomNav: React.FC = () => {
                 </button>
               </div>
 
-              {/* Monitoring Kasir & Audit Log */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsProfileOpen(false);
-                  router.push('/karyawan');
-                }}
-                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Monitoring Kasir & Audit Log</span>
-              </button>
+              {/* Monitoring Kasir & Audit Log (Khusus Owner) */}
+              {isOwnerUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    router.push('/karyawan');
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Monitoring Kasir & Audit Log</span>
+                </button>
+              )}
 
-              {/* Setting Lapangan */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsProfileOpen(false);
-                  router.push('/setting/lapangan');
-                }}
-                className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Setting Harga Lapangan</span>
-              </button>
+              {/* Setting Lapangan (Khusus Owner) */}
+              {isOwnerUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    router.push('/setting/lapangan');
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Setting Harga Lapangan</span>
+                </button>
+              )}
 
               <button
                 type="button"

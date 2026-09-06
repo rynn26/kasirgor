@@ -6,6 +6,8 @@ import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { EditTransactionModal } from './EditTransactionModal';
+import { DeleteConfirmationModal, DeleteInfoItem } from '@/components/common/DeleteConfirmationModal';
+import { logActivity } from '@/lib/db/activityLogs';
 import {
   X,
   Pencil,
@@ -51,31 +53,78 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
 
   const isCancelled = currentTx.status === 'CANCELLED';
 
-  const handleCancelTx = async () => {
-    setIsProcessing(true);
-    try {
-      await cancelTransaction(currentTx.id);
-      showToast('⚠️ Transaksi berhasil dibatalkan (Void)');
-      setCurrentTx({ ...currentTx, status: 'CANCELLED' });
-      setConfirmAction(null);
-      if (onUpdated) onUpdated();
-    } catch {
-      showToast('Gagal membatalkan transaksi');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const txDateFormatted = currentTx.createdAt
+    ? new Date(currentTx.createdAt).toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '-';
 
-  const handleDeleteTx = async () => {
+  const productSummary = currentTx.items.length === 1
+    ? currentTx.items[0].product.name
+    : currentTx.items.map((i) => `${i.product.name} (${i.quantity})`).join(', ');
+
+  const totalQty = currentTx.items.reduce((sum, i) => sum + i.quantity, 0);
+
+  const deleteInfoItems: DeleteInfoItem[] = [
+    { label: 'Tanggal', value: txDateFormatted },
+    { label: 'Produk', value: productSummary || '-' },
+    { label: 'Qty', value: totalQty },
+    { label: 'Total', value: formatRupiah(currentTx.grandTotal) },
+    { label: 'Metode Pembayaran', value: currentTx.paymentMethod === 'CASH' ? 'Cash' : (currentTx.paymentMethod || 'Cash') },
+  ];
+
+  const handleConfirmWithReason = async (reason: string) => {
     setIsProcessing(true);
     try {
-      await deleteTransaction(currentTx.id);
-      showToast('🗑️ Transaksi berhasil dihapus permanen');
+      let staffName = 'Kasir';
+      let staffRole = 'Kasir';
+      if (typeof window !== 'undefined') {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            staffName = parsed.name || (parsed.role === 'kasir' ? 'Yuli' : 'Owner');
+            staffRole = parsed.role === 'kasir' ? 'Kasir' : 'Owner';
+          } catch {}
+        }
+      }
+
+      const action = confirmAction;
+
+      // Log activity permanently with reason
+      await logActivity({
+        staffName,
+        role: staffRole,
+        actionType: action === 'CANCEL' ? 'VOID_TRANSACTION' : 'DELETE_TRANSACTION',
+        title: action === 'CANCEL' ? `Void Transaksi oleh ${staffName}` : `Hapus Transaksi oleh ${staffName}`,
+        details: `Alasan: "${reason}". Total: ${formatRupiah(currentTx.grandTotal)} (${currentTx.customerName || 'Pelanggan Umum'}, ${productSummary}).`,
+        metadata: {
+          transactionId: currentTx.id,
+          reason,
+          customerName: currentTx.customerName,
+          total: currentTx.grandTotal,
+          paymentMethod: currentTx.paymentMethod,
+        },
+      });
+
+      if (action === 'CANCEL') {
+        await cancelTransaction(currentTx.id);
+        showToast('⚠️ Transaksi berhasil dibatalkan (Void)');
+        setCurrentTx({ ...currentTx, status: 'CANCELLED' });
+      } else {
+        await deleteTransaction(currentTx.id);
+        showToast('🗑️ Transaksi berhasil dihapus permanen');
+        onClose();
+      }
+
       setConfirmAction(null);
-      onClose();
       if (onUpdated) onUpdated();
     } catch {
-      showToast('Gagal menghapus transaksi');
+      showToast('Gagal memproses penghapusan transaksi');
     } finally {
       setIsProcessing(false);
     }
@@ -192,106 +241,47 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 {formatRupiah(currentTx.grandTotal)}
               </div>
             </div>
-
-            {/* Confirmation Box if action triggered */}
-            {confirmAction === 'CANCEL' && (
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 animate-in fade-in duration-150">
-                <div className="flex items-start gap-2 text-xs text-amber-900">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <p>
-                    Apakah Anda yakin ingin <strong>membatalkan</strong> nota ini? Transaksi akan ditandai Void dan tidak dihitung ke laporan.
-                  </p>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction(null)}
-                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-white border border-amber-200 text-slate-700 text-xs font-bold cursor-pointer hover:bg-slate-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelTx}
-                    disabled={isProcessing}
-                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs cursor-pointer"
-                  >
-                    {isProcessing ? 'Memproses...' : 'Ya, Batalkan'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {confirmAction === 'DELETE' && (
-              <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl space-y-2 animate-in fade-in duration-150">
-                <div className="flex items-start gap-2 text-xs text-red-900">
-                  <Trash2 className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                  <p>
-                    Apakah Anda yakin ingin <strong>menghapus permanen</strong> nota ini dari database?
-                  </p>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction(null)}
-                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-white border border-red-200 text-slate-700 text-xs font-bold cursor-pointer hover:bg-slate-50"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDeleteTx}
-                    disabled={isProcessing}
-                    className="flex-1 py-1.5 px-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs cursor-pointer"
-                  >
-                    {isProcessing ? 'Menghapus...' : 'Ya, Hapus Permanen'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Action Footer */}
           <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-2">
-            {!confirmAction && (
-              <div className="grid grid-cols-3 gap-2">
-                {/* 1. Edit Button */}
+            <div className="grid grid-cols-3 gap-2">
+              {/* 1. Edit Button */}
+              <button
+                type="button"
+                onClick={() => setIsEditOpen(true)}
+                className="py-2.5 px-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Edit</span>
+              </button>
+
+              {/* 2. Void / Cancel Button */}
+              {!isCancelled ? (
                 <button
                   type="button"
-                  onClick={() => setIsEditOpen(true)}
-                  className="py-2.5 px-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                  onClick={() => setConfirmAction('CANCEL')}
+                  className="py-2.5 px-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Edit</span>
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Batalkan</span>
                 </button>
+              ) : (
+                <div className="py-2.5 px-2 rounded-2xl bg-slate-100 text-slate-400 text-xs font-bold flex items-center justify-center gap-1">
+                  <span>Sudah Void</span>
+                </div>
+              )}
 
-                {/* 2. Void / Cancel Button */}
-                {!isCancelled ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction('CANCEL')}
-                    className="py-2.5 px-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Ban className="w-3.5 h-3.5" />
-                    <span>Batalkan</span>
-                  </button>
-                ) : (
-                  <div className="py-2.5 px-2 rounded-2xl bg-slate-100 text-slate-400 text-xs font-bold flex items-center justify-center gap-1">
-                    <span>Sudah Void</span>
-                  </div>
-                )}
-
-                {/* 3. Delete Button */}
-                <button
-                  type="button"
-                  onClick={() => setConfirmAction('DELETE')}
-                  className="py-2.5 px-2 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Hapus</span>
-                </button>
-              </div>
-            )}
+              {/* 3. Delete Button */}
+              <button
+                type="button"
+                onClick={() => setConfirmAction('DELETE')}
+                className="py-2.5 px-2 rounded-2xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Hapus</span>
+              </button>
+            </div>
 
             <button
               type="button"
@@ -310,6 +300,21 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         transaction={currentTx}
         onClose={() => setIsEditOpen(false)}
         onSuccess={handleEditSuccess}
+      />
+
+      {/* Pop Up Alasan Penghapusan Transaksi (Wajib Diisi, Tanpa Tombol Silang) */}
+      <DeleteConfirmationModal
+        isOpen={Boolean(confirmAction)}
+        title={confirmAction === 'CANCEL' ? 'Batalkan Transaksi (Void)' : 'Hapus Transaksi'}
+        subtitle="Transaksi yang dihapus tidak akan muncul di riwayat transaksi aktif, tetapi akan tetap tercatat di log sistem."
+        warningTitle={confirmAction === 'CANCEL' ? 'Yakin ingin membatalkan transaksi ini?' : 'Yakin ingin menghapus transaksi ini?'}
+        warningSubtitle="Tindakan ini tidak dapat dibatalkan."
+        infoItems={deleteInfoItems}
+        reasonPlaceholder="Tulis alasan penghapusan transaksi..."
+        confirmButtonText={confirmAction === 'CANCEL' ? 'Batalkan Transaksi' : 'Hapus Transaksi'}
+        isProcessing={isProcessing}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleConfirmWithReason}
       />
     </>
   );

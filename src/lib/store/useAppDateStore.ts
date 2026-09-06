@@ -5,10 +5,13 @@ export type LaporanPeriod = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_IN
 
 interface AppDateState {
   selectedDate: string; // 'YYYY-MM-DD'
+  customStartDate: string; // 'YYYY-MM-DD'
+  customEndDate: string; // 'YYYY-MM-DD'
   period: LaporanPeriod;
   isCustomActive: boolean;
 
   setSelectedDate: (date: string) => void;
+  setDateRange: (start: string, end: string) => void;
   setPeriod: (period: LaporanPeriod) => void;
   resetToToday: () => void;
 }
@@ -23,12 +26,27 @@ export const useAppDateStore = create<AppDateState>()(
   persist(
     (set) => ({
       selectedDate: getTodayString(),
+      customStartDate: getTodayString(),
+      customEndDate: getTodayString(),
       period: 'HARI_INI',
       isCustomActive: false,
 
       setSelectedDate: (date: string) => {
         set({
           selectedDate: date,
+          customStartDate: date,
+          customEndDate: date,
+          period: 'CUSTOM',
+          isCustomActive: true,
+        });
+      },
+
+      setDateRange: (start: string, end: string) => {
+        const [s, e] = start <= end ? [start, end] : [end, start];
+        set({
+          selectedDate: s,
+          customStartDate: s,
+          customEndDate: e,
           period: 'CUSTOM',
           isCustomActive: true,
         });
@@ -42,8 +60,11 @@ export const useAppDateStore = create<AppDateState>()(
       },
 
       resetToToday: () => {
+        const today = getTodayString();
         set({
-          selectedDate: getTodayString(),
+          selectedDate: today,
+          customStartDate: today,
+          customEndDate: today,
           period: 'HARI_INI',
           isCustomActive: false,
         });

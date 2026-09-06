@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/layout/AppShell';
@@ -9,9 +9,23 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+export const viewport: Viewport = {
+  themeColor: '#eb4b2b',
+};
+
 export const metadata: Metadata = {
   title: 'KASIR GOR - Sistem Kasir Penjualan & POS Retail Olahraga',
-  description: 'Aplikasi kasir penjualan produk perlengkapan olahraga dan makanan/minuman GOR',
+  description: 'Aplikasi kasir penjualan produk perlengkapan olahraga dan arena lapangan GOR',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Kasir GOR',
+  },
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

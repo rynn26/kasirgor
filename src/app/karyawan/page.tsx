@@ -98,6 +98,29 @@ export default function ManajemenKaryawanPage() {
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('17:00');
 
+  const [isRoleChecked, setIsRoleChecked] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
+
+  // Check role first
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const session = localStorage.getItem('kasir_session');
+      if (session) {
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed.role === 'kasir') {
+            setIsOwner(false);
+          } else {
+            setIsOwner(true);
+          }
+        } catch {
+          setIsOwner(true);
+        }
+      }
+      setIsRoleChecked(true);
+    }
+  }, []);
+
   const refreshPresencesAndLogs = async () => {
     setIsRefreshingLogs(true);
     try {
@@ -114,8 +137,10 @@ export default function ManajemenKaryawanPage() {
     }
   };
 
-  // Load data on mount & set up polling/events
+  // Load data on mount & set up polling/events (only for owner)
   useEffect(() => {
+    if (!isOwner) return;
+
     loadStaff();
     loadShiftSchedules();
     loadShiftLogs();
@@ -141,7 +166,7 @@ export default function ManajemenKaryawanPage() {
         window.removeEventListener('kasir_activity_logged', onActivityLogged);
       }
     };
-  }, []);
+  }, [isOwner]);
 
   // Ensure default staff Yuli and Asfia exist in the displayed list
   const fullStaffList = useMemo(() => {
@@ -209,12 +234,21 @@ export default function ManajemenKaryawanPage() {
 
       let matchAction = true;
       if (logActionFilter !== 'SEMUA') {
-        if (logActionFilter === 'EDIT') {
-          matchAction = log.actionType === 'EDIT_BOOKING' || log.actionType === 'MANUAL_EDIT';
+        if (logActionFilter === 'HAPUS') {
+          matchAction =
+            log.actionType === 'DELETE_BOOKING' ||
+            log.actionType === 'DELETE_TRANSACTION' ||
+            log.actionType === 'CANCEL_BOOKING' ||
+            log.actionType === 'DELETE_PRODUCT' ||
+            log.actionType === 'CANCEL_TRANSACTION';
+        } else if (logActionFilter === 'EDIT') {
+          matchAction = log.actionType === 'EDIT_BOOKING' || log.actionType === 'MANUAL_EDIT' || log.actionType === 'EDIT_PRODUCT';
         } else if (logActionFilter === 'SHIFT') {
           matchAction = log.actionType === 'SHIFT_START' || log.actionType === 'SHIFT_END' || log.actionType === 'SHIFT_HANDOVER';
         } else if (logActionFilter === 'BOOKING') {
-          matchAction = log.actionType === 'CREATE_BOOKING' || log.actionType === 'SETTLE_BOOKING' || log.actionType === 'CANCEL_BOOKING';
+          matchAction = log.actionType === 'CREATE_BOOKING' || log.actionType === 'SETTLE_BOOKING' || log.actionType === 'CANCEL_BOOKING' || log.actionType === 'DELETE_BOOKING';
+        } else if (logActionFilter === 'TRANSAKSI') {
+          matchAction = log.actionType === 'CREATE_TRANSACTION' || log.actionType === 'DELETE_TRANSACTION' || log.actionType === 'CANCEL_TRANSACTION';
         } else if (logActionFilter === 'LOGIN') {
           matchAction = log.actionType === 'LOGIN' || log.actionType === 'LOGOUT';
         }
@@ -320,7 +354,14 @@ export default function ManajemenKaryawanPage() {
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-200">BOOKING BARU</span>;
       case 'CANCEL_BOOKING':
       case 'VOID_TRANSACTION':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-50 text-red-700 border border-red-200">BATAL / VOID</span>;
+      case 'CANCEL_TRANSACTION':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">BATAL / VOID</span>;
+      case 'DELETE_BOOKING':
+      case 'DELETE_TRANSACTION':
+      case 'DELETE_PRODUCT':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">HAPUS DATA</span>;
+      case 'CREATE_TRANSACTION':
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-50 text-teal-700 border border-teal-200">KASIR TOKO</span>;
       case 'LOGIN':
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200">LOGIN</span>;
       case 'LOGOUT':
@@ -329,6 +370,27 @@ export default function ManajemenKaryawanPage() {
         return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-700">AKTIVITAS</span>;
     }
   };
+
+  if (isRoleChecked && !isOwner) {
+    return (
+      <div className="min-h-[75vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-3xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center mb-4 shadow-sm">
+          <Shield className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900 mb-2">Akses Khusus Pemilik (Owner)</h2>
+        <p className="text-sm text-slate-500 max-w-md mb-6 leading-relaxed">
+          Fitur Monitoring Kasir & Audit Log hanya diperuntukkan bagi akun Owner untuk pengawasan operasional dan keamanan data.
+        </p>
+        <Link
+          href="/kasir"
+          className="px-6 py-2.5 rounded-xl bg-[#eb4b2b] text-white font-bold text-sm shadow-md hover:bg-[#d43f22] transition-colors inline-flex items-center gap-2"
+        >
+          <Store className="w-4 h-4" />
+          <span>Kembali ke Halaman Kasir</span>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-5 pb-28">
@@ -824,9 +886,11 @@ export default function ManajemenKaryawanPage() {
                 <span className="text-[10px] text-slate-400 font-bold px-1">Aksi:</span>
                 {[
                   { id: 'SEMUA', label: 'Semua' },
+                  { id: 'HAPUS', label: 'Hapus / Batal' },
+                  { id: 'BOOKING', label: 'Booking' },
+                  { id: 'TRANSAKSI', label: 'Toko' },
                   { id: 'EDIT', label: 'Edit' },
                   { id: 'SHIFT', label: 'Shift' },
-                  { id: 'BOOKING', label: 'Booking' },
                   { id: 'LOGIN', label: 'Login' },
                 ].map((act) => (
                   <button
