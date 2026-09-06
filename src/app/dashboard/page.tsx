@@ -90,7 +90,7 @@ export default function DashboardUnifiedPage() {
     }
   };
 
-  const handleTestPushNotification = async (type: 'booking' | 'pelunasan' | 'void' | 'general' = 'booking') => {
+  const handleTestPushNotification = async (type: 'booking' | 'pelunasan' | 'void' | 'stok' | 'general' = 'booking') => {
     // If not granted yet, automatically request permission first!
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
       const granted = await requestNotificationPermission();
@@ -118,6 +118,12 @@ export default function DashboardUnifiedPage() {
         title: '🚨 Pembatalan Transaksi Kasir (VOID)',
         body: 'Kasir Yuli membatalkan Transaksi #TX-1049 (Rp 150.000). Alasan: "Customer salah pesan raket".',
         url: '/laporan',
+      };
+    } else if (type === 'stok') {
+      payload = {
+        title: '⚠️ Peringatan: Stok Menipis!',
+        body: 'Stok produk "Shuttlecock Yonex Aerosensa" tersisa 3 slop (Batas aman: 15). Segera lakukan restock!',
+        url: '/produk',
       };
     }
 
@@ -856,7 +862,7 @@ export default function DashboardUnifiedPage() {
               Klik salah satu tombol di bawah untuk memunculkan notifikasi pop-up di layar HP/komputer Anda:
             </p>
 
-            <div className="grid grid-cols-3 gap-2 pt-0.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
               <button
                 type="button"
                 onClick={() => handleTestPushNotification('booking')}
@@ -882,6 +888,15 @@ export default function DashboardUnifiedPage() {
               >
                 <span>🚨</span>
                 <span className="truncate">Tes Void Kasir</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTestPushNotification('stok')}
+                className="py-2 px-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span>⚠️</span>
+                <span className="truncate">Tes Stok Menipis</span>
               </button>
             </div>
           </div>

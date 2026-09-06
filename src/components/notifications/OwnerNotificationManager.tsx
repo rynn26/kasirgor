@@ -11,6 +11,8 @@ import {
   OwnerNotificationPayload,
 } from '@/lib/notifications/webPush';
 
+import { supabase } from '@/lib/supabase/client';
+
 export const OwnerNotificationManager: React.FC = () => {
   const [isOwner, setIsOwner] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>('default');
@@ -41,7 +43,7 @@ export const OwnerNotificationManager: React.FC = () => {
       }
     }
 
-    // BroadcastChannel listener for notifications dispatched across tabs
+    // 1. BroadcastChannel listener for notifications dispatched across tabs
     let channel: BroadcastChannel | null = null;
     try {
       if ('BroadcastChannel' in window) {
@@ -54,7 +56,7 @@ export const OwnerNotificationManager: React.FC = () => {
       }
     } catch {}
 
-    // Storage event listener fallback
+    // 2. Storage event listener fallback
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'kasir_last_owner_notification' && e.newValue) {
         try {
@@ -67,8 +69,93 @@ export const OwnerNotificationManager: React.FC = () => {
     };
     window.addEventListener('storage', handleStorage);
 
+    // 3. Supabase Realtime listener for cross-device real-time alerts
+    let realtimeChannel: any = null;
+    try {
+      realtimeChannel = supabase
+        .channel('owner_realtime_alerts')
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'products' },
+          (payload) => {
+            if (!isUserOwner()) return;
+            const newRow = payload.new as any;
+            const oldRow = payload.old as any;
+            if (!newRow) return;
+
+            // Only trigger if stock is reduced or changed
+            if (oldRow && oldRow.stock !== undefined && newRow.stock >= oldRow.stock) {
+              return;
+            }
+
+            const currentStock = Number(newRow.stock || 0);
+            const minStock = Number(newRow.minimum_stock || 15);
+
+            if (currentStock === 0) {
+              sendWebPushNotificationToOwner({
+                title: '🚨 Peringatan: Stok Habis!',
+                body: `Stok produk "${newRow.name}" telah HABIS (0 ${newRow.unit || 'pcs'}). Segera lakukan restock!`,
+                url: '/produk',
+                tag: `stock-empty-${newRow.id}`,
+              });
+            } else if (currentStock <= minStock) {
+              sendWebPushNotificationToOwner({
+                title: '⚠️ Peringatan: Stok Menipis!',
+                body: `Stok produk "${newRow.name}" tersisa ${currentStock} ${newRow.unit || 'pcs'} (Batas minimum: ${minStock}). Segera lakukan pemesanan ulang.`,
+                url: '/produk',
+                tag: `stock-low-${newRow.id}`,
+              });
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'activity_logs' },
+          (payload) => {
+            if (!isUserOwner()) return;
+            const log = payload.new as any;
+            if (!log) return;
+
+            const actionType = log.action_type || '';
+            if (
+              actionType === 'DELETE_BOOKING' ||
+              actionType === 'CANCEL_BOOKING' ||
+              actionType === 'DELETE_TRANSACTION' ||
+              actionType === 'VOID_TRANSACTION' ||
+              actionType === 'CREATE_BOOKING' ||
+              actionType === 'SETTLE_BOOKING' ||
+              actionType === 'CREATE_TRANSACTION'
+            ) {
+              let title = '📢 Notifikasi Kasir GOR';
+              if (
+                actionType.includes('DELETE') ||
+                actionType.includes('VOID') ||
+                actionType.includes('CANCEL')
+              ) {
+                title = '🚨 ' + (log.title || 'Pembatalan Kasir (VOID)');
+              } else if (actionType === 'CREATE_BOOKING') {
+                title = '🏸 Booking Lapangan Baru';
+              } else if (actionType === 'SETTLE_BOOKING') {
+                title = '💰 Pelunasan Sewa Lapangan';
+              } else if (actionType === 'CREATE_TRANSACTION') {
+                title = '🛒 Penjualan Toko Baru Selesai';
+              }
+
+              sendWebPushNotificationToOwner({
+                title,
+                body: log.details || '',
+                tag: log.id || 'act-' + Date.now(),
+                url: actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+              });
+            }
+          }
+        )
+        .subscribe();
+    } catch {}
+
     return () => {
       if (channel) channel.close();
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
       window.removeEventListener('storage', handleStorage);
     };
   }, []);
