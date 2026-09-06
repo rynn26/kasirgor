@@ -159,6 +159,25 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
     }
   };
 
+  const handleChangeMonth = (targetYear: number, targetMonthIndex: number) => {
+    const cur = new Date(targetYear, targetMonthIndex, 1);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    let firstDate = '';
+    while (cur.getMonth() === targetMonthIndex) {
+      if (cur.getDay() === selectedMemberDayIndex) {
+        firstDate = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+        break;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    if (!firstDate) {
+      firstDate = `${targetYear}-${pad(targetMonthIndex + 1)}-01`;
+    }
+    setDate(firstDate);
+    const schedule = getMemberDatesInMonth(firstDate, selectedMemberDayIndex);
+    setNotes(`Paket Member ${schedule.monthName} ${schedule.year}: ${schedule.sessionCount}x Pertemuan (Setiap ${schedule.dayName}: ${schedule.formattedDatesList})`);
+  };
+
   if (!isOpen || !booking) return null;
 
   const maxCourts = selectedSport === 'Pickleball' ? 2 : 4;
@@ -454,6 +473,58 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                       })}
                     </div>
 
+                    {/* Pemilih Bulan Paket Member */}
+                    <div className="space-y-1.5 pt-1 border-t border-blue-200/60">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-blue-900">
+                          Bulan Paket Main:
+                        </label>
+                        <span className="text-[10px] font-bold text-blue-800 bg-white px-2 py-0.5 rounded-md border border-blue-200">
+                          {memberSchedule.monthName} {memberSchedule.year}
+                        </span>
+                      </div>
+
+                      {/* Tombol Pilihan Bulan */}
+                      <div className="grid grid-cols-4 gap-1">
+                        {[
+                          { y: 2026, m: 6, label: 'Juli' },
+                          { y: 2026, m: 7, label: 'Agustus' },
+                          { y: 2026, m: 8, label: 'September' },
+                          { y: 2026, m: 9, label: 'Oktober' },
+                        ].map((b) => {
+                          const isCurrent = memberSchedule.monthIndex === b.m && memberSchedule.year === b.y;
+                          return (
+                            <button
+                              key={`${b.y}-${b.m}`}
+                              type="button"
+                              onClick={() => handleChangeMonth(b.y, b.m)}
+                              className={`py-1 text-center text-[10px] font-bold rounded-lg transition-all cursor-pointer border ${
+                                isCurrent
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs scale-102'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-100/50'
+                              }`}
+                            >
+                              {b.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Tombol Pintas jika Jadwal masih di bulan Juli padahal Pelunasan di bulan September */}
+                      {settlementPaidDate && new Date(settlementPaidDate).getMonth() !== memberSchedule.monthIndex && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(settlementPaidDate);
+                            handleChangeMonth(d.getFullYear(), d.getMonth());
+                          }}
+                          className="w-full mt-1 py-1.5 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-[10px] font-bold border border-amber-300 flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs text-center"
+                        >
+                          <span>⚡ Jadwal masih {memberSchedule.monthName}! Klik untuk sinkron ke bulan September 2026</span>
+                        </button>
+                      )}
+                    </div>
+
                     {/* Ringkasan Otomatis Jadwal Pertemuan */}
                     <div className="bg-white/90 p-2.5 rounded-xl border border-blue-100 text-[10px] text-blue-950 space-y-1">
                       <div className="font-bold text-blue-900 flex items-center justify-between">
@@ -705,13 +776,27 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="font-bold text-slate-800">Catatan Tambahan (Opsional)</label>
               {memberType === 'MEMBER' && (
-                <button
-                  type="button"
-                  onClick={() => setNotes(`Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})`)}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer flex items-center gap-1"
-                >
-                  <span>🔄 Sinkronkan ke Jadwal {memberSchedule.monthName} {memberSchedule.year}</span>
-                </button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {settlementPaidDate && new Date(settlementPaidDate).getMonth() !== memberSchedule.monthIndex && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(settlementPaidDate);
+                        handleChangeMonth(d.getFullYear(), d.getMonth());
+                      }}
+                      className="text-[10px] text-amber-800 hover:text-amber-950 font-bold hover:underline cursor-pointer flex items-center gap-1 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300"
+                    >
+                      <span>⚡ Ubah ke September (Pelunasan)</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setNotes(`Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})`)}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <span>🔄 Sinkronkan ke Jadwal {memberSchedule.monthName}</span>
+                  </button>
+                </div>
               )}
             </div>
             <input
