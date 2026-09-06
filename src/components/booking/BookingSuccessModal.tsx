@@ -116,19 +116,28 @@ export const BookingSuccessModal: React.FC<BookingSuccessModalProps> = ({
               <span className="font-black text-slate-900">{formatRupiah(booking.totalAmount)}</span>
             </div>
 
-            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
-              <span className="text-slate-500 font-medium">DP</span>
-              <span className="font-bold text-slate-900">{formatRupiah(booking.dpAmount)}</span>
-            </div>
+            {isLunas && (!booking.settlementAmount || booking.settlementAmount === 0 || booking.dpAmount >= booking.totalAmount) ? (
+              <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+                <span className="text-slate-500 font-medium">Bayar Lunas</span>
+                <span className="font-bold text-emerald-700">{formatRupiah(booking.totalAmount)}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+                  <span className="text-slate-500 font-medium">DP Terbayar</span>
+                  <span className="font-bold text-slate-900">{formatRupiah(booking.dpAmount)}</span>
+                </div>
 
-            <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
-              <span className="text-slate-500 font-medium">
-                {isLunas ? 'Pelunasan' : 'Sisa Pelunasan'}
-              </span>
-              <span className={`font-black ${isLunas ? 'text-slate-900' : 'text-amber-600'}`}>
-                {isLunas ? formatRupiah(booking.settlementAmount || (booking.totalAmount - booking.dpAmount)) : formatRupiah(booking.remainingBalance)}
-              </span>
-            </div>
+                <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
+                  <span className="text-slate-500 font-medium">
+                    {isLunas ? 'Pelunasan' : 'Sisa Pelunasan'}
+                  </span>
+                  <span className={`font-black ${isLunas ? 'text-slate-900' : 'text-amber-600'}`}>
+                    {isLunas ? formatRupiah(booking.settlementAmount || (booking.totalAmount - booking.dpAmount)) : formatRupiah(booking.remainingBalance)}
+                  </span>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-between items-center py-0.5 border-b border-slate-200/50">
               <span className="text-slate-500 font-medium">Status</span>

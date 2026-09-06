@@ -509,14 +509,14 @@ export function printCourtBookingsPDF(
   activeBookings.forEach((b) => {
     const items = getBookingPaymentItemsInPeriod(b, sDate, eDate);
     items.forEach((it) => {
-      if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
+      if (it.type === 'DP') {
         dpCount += 1;
         if (it.method === 'CASH') {
           dpCash += it.amount;
         } else {
           dpQris += it.amount;
         }
-      } else if (it.type === 'PELUNASAN') {
+      } else if (it.type === 'PELUNASAN' || it.type === 'LUNAS_LANGSUNG') {
         settleCount += 1;
         if (it.method === 'CASH') {
           settleCash += it.amount;
@@ -564,10 +564,10 @@ export function printCourtBookingsPDF(
           dateBookings.forEach((b) => {
             const items = getBookingPaymentItemsInPeriod(b, sDate, eDate);
             items.forEach((it) => {
-              if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
+              if (it.type === 'DP') {
                 if (it.method === 'CASH') dateDpCash += it.amount;
                 else dateDpQris += it.amount;
-              } else if (it.type === 'PELUNASAN') {
+              } else if (it.type === 'PELUNASAN' || it.type === 'LUNAS_LANGSUNG') {
                 if (it.method === 'CASH') dateSettleCash += it.amount;
                 else dateSettleQris += it.amount;
               }
@@ -627,7 +627,7 @@ export function printCourtBookingsPDF(
                           ? 'background: #fef3c7; color: #92400e; border: 1px solid #fde68a;'
                           : 'background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0;'
                       }">
-                        ${it.type === 'PELUNASAN' ? 'Pelunasan' : 'DP'}: ${it.method === 'CASH' ? 'Cash' : 'QRIS'} Rp ${it.amount.toLocaleString('id-ID')}
+                        ${it.type === 'DP' ? 'DP' : 'Pelunasan'}: ${it.method === 'CASH' ? 'Cash' : 'QRIS'} Rp ${it.amount.toLocaleString('id-ID')}
                       </span>
                     `).join('')}
                   </div>
@@ -899,13 +899,13 @@ export function printCombinedReportPDF(
       activeBookings.forEach((b) => {
         const items = getBookingPaymentItemsInPeriod(b, dStr, dStr);
         items.forEach((it) => {
-          if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
+          if (it.type === 'DP') {
             if (it.method === 'CASH') {
               dpCash += it.amount;
             } else {
               dpQris += it.amount;
             }
-          } else if (it.type === 'PELUNASAN') {
+          } else if (it.type === 'PELUNASAN' || it.type === 'LUNAS_LANGSUNG') {
             if (it.method === 'CASH') {
               lapCash += it.amount;
             } else {
@@ -1238,10 +1238,10 @@ export function exportCombinedReportToExcel(
     activeBookings.forEach((b) => {
       const items = getBookingPaymentItemsInPeriod(b, dStr, dStr);
       items.forEach((it) => {
-        if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
+        if (it.type === 'DP') {
           if (it.method === 'CASH') dpCash += it.amount;
           else dpQris += it.amount;
-        } else if (it.type === 'PELUNASAN') {
+        } else if (it.type === 'PELUNASAN' || it.type === 'LUNAS_LANGSUNG') {
           if (it.method === 'CASH') lapCash += it.amount;
           else lapQris += it.amount;
         }

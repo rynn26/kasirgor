@@ -98,14 +98,14 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       if (b.status === 'CANCELLED') return;
       const items = getBookingPaymentItemsInPeriod(b, effectiveStart, effectiveEnd);
       items.forEach((it) => {
-        if (it.type === 'DP' || it.type === 'LUNAS_LANGSUNG') {
+        if (it.type === 'DP') {
           dpCount += 1;
           if (it.method === 'CASH') {
             dpCash += it.amount;
           } else {
             dpQris += it.amount;
           }
-        } else if (it.type === 'PELUNASAN') {
+        } else if (it.type === 'PELUNASAN' || it.type === 'LUNAS_LANGSUNG') {
           settleCount += 1;
           if (it.method === 'CASH') {
             settleCash += it.amount;
@@ -233,7 +233,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 - QRIS: ${formatRupiah(revenueSummary.lapanganQris)}
 👉 Subtotal Lapangan: ${formatRupiah(revenueSummary.lapanganTotal)} (${revenueSummary.lapanganTxCount} transaksi)
   • DP Masuk: ${formatRupiah(revenueSummary.dpTotal)} (${revenueSummary.dpCount} tim) [Cash: ${formatRupiah(revenueSummary.dpCash)} | QRIS: ${formatRupiah(revenueSummary.dpQris)}]
-  • Pelunasan: ${formatRupiah(revenueSummary.settleTotal)} (${revenueSummary.settleCount} tim) [Cash: ${formatRupiah(revenueSummary.settleCash)} | QRIS: ${formatRupiah(revenueSummary.settleQris)}]
+  • Pelunasan / Lapangan: ${formatRupiah(revenueSummary.settleTotal)} (${revenueSummary.settleCount} tim) [Cash: ${formatRupiah(revenueSummary.settleCash)} | QRIS: ${formatRupiah(revenueSummary.settleQris)}]
 
 ━━━━━━━━━━━━━━━━━━━━
 💰 *TOTAL PER METODE PEMBAYARAN:*
@@ -511,7 +511,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                    <span className="text-slate-600">Pelunasan:</span>
+                    <span className="text-slate-600">Pelunasan / Lapangan:</span>
                     <strong className="text-slate-900 font-bold">{formatRupiah(revenueSummary.settleTotal)}</strong>
                     <span className="text-[10px] text-slate-400">({revenueSummary.settleCount} tim)</span>
                   </div>

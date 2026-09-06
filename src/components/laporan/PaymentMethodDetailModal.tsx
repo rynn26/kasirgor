@@ -269,9 +269,9 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                       <div className="flex items-center gap-1.5 line-clamp-1 flex-wrap">
                         <CalendarCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{b.courtName} • {b.bookingDate && b.bookingDate !== b.date ? `Booking ${b.bookingDate} · ` : ''}Main {b.date} ({b.startTime}-{b.endTime})</span>
-                        {item.paymentType === 'PELUNASAN' && (
+                        {(item.paymentType === 'PELUNASAN' || item.paymentType === 'LUNAS_LANGSUNG') && (
                           <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                            Tgl Pelunasan: {b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}
+                            {item.paymentType === 'LUNAS_LANGSUNG' ? 'Tgl Bayar:' : 'Tgl Pelunasan:'} {b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}
                           </span>
                         )}
                         {item.paymentType === 'DP' && (

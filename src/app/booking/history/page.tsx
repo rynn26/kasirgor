@@ -123,7 +123,7 @@ export default function HistoryBookingPage() {
 
   // Jumlah transaksi DP
   const pendingDpCount = isDateActive
-    ? activeBookings.filter((b) => getTxDate(b) === selectedDate && (b.dpAmount || 0) > 0).length
+    ? activeBookings.filter((b) => getTxDate(b) === selectedDate && (b.dpAmount || 0) > 0 && b.status !== 'SETTLED' && b.remainingBalance > 0).length
     : activeBookings.filter((b) => b.status === 'DP_PAID' && b.remainingBalance > 0).length;
 
   const totalPiutang = activeBookings.reduce((sum, b) => sum + b.remainingBalance, 0);
@@ -162,7 +162,8 @@ export default function HistoryBookingPage() {
         } else if (statusFilter === 'DP_PAID') {
           if (isDateActive) {
             const txDate = getTxDate(bkg);
-            if (txDate !== selectedDate || (bkg.dpAmount || 0) <= 0) return false;
+            const isPendingDp = bkg.status !== 'SETTLED' && bkg.remainingBalance > 0 && (bkg.dpAmount || 0) > 0;
+            if (txDate !== selectedDate || !isPendingDp) return false;
           } else {
             if (bkg.status !== 'DP_PAID' || bkg.remainingBalance === 0) return false;
           }
@@ -589,13 +590,13 @@ export default function HistoryBookingPage() {
                         const txDate = getTxDate(bkg);
                         const settleDate = getSettleDate(bkg);
                         const isSettleToday = settleDate === selectedDate && isLunas;
-                        const isDpToday = txDate === selectedDate && (bkg.dpAmount || 0) > 0;
+                        const isDpToday = txDate === selectedDate && (bkg.dpAmount || 0) > 0 && !isLunas;
 
-                        if (isSettleToday && settleDate !== txDate) {
+                        if (isLunas) {
                           return (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>Pelunasan</span>
+                              <span>{settleDate !== txDate ? 'Pelunasan' : 'Lunas'}</span>
                             </span>
                           );
                         }
@@ -603,14 +604,6 @@ export default function HistoryBookingPage() {
                           return (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 flex items-center gap-1">
                               <span>DP</span>
-                            </span>
-                          );
-                        }
-                        if (isLunas) {
-                          return (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>Lunas</span>
                             </span>
                           );
                         }

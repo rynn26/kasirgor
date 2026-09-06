@@ -459,10 +459,10 @@ export default function BookingLapanganPage() {
                         </div>
                         <div className="text-right">
                           <span className="text-[10px] text-slate-400 block font-medium">
-                            {isDP ? 'Sisa Pelunasan' : 'DP Masuk'}
+                            {isDP ? 'Sisa Pelunasan' : 'Status Pembayaran'}
                           </span>
                           <span className={`font-black ${isDP ? 'text-amber-600' : 'text-emerald-700'}`}>
-                            {isDP ? formatRupiah(bkg.remainingBalance) : formatRupiah(bkg.dpAmount)}
+                            {isDP ? formatRupiah(bkg.remainingBalance) : 'LUNAS (100%)'}
                           </span>
                         </div>
                       </div>
