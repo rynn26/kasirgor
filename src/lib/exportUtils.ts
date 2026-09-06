@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { CourtBooking } from '@/types/booking';
 import { useProductStore } from '@/lib/store/useProductStore';
-import { getBookingAmountInPeriod, getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
+import { getBookingAmountInPeriod, getBookingPaymentItemsInPeriod, getBookingSettleDate } from '@/lib/bookingUtils';
 
 export interface KantinSalesItemRow {
   no: number;
@@ -376,9 +376,7 @@ export function exportCourtBookingsToExcel(
       const isLunas = b.status === 'SETTLED' || b.remainingBalance === 0;
       const statusLabel = isLunas ? 'LUNAS' : b.status === 'DP_PAID' ? 'DP' : b.status;
       const paymentMethod = b.settlementPaymentMethod || b.dpPaymentMethod || '-';
-      const tglPelunasan = isLunas
-        ? (b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date))
-        : '-';
+      const tglPelunasan = isLunas ? getBookingSettleDate(b) : '-';
 
       const paidInPeriod = (startDate && endDate)
         ? getBookingAmountInPeriod(b, startDate, endDate)
@@ -636,7 +634,7 @@ export function printCourtBookingsPDF(
               </td>
               <td style="border: 1px solid #cbd5e1; padding: 5px 6px; text-align: center;">
                 <span style="font-weight: 700; font-size: 9.5px; color: ${isLunas ? '#059669' : '#d97706'};">
-                  ${isLunas ? `✓ LUNAS<br><span style="font-size: 8px; font-weight: 600; color: #065f46;">Pelunasan: ${b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}</span>` : `DP (Sisa Rp ${b.remainingBalance.toLocaleString('id-ID')})`}
+                  ${isLunas ? `✓ LUNAS<br><span style="font-size: 8px; font-weight: 600; color: #065f46;">Pelunasan: ${getBookingSettleDate(b)}</span>` : `DP (Sisa Rp ${b.remainingBalance.toLocaleString('id-ID')})`}
                 </span>
               </td>
             </tr>

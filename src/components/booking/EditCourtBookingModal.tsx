@@ -7,6 +7,7 @@ import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { DAY_NAMES, getMemberDatesInMonth } from '@/lib/memberUtils';
+import { getBookingTxDate, getBookingSettleDate } from '@/lib/bookingUtils';
 import {
   X,
   User,
@@ -98,7 +99,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       }
       setSelectedMemberDayIndex(initialDayIdx);
 
-      setBookingDate(booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : booking.date));
+      setBookingDate(getBookingTxDate(booking));
       setDate(booking.date || '');
       setStartTime(booking.startTime || '19:00');
       setEndTime(booking.endTime || '21:00');
@@ -106,9 +107,9 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       setDpAmount(booking.dpAmount || 0);
       setDpPaymentMethod(booking.dpPaymentMethod || 'QRIS');
       setSettlementPaymentMethod(booking.settlementPaymentMethod || 'QRIS');
-      const initSettle = booking.settlementPaidAt
-        ? booking.settlementPaidAt.split('T')[0]
-        : (booking.status === 'SETTLED' ? (booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : booking.date)) : new Date().toISOString().split('T')[0]);
+      const initSettle = booking.status === 'SETTLED'
+        ? getBookingSettleDate(booking)
+        : (booking.settlementPaidAt ? getBookingSettleDate(booking) : getBookingTxDate(booking));
       setSettlementPaidDate(initSettle);
       setStatus(booking.status);
       setNotes(booking.notes || '');
@@ -267,7 +268,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         memberDates: isMember ? memberSchedule.dates : undefined,
         bookingDate,
         date,
-        dpPaidAt: bookingDate ? `${bookingDate}T12:00:00.000Z` : booking.dpPaidAt,
+        dpPaidAt: bookingDate ? `${bookingDate}T12:00:00+07:00` : booking.dpPaidAt,
         courtId: selectedCourtIds[0] || booking.courtId || courts[0]?.id || '',
         courtName: selectedCourtsNames,
         courtPricePerHour: baseRatePerHour,
@@ -280,7 +281,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         dpPaymentMethod: dpPaymentMethod,
         settlementAmount: status === 'SETTLED' ? (dpAmount < totalSewa ? totalSewa - dpAmount : totalSewa) : undefined,
         settlementPaymentMethod: status === 'SETTLED' ? settlementPaymentMethod : undefined,
-        settlementPaidAt: status === 'SETTLED' ? `${settlementPaidDate}T12:00:00.000Z` : undefined,
+        settlementPaidAt: status === 'SETTLED' ? `${settlementPaidDate}T12:00:00+07:00` : undefined,
         amountPaidTotal: finalAmountPaid,
         remainingBalance: finalRemaining,
         status: status,

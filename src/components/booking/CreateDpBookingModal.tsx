@@ -232,7 +232,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       hour12: false,
     }).format(new Date()).replace(/\./g, ':');
     const settleTimeIso = bookingDate
-      ? new Date(`${bookingDate}T${timeStr}+07:00`).toISOString()
+      ? `${bookingDate}T12:00:00+07:00`
       : new Date().toISOString();
 
     const newBooking = await addBooking({

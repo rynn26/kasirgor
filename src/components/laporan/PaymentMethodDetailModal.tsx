@@ -19,7 +19,7 @@ import {
 import { CourtBooking } from '@/types/booking';
 import { Transaction } from '@/types/pos';
 import { formatRupiah, formatDate } from '@/lib/utils';
-import { getBookingPaymentItemsInPeriod } from '@/lib/bookingUtils';
+import { getBookingPaymentItemsInPeriod, getBookingTxDate, getBookingSettleDate } from '@/lib/bookingUtils';
 
 interface PaymentMethodDetailModalProps {
   isOpen: boolean;
@@ -63,6 +63,7 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
         booking: CourtBooking;
         paidAmount: number;
         paymentType: 'DP' | 'PELUNASAN' | 'LUNAS_LANGSUNG';
+        paymentDate: string;
       }> = [];
 
       filteredBookings.forEach((b) => {
@@ -78,6 +79,7 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
               booking: b,
               paidAmount: it.amount,
               paymentType: it.type,
+              paymentDate: it.date,
             });
           }
         });
@@ -105,6 +107,7 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
         booking: CourtBooking;
         paidAmount: number;
         paymentType: 'DP' | 'PELUNASAN' | 'LUNAS_LANGSUNG';
+        paymentDate: string;
       }>).filter((item) => {
         const b = item.booking;
         return (
@@ -233,6 +236,7 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                 booking: CourtBooking;
                 paidAmount: number;
                 paymentType: 'DP' | 'PELUNASAN' | 'LUNAS_LANGSUNG';
+                paymentDate?: string;
                 dateNote?: string;
               }>).map((item, idx) => {
                 const b = item.booking;
@@ -271,12 +275,12 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                         <span>{b.courtName} • {b.bookingDate && b.bookingDate !== b.date ? `Booking ${b.bookingDate} · ` : ''}Main {b.date} ({b.startTime}-{b.endTime})</span>
                         {(item.paymentType === 'PELUNASAN' || item.paymentType === 'LUNAS_LANGSUNG') && (
                           <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                            {item.paymentType === 'LUNAS_LANGSUNG' ? 'Tgl Bayar:' : 'Tgl Pelunasan:'} {b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}
+                            {item.paymentType === 'LUNAS_LANGSUNG' ? 'Tgl Bayar:' : 'Tgl Pelunasan:'} {item.paymentDate || getBookingSettleDate(b)}
                           </span>
                         )}
                         {item.paymentType === 'DP' && (
                           <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                            Tgl DP: {b.bookingDate || (b.dpPaidAt ? b.dpPaidAt.split('T')[0] : b.date)}
+                            Tgl DP: {item.paymentDate || getBookingTxDate(b)}
                           </span>
                         )}
                       </div>

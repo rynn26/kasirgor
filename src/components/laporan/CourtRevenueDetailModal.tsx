@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { CourtBooking } from '@/types/booking';
 import { formatRupiah, formatDate } from '@/lib/utils';
-import { getBookingAmountInPeriod } from '@/lib/bookingUtils';
+import { getBookingAmountInPeriod, getBookingSettleDate } from '@/lib/bookingUtils';
 
 interface CourtRevenueDetailModalProps {
   isOpen: boolean;
@@ -275,7 +275,7 @@ export const CourtRevenueDetailModal: React.FC<CourtRevenueDetailModalProps> = (
                         <>
                           <span className="text-slate-300">•</span>
                           <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                            Lunas: {b.settlementPaidAt ? b.settlementPaidAt.split('T')[0] : (b.bookingDate || b.date)}
+                            Lunas: {getBookingSettleDate(b)}
                           </span>
                         </>
                       )}
