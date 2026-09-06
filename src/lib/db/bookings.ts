@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase/client';
 import { CourtBooking, BookingStatus, AdditionalItem } from '@/types/booking';
 import { PaymentMethod } from '@/types/pos';
 import { Court } from '@/types/booking';
+import { toJakartaDateString } from '@/lib/bookingUtils';
 
 export interface DbCourt {
   id: string;
@@ -105,7 +106,7 @@ function mapDbToBooking(
             }
           })()
         : undefined),
-    bookingDate: row.booking_date || (row.dp_paid_at ? row.dp_paid_at.split('T')[0] : (row.created_at ? row.created_at.split('T')[0] : row.date)),
+    bookingDate: row.booking_date || (row.dp_paid_at ? toJakartaDateString(row.dp_paid_at) : (row.created_at ? toJakartaDateString(row.created_at) : row.date)),
     date: row.date,
     courtId: row.court_id || '',
     courtName: row.court_name,
@@ -262,7 +263,7 @@ export async function createBooking(
       member_day: booking.memberDay || null,
       member_sessions_count: booking.memberSessionsCount || 1,
       member_dates: booking.memberDates || null,
-      booking_date: booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+      booking_date: booking.bookingDate || (booking.dpPaidAt ? toJakartaDateString(booking.dpPaidAt) : toJakartaDateString(new Date())),
       date: booking.date,
       court_id: booking.courtId || null,
       court_name: booking.courtName,
@@ -275,13 +276,13 @@ export async function createBooking(
       total_amount: booking.totalAmount,
       dp_amount: booking.dpAmount,
       dp_payment_method: booking.dpPaymentMethod || null,
-      dp_paid_at: booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : null),
+      dp_paid_at: booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T12:00:00.000Z` : null),
       dp_cashier: booking.dpCashier || null,
       amount_paid_total: booking.amountPaidTotal,
       remaining_balance: booking.remainingBalance,
       settlement_amount: booking.settlementAmount || (booking.status === 'SETTLED' ? booking.totalAmount : null),
       settlement_payment_method: booking.settlementPaymentMethod || booking.dpPaymentMethod || null,
-      settlement_paid_at: booking.settlementPaidAt || (booking.status === 'SETTLED' ? (booking.dpPaidAt || new Date().toISOString()) : null),
+      settlement_paid_at: booking.settlementPaidAt || (booking.status === 'SETTLED' ? (booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T12:00:00.000Z` : new Date().toISOString())) : null),
       settlement_cashier: booking.settlementCashier || booking.dpCashier || null,
       status: booking.status,
       notes: booking.notes || null,

@@ -45,6 +45,15 @@ export function getBookingTxDate(b: CourtBooking): string {
  * Jika belum dilunasi, fallback ke tanggal DP.
  */
 export function getBookingSettleDate(b: CourtBooking): string {
+  // Jika transaksi sewa langsung lunas tanpa pelunasan terpisah, tanggal pelunasan adalah tanggal transaksi
+  const isDirectLunas = b.status === 'SETTLED' && (
+    (b.dpAmount || 0) >= (b.totalAmount || 0) ||
+    !b.settlementAmount ||
+    b.settlementAmount === 0
+  );
+  if (isDirectLunas) {
+    return getBookingTxDate(b);
+  }
   if (b.settlementPaidAt) return toJakartaDateString(b.settlementPaidAt);
   return getBookingTxDate(b);
 }

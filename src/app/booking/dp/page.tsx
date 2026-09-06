@@ -235,9 +235,15 @@ export default function InputDpBookingPage() {
 
     const remaining = Math.max(0, netTotalSewa - finalDp);
 
-    const nowTime = new Date().toTimeString().slice(0, 8);
+    const timeStr = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(new Date()).replace(/\./g, ':');
     const finalDpPaidAt = bookingDate 
-      ? new Date(`${bookingDate}T${nowTime}`).toISOString() 
+      ? new Date(`${bookingDate}T${timeStr}+07:00`).toISOString() 
       : new Date().toISOString();
 
     const newBooking = await addBooking({

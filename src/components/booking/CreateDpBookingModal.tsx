@@ -224,7 +224,16 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       ? memberSchedule.dates[0]
       : date;
 
-    const settleTimeIso = bookingDate ? `${bookingDate}T${new Date().toTimeString().slice(0, 8)}.000Z` : new Date().toISOString();
+    const timeStr = new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(new Date()).replace(/\./g, ':');
+    const settleTimeIso = bookingDate
+      ? new Date(`${bookingDate}T${timeStr}+07:00`).toISOString()
+      : new Date().toISOString();
 
     const newBooking = await addBooking({
       customerName: finalCustomerName,

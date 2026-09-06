@@ -278,6 +278,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         totalAmount: totalSewa,
         dpAmount: dpAmount,
         dpPaymentMethod: dpPaymentMethod,
+        settlementAmount: status === 'SETTLED' ? (dpAmount < totalSewa ? totalSewa - dpAmount : totalSewa) : undefined,
         settlementPaymentMethod: status === 'SETTLED' ? settlementPaymentMethod : undefined,
         settlementPaidAt: status === 'SETTLED' ? `${settlementPaidDate}T12:00:00.000Z` : undefined,
         amountPaidTotal: finalAmountPaid,
