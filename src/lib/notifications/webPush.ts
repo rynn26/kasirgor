@@ -26,6 +26,28 @@ export function isUserOwner(): boolean {
 }
 
 /**
+ * Detects if the current user device is iOS (iPhone/iPad).
+ */
+export function isIOS(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
+ * Checks if the web app is running in Standalone PWA mode (added to Home Screen).
+ */
+export function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as any).standalone === true
+  );
+}
+
+/**
  * Checks if the browser supports the HTML5 Notification API.
  */
 export function isWebNotificationSupported(): boolean {

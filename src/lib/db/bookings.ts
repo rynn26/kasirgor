@@ -21,6 +21,10 @@ export interface DbCourtBooking {
   phone: string;
   community_name: string | null;
   booking_date?: string | null;
+  member_type?: string | null;
+  member_day?: string | null;
+  member_sessions_count?: number | null;
+  member_dates?: string[] | null;
   date: string;
   court_id: string | null;
   court_name: string;
@@ -86,6 +90,21 @@ function mapDbToBooking(
     customerName: row.customer_name,
     phone: row.phone,
     communityName: row.community_name || undefined,
+    memberType: (row.member_type as CourtBooking['memberType']) || (row.community_name?.includes('Member') ? 'MEMBER' : 'INSIDENTIL'),
+    memberDay: row.member_day || undefined,
+    memberSessionsCount: row.member_sessions_count ? Number(row.member_sessions_count) : undefined,
+    memberDates: Array.isArray(row.member_dates)
+      ? row.member_dates
+      : (typeof row.member_dates === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(row.member_dates);
+              return Array.isArray(parsed) ? parsed : undefined;
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined),
     bookingDate: row.booking_date || (row.dp_paid_at ? row.dp_paid_at.split('T')[0] : (row.created_at ? row.created_at.split('T')[0] : row.date)),
     date: row.date,
     courtId: row.court_id || '',
@@ -239,6 +258,10 @@ export async function createBooking(
       customer_name: booking.customerName,
       phone: booking.phone,
       community_name: booking.communityName || null,
+      member_type: booking.memberType || 'INSIDENTIL',
+      member_day: booking.memberDay || null,
+      member_sessions_count: booking.memberSessionsCount || 1,
+      member_dates: booking.memberDates || null,
       booking_date: booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : new Date().toISOString().split('T')[0]),
       date: booking.date,
       court_id: booking.courtId || null,
@@ -401,6 +424,9 @@ export async function updateBooking(
     phone: string;
     communityName: string;
     memberType: 'MEMBER' | 'INSIDENTIL';
+    memberDay: string;
+    memberSessionsCount: number;
+    memberDates: string[];
     bookingDate: string;
     date: string;
     courtId: string;
@@ -429,8 +455,17 @@ export async function updateBooking(
   if (data.customerName !== undefined) updatePayload.customer_name = data.customerName;
   if (data.phone !== undefined) updatePayload.phone = data.phone;
   if (data.communityName !== undefined) updatePayload.community_name = data.communityName;
+  if (data.memberType !== undefined) updatePayload.member_type = data.memberType;
+  if (data.memberDay !== undefined) updatePayload.member_day = data.memberDay;
+  if (data.memberSessionsCount !== undefined) updatePayload.member_sessions_count = data.memberSessionsCount;
+  if (data.memberDates !== undefined) updatePayload.member_dates = data.memberDates;
+  if (data.bookingDate !== undefined) {
+    updatePayload.booking_date = data.bookingDate;
+    if (data.dpPaidAt === undefined) {
+      updatePayload.dp_paid_at = `${data.bookingDate}T12:00:00.000Z`;
+    }
+  }
   if (data.dpPaidAt !== undefined) updatePayload.dp_paid_at = data.dpPaidAt;
-  else if (data.bookingDate !== undefined) updatePayload.dp_paid_at = `${data.bookingDate}T12:00:00.000Z`;
   if (data.date !== undefined) updatePayload.date = data.date;
   if (data.courtId !== undefined) updatePayload.court_id = data.courtId;
   if (data.courtName !== undefined) updatePayload.court_name = data.courtName;

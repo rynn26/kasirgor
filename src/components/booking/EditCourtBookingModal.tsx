@@ -6,6 +6,7 @@ import { PaymentMethod } from '@/types/pos';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
+import { DAY_NAMES, getMemberDatesInMonth } from '@/lib/memberUtils';
 import {
   X,
   User,
@@ -56,6 +57,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
   const [phone, setPhone] = useState('');
   const [selectedSport, setSelectedSport] = useState('Badminton');
   const [memberType, setMemberType] = useState<'MEMBER' | 'INSIDENTIL'>('INSIDENTIL');
+  const [selectedMemberDayIndex, setSelectedMemberDayIndex] = useState<number>(1);
   const [bookingDate, setBookingDate] = useState('');
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('19:00');
@@ -79,7 +81,23 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       const sport = isPickleball ? 'Pickleball' : 'Badminton';
       setSelectedSport(sport);
       const isMem = booking.memberType === 'MEMBER' || booking.communityName?.toLowerCase().includes('member');
-      setMemberType(sport === 'Badminton' && isMem ? 'MEMBER' : 'INSIDENTIL');
+      const resolvedMemberType = sport === 'Badminton' && isMem ? 'MEMBER' : 'INSIDENTIL';
+      setMemberType(resolvedMemberType);
+
+      // Detect initial day index for member
+      let initialDayIdx = 1;
+      if (booking.memberDay) {
+        const foundIdx = DAY_NAMES.indexOf(booking.memberDay);
+        if (foundIdx !== -1) initialDayIdx = foundIdx;
+      } else if (booking.communityName) {
+        const foundDay = DAY_NAMES.findIndex((d) => booking.communityName?.toLowerCase().includes(d.toLowerCase()));
+        if (foundDay !== -1) initialDayIdx = foundDay;
+      } else if (booking.date) {
+        const d = new Date(booking.date.includes('T') ? booking.date : `${booking.date}T00:00:00`);
+        if (!isNaN(d.getDay())) initialDayIdx = d.getDay();
+      }
+      setSelectedMemberDayIndex(initialDayIdx);
+
       setBookingDate(booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : booking.date));
       setDate(booking.date || '');
       setStartTime(booking.startTime || '19:00');
@@ -109,6 +127,37 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       }
     }
   }, [booking, isOpen, courts]);
+
+  // Calculate member schedule dynamically
+  const memberSchedule = React.useMemo(() => {
+    return getMemberDatesInMonth(date || new Date().toISOString().split('T')[0], selectedMemberDayIndex);
+  }, [date, selectedMemberDayIndex]);
+
+  const handleSelectMemberDay = (dayIdx: number) => {
+    setSelectedMemberDayIndex(dayIdx);
+    const schedule = getMemberDatesInMonth(date || new Date().toISOString().split('T')[0], dayIdx);
+    if (schedule.dates.length > 0) {
+      setDate(schedule.dates[0]);
+    }
+    if (!notes || notes.includes('Paket Member')) {
+      setNotes(`Paket Member ${schedule.monthName} ${schedule.year}: ${schedule.sessionCount}x Pertemuan (Setiap ${schedule.dayName}: ${schedule.formattedDatesList})`);
+    }
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    if (memberType === 'MEMBER' && newDate) {
+      const d = new Date(newDate.includes('T') ? newDate : `${newDate}T00:00:00`);
+      if (!isNaN(d.getDay())) {
+        const dayIdx = d.getDay();
+        setSelectedMemberDayIndex(dayIdx);
+        const schedule = getMemberDatesInMonth(newDate, dayIdx);
+        if (!notes || notes.includes('Paket Member')) {
+          setNotes(`Paket Member ${schedule.monthName} ${schedule.year}: ${schedule.sessionCount}x Pertemuan (Setiap ${schedule.dayName}: ${schedule.formattedDatesList})`);
+        }
+      }
+    }
+  };
 
   if (!isOpen || !booking) return null;
 
@@ -173,13 +222,30 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       const finalAmountPaid = status === 'SETTLED' ? totalSewa : dpAmount;
       const finalRemaining = Math.max(0, totalSewa - finalAmountPaid);
 
+      const isMember = selectedSport === 'Badminton' && memberType === 'MEMBER';
+      const finalCommunityName = selectedSport === 'Badminton'
+        ? (isMember
+            ? `Badminton (Member ${memberSchedule.sessionCount}x Pertemuan - Setiap ${memberSchedule.dayName})`
+            : 'Badminton (Insidentil)')
+        : 'Pickleball (Insidentil)';
+
+      const autoScheduleNote = `Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})`;
+
+      let finalNotes: string | undefined = notes.trim() || undefined;
+      if (isMember) {
+        if (!finalNotes || finalNotes.includes('Paket Member')) {
+          finalNotes = autoScheduleNote;
+        }
+      }
+
       const updated = await updateBooking(booking.id, {
         customerName: customerName.trim(),
         phone: phone.trim() || '0812-0000-0000',
-        communityName: selectedSport === 'Badminton'
-          ? (memberType === 'MEMBER' ? 'Badminton (Member)' : 'Badminton (Insidentil)')
-          : 'Pickleball (Insidentil)',
-        memberType: selectedSport === 'Badminton' ? memberType : 'INSIDENTIL',
+        communityName: finalCommunityName,
+        memberType: isMember ? 'MEMBER' : 'INSIDENTIL',
+        memberDay: isMember ? memberSchedule.dayName : undefined,
+        memberSessionsCount: isMember ? memberSchedule.sessionCount : undefined,
+        memberDates: isMember ? memberSchedule.dates : undefined,
         bookingDate,
         date,
         dpPaidAt: bookingDate ? `${bookingDate}T12:00:00.000Z` : booking.dpPaidAt,
@@ -198,7 +264,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         amountPaidTotal: finalAmountPaid,
         remainingBalance: finalRemaining,
         status: status,
-        notes: notes.trim() || undefined,
+        notes: finalNotes,
       });
 
       showToast('Data booking berhasil diperbarui!');
@@ -326,7 +392,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
 
             {/* Kategori Sewa Khusus Badminton */}
             {selectedSport === 'Badminton' && (
-              <div className="pt-1">
+              <div className="pt-1 space-y-2">
                 <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl">
                   <button
                     type="button"
@@ -354,6 +420,52 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                     {memberType === 'INSIDENTIL' && <Check className="w-3 h-3 stroke-[3]" />}
                   </button>
                 </div>
+
+                {/* Khusus Member: Pilihan Hari & Ringkasan Jadwal Pertemuan */}
+                {memberType === 'MEMBER' && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-blue-900">
+                        Pilih Hari Rutin Mingguan:
+                      </label>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                        Setiap {DAY_NAMES[selectedMemberDayIndex]}
+                      </span>
+                    </div>
+
+                    {/* Selector Hari 7 Hari */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {DAY_NAMES.map((name, idx) => {
+                        const isSelected = selectedMemberDayIndex === idx;
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => handleSelectMemberDay(idx)}
+                            className={`py-1.5 text-center text-[10px] font-bold rounded-lg transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-blue-100/50'
+                            }`}
+                          >
+                            {name.slice(0, 3)}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Ringkasan Otomatis Jadwal Pertemuan */}
+                    <div className="bg-white/90 p-2.5 rounded-xl border border-blue-100 text-[10px] text-blue-950 space-y-1">
+                      <div className="font-bold text-blue-900 flex items-center justify-between">
+                        <span>📅 Paket {memberSchedule.sessionCount}x Pertemuan</span>
+                        <span className="text-slate-500 font-normal">{memberSchedule.monthName} {memberSchedule.year}</span>
+                      </div>
+                      <p className="text-slate-600 leading-relaxed font-medium">
+                        <span className="font-bold text-blue-800">Tanggal:</span> {memberSchedule.formattedDatesList}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -378,9 +490,16 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-800 flex items-center gap-1">
-                <span>Tanggal Main</span>
-                <span className="text-red-500">*</span>
+              <label className="font-bold text-slate-800 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <span>Tanggal Main</span>
+                  <span className="text-red-500">*</span>
+                </span>
+                {memberType === 'MEMBER' && (
+                  <span className="text-[10px] text-blue-600 font-semibold">
+                    (Pertemuan ke-1)
+                  </span>
+                )}
               </label>
               <div className="relative">
                 <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
@@ -388,7 +507,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                   type="date"
                   required
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => handleDateChange(e.target.value)}
                   className="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-[#b92b10] cursor-pointer"
                 />
               </div>
@@ -582,8 +701,19 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
           </div>
 
           {/* Notes */}
-          <div className="space-y-1">
-            <label className="font-bold text-slate-800">Catatan Tambahan (Opsional)</label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-800">Catatan Tambahan (Opsional)</label>
+              {memberType === 'MEMBER' && (
+                <button
+                  type="button"
+                  onClick={() => setNotes(`Paket Member ${memberSchedule.monthName} ${memberSchedule.year}: ${memberSchedule.sessionCount}x Pertemuan (Setiap ${memberSchedule.dayName}: ${memberSchedule.formattedDatesList})`)}
+                  className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <span>🔄 Sinkronkan ke Jadwal {memberSchedule.monthName} {memberSchedule.year}</span>
+                </button>
+              )}
+            </div>
             <input
               type="text"
               value={notes}
@@ -591,6 +721,11 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
               placeholder="Misal: Raket sewa, DP via transfer, etc..."
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
             />
+            {memberType === 'MEMBER' && (
+              <p className="text-[10px] text-slate-500">
+                Catatan ini dicetak pada struk member. Bila tanggal atau hari main diubah, klik tombol sinkronkan di atas untuk memperbarui catatan otomatis ke bulan yang sesuai.
+              </p>
+            )}
           </div>
         </form>
 

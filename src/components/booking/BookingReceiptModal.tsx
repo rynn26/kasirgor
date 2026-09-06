@@ -48,6 +48,7 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
   if (!isOpen || !booking) return null;
 
   const isLunas = booking.status === 'SETTLED' || booking.remainingBalance === 0;
+  const isMember = booking.memberType === 'MEMBER' || Boolean(booking.communityName?.toLowerCase().includes('member'));
 
   const handlePrint = () => {
     window.print();
@@ -119,8 +120,8 @@ Terima kasih telah bermain di ${shopName}!`;
       `👤 *Nama*: ${booking.customerName}\n` +
       (isMember ? `🏷️ *Kategori*: Member Bulanan (Rutin Tiap Minggu)\n` : '') +
       (booking.notes ? `🗓️ *Jadwal Member*: ${booking.notes}\n` : '') +
-      (bookingDateStr ? `📝 *Tgl Booking*: ${bookingDateStr}\n` : '') +
-      `📅 *Tgl Main*: ${booking.date}\n` +
+      (bookingDateStr ? `📝 *Tgl Booking*: ${formatDate(bookingDateStr, false)}\n` : '') +
+      `📅 *Tgl Main*: ${formatDate(booking.date, false)}\n` +
       `⏰ *Waktu*: ${booking.startTime} - ${booking.endTime} WIB (${booking.durationHours} Jam)\n` +
       `💰 *Total Biaya*: ${formatRupiah(booking.totalAmount)}\n` +
       paymentDetails +
@@ -207,8 +208,13 @@ Terima kasih telah bermain di ${shopName}!`;
                   <span className="font-semibold text-blue-900">{booking.communityName}</span>
                 </div>
               )}
-              {booking.notes && booking.memberType === 'MEMBER' && (
-                <div className="text-[9px] bg-blue-50 p-1.5 rounded text-blue-950 font-medium">
+              {booking.notes && (
+                <div className={`text-[9px] p-1.5 rounded font-medium mt-1 leading-relaxed ${
+                  isMember ? 'bg-blue-50 text-blue-950 border border-blue-200' : 'bg-slate-50 text-slate-800 border border-slate-200'
+                }`}>
+                  <span className="font-bold block text-[8px] uppercase tracking-wider text-slate-500 mb-0.5">
+                    {isMember ? 'Jadwal Member / Catatan:' : 'Catatan Tambahan:'}
+                  </span>
                   {booking.notes}
                 </div>
               )}
@@ -218,7 +224,7 @@ Terima kasih telah bermain di ${shopName}!`;
             <div className="py-2 border-b border-dashed border-gray-300 space-y-1.5">
               <div className="flex justify-between text-[10px] text-gray-700">
                 <span>Tanggal Main:</span>
-                <span className="font-semibold">{booking.date}</span>
+                <span className="font-semibold">{formatDate(booking.date, false)}</span>
               </div>
               <div className="flex justify-between text-[10px] text-gray-700">
                 <span>Jam Main:</span>

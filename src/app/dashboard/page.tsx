@@ -42,6 +42,8 @@ import {
   sendWebPushNotificationToOwner,
   getNotificationPermission,
   isWebNotificationSupported,
+  isIOS,
+  isStandalone,
 } from '@/lib/notifications/webPush';
 
 type TimeFilter = 'HARI' | 'MINGGU' | 'BULAN';
@@ -67,6 +69,7 @@ export default function DashboardUnifiedPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [cashierPresences, setCashierPresences] = useState<CashierPresence[]>([]);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
+  const [isIosInstructionOpen, setIsIosInstructionOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && isWebNotificationSupported()) {
@@ -75,6 +78,11 @@ export default function DashboardUnifiedPage() {
   }, [isNotificationOpen]);
 
   const handleEnablePushNotification = async () => {
+    if (isIOS() && !isStandalone()) {
+      setIsIosInstructionOpen(true);
+      return;
+    }
+
     const granted = await requestNotificationPermission();
     if (granted) {
       setPushPermission('granted');
@@ -91,6 +99,12 @@ export default function DashboardUnifiedPage() {
   };
 
   const handleTestPushNotification = async (type: 'booking' | 'pelunasan' | 'void' | 'stok' | 'general' = 'booking') => {
+    // If iOS and opened inside regular Safari tab, Apple requires Add to Home Screen first!
+    if (isIOS() && !isStandalone()) {
+      setIsIosInstructionOpen(true);
+      return;
+    }
+
     // If not granted yet, automatically request permission first!
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
       const granted = await requestNotificationPermission();
@@ -1720,6 +1734,80 @@ export default function DashboardUnifiedPage() {
         onClose={() => setIsOwnerRevenueModalOpen(false)}
         initialDate={activeDate}
       />
+
+      {/* iOS Safari Instruction Modal */}
+      {isIosInstructionOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150 text-slate-800">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📱</span>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Khusus iPhone / iPad (iOS)</h3>
+                  <p className="text-[10px] text-slate-400">Aturan Resmi Web Push dari Apple</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsIosInstructionOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-900 leading-relaxed space-y-1">
+              <p className="font-bold flex items-center gap-1">
+                <span>⚠️</span> Apple Membatasi Notifikasi di Tab Biasa
+              </p>
+              <p>
+                Di sistem iPhone (iOS), Apple mewajibkan aplikasi web dipasang ke <b>Layar Utama (Add to Home Screen)</b> terlebih dahulu agar izin notifikasi bisa dibuka.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <span className="font-bold text-slate-900 block text-[11px]">
+                Ikuti 3 Langkah Mudah Ini:
+              </span>
+
+              <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="w-5 h-5 rounded-full bg-[#eb4b2b] text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                  1
+                </div>
+                <div className="text-[11px] text-slate-600">
+                  Ketuk tombol <b>Bagikan / Share</b> (ikon kotak dengan panah ke atas di bilah bawah Safari).
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="w-5 h-5 rounded-full bg-[#eb4b2b] text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                  2
+                </div>
+                <div className="text-[11px] text-slate-600">
+                  Gulir ke bawah, lalu pilih <b>"Tambahkan ke Layar Utama" (Add to Home Screen)</b>.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="w-5 h-5 rounded-full bg-[#eb4b2b] text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                  3
+                </div>
+                <div className="text-[11px] text-slate-600">
+                  Tutup Safari, lalu <b>buka aplikasi dari ikon Kasir GOR di Layar Utama HP Anda</b>. Notifikasi akan langsung aktif!
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsIosInstructionOpen(false)}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#eb4b2b] hover:bg-[#d93f20] text-white font-bold text-xs cursor-pointer transition-colors shadow-xs"
+            >
+              Saya Mengerti
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

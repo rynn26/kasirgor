@@ -663,129 +663,205 @@ export default function LaporanPenjualanPage() {
           )}
         </div>
 
-        {/* Period Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {([
-            { id: 'BULAN_INI', label: 'Bulan Ini' },
-            { id: 'BULAN_LALU', label: 'Bulan Kemarin' },
-            { id: 'MINGGU_INI', label: 'Minggu Ini' },
-            { id: 'HARI_INI', label: 'Hari Ini' },
-          ] as { id: PeriodType; label: string }[]).map((item) => {
-            const isActive = period === item.id;
-            return (
+        {isOwner ? (
+          /* ============================================================ */
+          /* FITUR PILIH RENTANG TANGGAL (KHUSUS OWNER) */
+          /* ============================================================ */
+          <>
+            {/* Period Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {([
+                { id: 'BULAN_INI', label: 'Bulan Ini' },
+                { id: 'BULAN_LALU', label: 'Bulan Kemarin' },
+                { id: 'MINGGU_INI', label: 'Minggu Ini' },
+                { id: 'HARI_INI', label: 'Hari Ini' },
+              ] as { id: PeriodType; label: string }[]).map((item) => {
+                const isActive = period === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { setPeriod(item.id); setHoveredPoint(null); }}
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? isLapangan
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'bg-[#a62512] text-white shadow-xs'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+
+              {/* Custom Date Range Pill */}
               <button
-                key={item.id}
                 type="button"
-                onClick={() => { setPeriod(item.id); setHoveredPoint(null); }}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  isActive
+                onClick={() => {
+                  if (period !== 'CUSTOM') {
+                    setPeriod('CUSTOM');
+                  }
+                  setIsDateRangeModalOpen(true);
+                  setHoveredPoint(null);
+                }}
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
+                  period === 'CUSTOM'
                     ? isLapangan
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'bg-[#a62512] text-white shadow-xs'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                      ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                      : 'bg-[#a62512] text-white border-[#a62512] shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                 }`}
+                title="Pilih Periode Tanggal"
               >
-                {item.label}
-              </button>
-            );
-          })}
-
-          {/* Custom Date Range Pill */}
-          <button
-            type="button"
-            onClick={() => {
-              if (period !== 'CUSTOM') {
-                setPeriod('CUSTOM');
-              }
-              setIsDateRangeModalOpen(true);
-              setHoveredPoint(null);
-            }}
-            className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
-              period === 'CUSTOM'
-                ? isLapangan
-                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                  : 'bg-[#a62512] text-white border-[#a62512] shadow-xs'
-                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-            }`}
-            title="Pilih Periode Tanggal"
-          >
-            <Calendar className="w-3.5 h-3.5 shrink-0" />
-            <span>
-              {period === 'CUSTOM' && customStartDate
-                ? formatDateRange(customStartDate, customEndDate)
-                : 'Pilih Periode'}
-            </span>
-          </button>
-        </div>
-
-        {/* Quick Date Range Bar when CUSTOM is active */}
-        {period === 'CUSTOM' && (
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs space-y-2 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                <Calendar className={`w-3.5 h-3.5 ${isLapangan ? 'text-emerald-700' : 'text-[#a62512]'}`} />
-                <span>Pilih Rentang Tanggal:</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsDateRangeModalOpen(true)}
-                className={`text-[11px] font-bold hover:underline cursor-pointer flex items-center gap-0.5 ${
-                  isLapangan ? 'text-emerald-700' : 'text-[#a62512]'
-                }`}
-              >
-                <span>Pilihan Cepat & Presets</span>
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  {period === 'CUSTOM' && customStartDate
+                    ? formatDateRange(customStartDate, customEndDate)
+                    : 'Pilih Periode'}
+                </span>
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Dari Tanggal
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setDateRange(e.target.value, customEndDate || e.target.value);
-                      setHoveredPoint(null);
-                    }
-                  }}
-                  className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white transition-all ${
-                    isLapangan ? 'focus:border-emerald-600' : 'focus:border-red-500'
-                  }`}
-                />
+            {/* Quick Date Range Bar when CUSTOM is active */}
+            {period === 'CUSTOM' && (
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3 shadow-2xs space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    <Calendar className={`w-3.5 h-3.5 ${isLapangan ? 'text-emerald-700' : 'text-[#a62512]'}`} />
+                    <span>Pilih Rentang Tanggal:</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDateRangeModalOpen(true)}
+                    className={`text-[11px] font-bold hover:underline cursor-pointer flex items-center gap-0.5 ${
+                      isLapangan ? 'text-emerald-700' : 'text-[#a62512]'
+                    }`}
+                  >
+                    <span>Pilihan Cepat & Presets</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Dari Tanggal
+                    </label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setDateRange(e.target.value, customEndDate || e.target.value);
+                          setHoveredPoint(null);
+                        }
+                      }}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white transition-all ${
+                        isLapangan ? 'focus:border-emerald-600' : 'focus:border-red-500'
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Sampai Tanggal
+                    </label>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setDateRange(customStartDate || e.target.value, e.target.value);
+                          setHoveredPoint(null);
+                        }
+                      }}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white transition-all ${
+                        isLapangan ? 'focus:border-emerald-600' : 'focus:border-red-500'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Sampai Tanggal
-                </label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setDateRange(customStartDate || e.target.value, e.target.value);
-                      setHoveredPoint(null);
-                    }
-                  }}
-                  className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white transition-all ${
-                    isLapangan ? 'focus:border-emerald-600' : 'focus:border-red-500'
-                  }`}
-                />
+            )}
+          </>
+        ) : (
+          /* ============================================================ */
+          /* FITUR PILIH 1 TANGGAL SAJA (ROLE KASIR) */
+          /* Kasir tidak bisa rentang 'dari... sampai...', hanya 1 tanggal */
+          /* ============================================================ */
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs space-y-2.5 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <Calendar className="w-4 h-4 text-[#a62512]" />
+                <span>Pilih Tanggal Laporan:</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+                    setDateRange(todayStr, todayStr);
+                    setHoveredPoint(null);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    customStartDate === new Date().toISOString().split('T')[0]
+                      ? 'bg-[#a62512] text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Hari Ini
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const y = new Date();
+                    y.setDate(y.getDate() - 1);
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    const yStr = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+                    setDateRange(yStr, yStr);
+                    setHoveredPoint(null);
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Kemarin
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Tanggal Laporan Kasir
+              </label>
+              <input
+                type="date"
+                value={customStartDate || new Date().toISOString().split('T')[0]}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setDateRange(e.target.value, e.target.value);
+                    setHoveredPoint(null);
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white focus:border-red-500 transition-all cursor-pointer"
+              />
             </div>
           </div>
         )}
       </div>
 
-      {/* 3. HERO CARD (Hanya untuk Arena Lapangan jika Owner) */}
-      {isLapangan && isOwner && (
-        <div className="w-full rounded-[24px] p-5 text-white shadow-md space-y-2 relative overflow-hidden bg-gradient-to-tr from-emerald-700 to-teal-800 shadow-emerald-700/20">
+      {/* 3. HERO CARD: TOTAL PENDAPATAN (Baik Lapangan maupun Kantin/POS jika Owner) */}
+      {isOwner && (
+        <div
+          className={`w-full rounded-[24px] p-5 text-white shadow-md space-y-2 relative overflow-hidden ${
+            isLapangan
+              ? 'bg-gradient-to-tr from-emerald-700 to-teal-800 shadow-emerald-700/20'
+              : 'bg-gradient-to-tr from-[#eb4b2b] to-[#b92b10] shadow-[#eb4b2b]/20'
+          }`}
+        >
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none blur-xl" />
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-white/80 block">
-              Total Pendapatan Sewa Lapangan
+              {isLapangan ? 'Total Pendapatan Sewa Lapangan' : 'Total Penjualan Toko & Kantin'}
             </span>
             <span className="px-2 py-0.5 rounded-full bg-white/15 text-white text-[10px] font-bold">
               {current.label}
@@ -1014,9 +1090,9 @@ export default function LaporanPenjualanPage() {
         initialDate={customStartDate || customDate}
       />
 
-      {/* Modal Pilih Rentang Periode Tanggal */}
+      {/* Modal Pilih Rentang Periode Tanggal (Khusus Owner) */}
       <DateRangeModal
-        isOpen={isDateRangeModalOpen}
+        isOpen={isDateRangeModalOpen && isOwner}
         onClose={() => setIsDateRangeModalOpen(false)}
         startDate={customStartDate}
         endDate={customEndDate}
