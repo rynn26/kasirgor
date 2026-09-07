@@ -194,21 +194,23 @@ export const AppSidebar: React.FC = () => {
               {cashierName ? cashierName.slice(0, 2).toUpperCase() : 'KG'}
             </div>
             <div>
-              <p className="text-xs font-bold text-slate-900">{cashierName || 'Kasir'}</p>
+              <p className="text-xs font-bold text-slate-900">{isOwner ? 'Wilson (Owner)' : (cashierName || 'Kasir')}</p>
               <p className="text-[10px] text-slate-500">
-                {selectedShift?.name || (cashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')} • Bertugas
+                {isOwner ? 'Pemilik Bisnis • Aktif' : `${selectedShift?.name || (cashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')} • Bertugas`}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-1">
-            <button
-              onClick={handleSwitchShift}
-              title="Ganti Shift / Unit"
-              className="p-2 text-slate-400 hover:text-[#b92b10] hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-            >
-              <Repeat className="w-4 h-4" />
-            </button>
+            {!isOwner && (
+              <button
+                onClick={handleSwitchShift}
+                title="Ganti Shift / Unit"
+                className="p-2 text-slate-400 hover:text-[#b92b10] hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              >
+                <Repeat className="w-4 h-4" />
+              </button>
+            )}
 
             <button
               onClick={handleLogout}

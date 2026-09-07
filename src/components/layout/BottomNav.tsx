@@ -341,70 +341,74 @@ export const BottomNav: React.FC = () => {
                 </button>
               </div>
 
-              {/* Switch Shift Tugas */}
-              <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between px-0.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Pilih Shift Tugas
-                  </span>
-                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                    {selectedShift?.name || (cashierName.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')}
-                  </span>
+              {/* Switch Shift Tugas (Hanya untuk Staff Kasir, bukan Owner) */}
+              {!isOwnerUser && (
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Pilih Shift Tugas
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                      {selectedShift?.name || (cashierName.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {SHIFT_OPTIONS.map((shift) => {
+                      const activeShiftId = selectedShift?.id || (cashierName.toLowerCase() === 'asfia' ? 'SHIFT_SORE' : 'SHIFT_PAGI');
+                      const isSelected = activeShiftId === shift.id;
+                      const isMorning = shift.id === 'SHIFT_PAGI';
+                      const Icon = isMorning ? Sun : Moon;
+
+                      return (
+                        <button
+                          key={shift.id}
+                          type="button"
+                          onClick={() => handleSwitchShift(shift)}
+                          className={`py-2 px-2 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-xs ring-2 ring-amber-400/40'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : isMorning ? 'text-amber-500' : 'text-indigo-500'}`} />
+                            <span className="leading-tight text-[11px]">{shift.name}</span>
+                            {isSelected && <Check className="w-3 h-3 text-white ml-0.5" />}
+                          </div>
+                          <span className={`text-[9px] font-medium ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>
+                            {shift.timeRange} WIB
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+              )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  {SHIFT_OPTIONS.map((shift) => {
-                    const activeShiftId = selectedShift?.id || (cashierName.toLowerCase() === 'asfia' ? 'SHIFT_SORE' : 'SHIFT_PAGI');
-                    const isSelected = activeShiftId === shift.id;
-                    const isMorning = shift.id === 'SHIFT_PAGI';
-                    const Icon = isMorning ? Sun : Moon;
-
-                    return (
-                      <button
-                        key={shift.id}
-                        type="button"
-                        onClick={() => handleSwitchShift(shift)}
-                        className={`py-2 px-2 rounded-xl font-bold text-xs flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer border ${
-                          isSelected
-                            ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500 shadow-xs ring-2 ring-amber-400/40'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : isMorning ? 'text-amber-500' : 'text-indigo-500'}`} />
-                          <span className="leading-tight text-[11px]">{shift.name}</span>
-                          {isSelected && <Check className="w-3 h-3 text-white ml-0.5" />}
-                        </div>
-                        <span className={`text-[9px] font-medium ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>
-                          {shift.timeRange} WIB
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Ganti Shift & Logout */}
+              {/* Ganti Shift (Hanya Kasir) & Logout */}
               <div className="pt-1 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsProfileOpen(false);
-                    router.push('/shift');
-                  }}
-                  className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Repeat className="w-3.5 h-3.5" />
-                  <span>Ganti Shift</span>
-                </button>
+                {!isOwnerUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      router.push('/shift');
+                    }}
+                    className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Repeat className="w-3.5 h-3.5" />
+                    <span>Ganti Shift</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex-1 py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className={`${isOwnerUser ? 'w-full' : 'flex-1'} py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer`}
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>Keluar</span>
+                  <span>Keluar Akun</span>
                 </button>
               </div>
 

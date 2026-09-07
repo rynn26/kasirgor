@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getJakartaToday } from '@/lib/bookingUtils';
 
 export type LaporanPeriod = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
 
@@ -16,28 +17,24 @@ interface AppDateState {
   resetToToday: () => void;
 }
 
-const getTodayString = () => {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
-
 export const useAppDateStore = create<AppDateState>()(
   persist(
     (set) => ({
-      selectedDate: getTodayString(),
-      customStartDate: getTodayString(),
-      customEndDate: getTodayString(),
+      selectedDate: getJakartaToday(),
+      customStartDate: getJakartaToday(),
+      customEndDate: getJakartaToday(),
       period: 'HARI_INI',
       isCustomActive: false,
 
       setSelectedDate: (date: string) => {
+        const today = getJakartaToday();
+        const isToday = date === today;
         set({
           selectedDate: date,
           customStartDate: date,
           customEndDate: date,
-          period: 'CUSTOM',
-          isCustomActive: true,
+          period: isToday ? 'HARI_INI' : 'CUSTOM',
+          isCustomActive: !isToday,
         });
       },
 
@@ -53,14 +50,23 @@ export const useAppDateStore = create<AppDateState>()(
       },
 
       setPeriod: (period: LaporanPeriod) => {
+        const today = getJakartaToday();
         set({
           period,
           isCustomActive: period === 'CUSTOM',
+          ...(period === 'HARI_INI'
+            ? {
+                selectedDate: today,
+                customStartDate: today,
+                customEndDate: today,
+                isCustomActive: false,
+              }
+            : {}),
         });
       },
 
       resetToToday: () => {
-        const today = getTodayString();
+        const today = getJakartaToday();
         set({
           selectedDate: today,
           customStartDate: today,
@@ -72,6 +78,18 @@ export const useAppDateStore = create<AppDateState>()(
     }),
     {
       name: 'kasir_active_date_store',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const today = getJakartaToday();
+          if (state.period === 'HARI_INI' || !state.isCustomActive) {
+            state.selectedDate = today;
+            state.customStartDate = today;
+            state.customEndDate = today;
+            state.isCustomActive = false;
+            state.period = 'HARI_INI';
+          }
+        }
+      },
     }
   )
 );

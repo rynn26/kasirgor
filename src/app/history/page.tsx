@@ -6,6 +6,7 @@ import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { formatDate, formatRupiah } from '@/lib/utils';
 import { Transaction } from '@/types/pos';
+import { toJakartaDateString } from '@/lib/bookingUtils';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import {
   ArrowLeft,
@@ -57,7 +58,6 @@ export default function HistoryPage() {
       const d = params.get('date');
       if (d) {
         setSelectedDate(d);
-        setGlobalDate(d);
       } else if (isCustomActive && globalSelectedDate) {
         setSelectedDate(globalSelectedDate);
       }
@@ -87,7 +87,8 @@ export default function HistoryPage() {
       tx.items.some((item) => item.product.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchMethod = methodFilter === 'ALL' || tx.paymentMethod === methodFilter;
-    const matchDate = !selectedDate || tx.createdAt.startsWith(selectedDate);
+    const txDate = toJakartaDateString(tx.createdAt);
+    const matchDate = !selectedDate || txDate === selectedDate;
 
     return matchSearch && matchMethod && matchDate;
   });

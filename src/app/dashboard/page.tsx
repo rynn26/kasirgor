@@ -37,7 +37,7 @@ import { useToastStore } from '@/lib/store/useToastStore';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Transaction } from '@/types/pos';
 import { fetchCashierPresence, CashierPresence } from '@/lib/db/activityLogs';
-import { getBookingAmountInPeriod } from '@/lib/bookingUtils';
+import { getBookingAmountInPeriod, toJakartaDateString } from '@/lib/bookingUtils';
 import {
   requestNotificationPermission,
   sendWebPushNotificationToOwner,
@@ -221,7 +221,7 @@ export default function DashboardUnifiedPage() {
   const summary = useMemo(() => getDailySummary(activeDate), [getDailySummary, activeDate, transactions]);
   const recentTransactions = useMemo(() => {
     if (isCustomActive) {
-      const filtered = transactions.filter((t) => t.createdAt.startsWith(activeDate));
+      const filtered = transactions.filter((t) => toJakartaDateString(t.createdAt) === activeDate);
       return filtered.length > 0 ? filtered.slice(0, 10) : [];
     }
     return transactions.slice(0, 5);
@@ -279,7 +279,7 @@ export default function DashboardUnifiedPage() {
         const nextH = hours[i + 1] ?? 24;
         const value = txList
           .filter((t) => {
-            if (!t.createdAt.startsWith(activeDate)) return false;
+            if (toJakartaDateString(t.createdAt) !== activeDate) return false;
             const txH = new Date(t.createdAt).getHours();
             return txH >= h && txH < nextH;
           })
@@ -294,9 +294,9 @@ export default function DashboardUnifiedPage() {
       return Array.from({ length: 6 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (5 - i));
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = toJakartaDateString(d);
         const value = txList
-          .filter((t) => t.status === 'COMPLETED' && t.createdAt.startsWith(dateStr))
+          .filter((t) => t.status === 'COMPLETED' && toJakartaDateString(t.createdAt) === dateStr)
           .reduce((s, t) => s + t.grandTotal, 0);
         return { label: dayLabels[d.getDay()], value, x: 20 + i * 60, y: 175 };
       });
@@ -307,10 +307,14 @@ export default function DashboardUnifiedPage() {
       endDate.setDate(endDate.getDate() - i * 7);
       const startDate = new Date(endDate);
       startDate.setDate(startDate.getDate() - 6);
-      const start = startDate.toISOString().split('T')[0];
-      const end = endDate.toISOString().split('T')[0];
+      const start = toJakartaDateString(startDate);
+      const end = toJakartaDateString(endDate);
       const value = txList
-        .filter((t) => t.status === 'COMPLETED' && t.createdAt.split('T')[0] >= start && t.createdAt.split('T')[0] <= end)
+        .filter((t) => {
+          if (t.status !== 'COMPLETED') return false;
+          const txDate = toJakartaDateString(t.createdAt);
+          return txDate >= start && txDate <= end;
+        })
         .reduce((s, t) => s + t.grandTotal, 0);
       return { label: `Mgg ${4 - i}`, value, x: 20 + (3 - i) * 100, y: 175 };
     }).reverse();
@@ -420,7 +424,7 @@ export default function DashboardUnifiedPage() {
       const pad = (n: number) => String(n).padStart(2, '0');
       const ydStr = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}-${pad(prevDate.getDate())}`;
       return transactions
-        .filter((t) => t.status === 'COMPLETED' && t.createdAt.startsWith(ydStr))
+        .filter((t) => t.status === 'COMPLETED' && toJakartaDateString(t.createdAt) === ydStr)
         .reduce((s, t) => s + t.grandTotal, 0);
     } catch {
       return 0;
@@ -1240,209 +1244,6 @@ export default function DashboardUnifiedPage() {
                 </div>
               </div>
 
-              {/* 3. 2x2 STATS KPI GRID (LAPANGAN) */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Total Booking */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center space-x-2">
-                    <CalendarCheck className="w-4 h-4 text-emerald-600 stroke-[2.2]" />
-                    <span className="text-xs font-medium text-slate-500">Total Booking</span>
-                  </div>
-                  <div className="text-2xl font-black text-slate-900 tracking-tight mt-2">
-                    {todayCourtBookings.length} <span className="text-xs font-bold text-slate-400">Jadwal</span>
-                  </div>
-                </div>
-
-                {/* Okupansi Lapangan */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center space-x-2">
-                    <TrendingUp className="w-4 h-4 text-teal-600 stroke-[2.2]" />
-                    <span className="text-xs font-medium text-slate-500">Sedang Aktif</span>
-                  </div>
-                  <div className="text-2xl font-black text-emerald-600 tracking-tight mt-2">
-                    {courtsInPlay} <span className="text-xs font-bold text-slate-400">Lapangan</span>
-                  </div>
-                </div>
-
-                {/* Lapangan In-Play */}
-                <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-[#3b82f6] stroke-[2.2]" />
-                    <span className="text-xs font-medium text-slate-500">Okupansi</span>
-                  </div>
-                  <div className="text-2xl font-black text-slate-900 tracking-tight mt-2">
-                    {occupancyPct}%
-                  </div>
-                </div>
-
-                {/* Menunggu Pelunasan */}
-                <div className="bg-[#fffbf0] rounded-2xl p-4 border border-[#fef3c7] shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center space-x-2">
-                    <AlertTriangle className="w-4 h-4 text-[#f59e0b] stroke-[2.2]" />
-                    <span className="text-xs font-medium text-[#d97706]">Perlu Pelunasan</span>
-                  </div>
-                  <div className="text-2xl font-black text-[#f59e0b] tracking-tight mt-2">
-                    {bookingsPendingSettlement} <span className="text-xs font-bold text-amber-600/70">Tim</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. TREN CHART LAPANGAN */}
-              <div className="bg-white rounded-[24px] p-5 border border-slate-200/80 shadow-xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                      Tren Sewa Lapangan
-                    </h2>
-                    <p className="text-[11px] text-slate-400 font-medium">Grafik booking & pendapatan</p>
-                  </div>
-
-                  <div className="flex items-center bg-slate-100/90 p-1 rounded-xl gap-1">
-                    {(['HARI', 'MINGGU', 'BULAN'] as TimeFilter[]).map((tab) => {
-                      const isActive = timeFilter === tab;
-                      const labelMap = { HARI: 'Hari', MINGGU: 'Minggu', BULAN: 'Bulan' };
-                      return (
-                        <button
-                          key={tab}
-                          type="button"
-                          onClick={() => {
-                            setTimeFilter(tab);
-                            setHoveredPoint(null);
-                          }}
-                          className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                            isActive
-                              ? 'bg-white text-emerald-700 shadow-xs'
-                              : 'text-slate-500 hover:text-slate-800'
-                          }`}
-                        >
-                          {labelMap[tab]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Interactive SVG Smooth Line Chart (Emerald Glow Theme) */}
-                <div className="relative pt-2">
-                  {hoveredPoint && (
-                    <div className="absolute top-0 right-4 px-2.5 py-1 rounded-xl bg-slate-900 text-white text-[11px] font-bold shadow-md z-10 flex items-center gap-1.5">
-                      <span className="text-slate-300">{hoveredPoint.label}:</span>
-                      <span className="text-emerald-400 font-black">{formatRupiah(hoveredPoint.value)}</span>
-                    </div>
-                  )}
-
-                  <div className="w-full h-44 flex items-center justify-center">
-                    <svg viewBox="0 0 335 180" className="w-full h-full overflow-visible">
-                      <defs>
-                        <linearGradient id="courtGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#059669" stopOpacity="0.28" />
-                          <stop offset="60%" stopColor="#059669" stopOpacity="0.08" />
-                          <stop offset="100%" stopColor="#059669" stopOpacity="0.0" />
-                        </linearGradient>
-                        <filter id="courtGlow" x="-20%" y="-20%" width="140%" height="140%">
-                          <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#059669" floodOpacity="0.25" />
-                        </filter>
-                      </defs>
-
-                      <line x1="15" y1="40" x2="320" y2="40" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3" />
-                      <line x1="15" y1="90" x2="320" y2="90" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3" />
-                      <line x1="15" y1="140" x2="320" y2="140" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3" />
-                      <line x1="15" y1="175" x2="320" y2="175" stroke="#e2e8f0" strokeWidth="1" />
-
-                      {areaPath && <path d={areaPath} fill="url(#courtGradient)" className="transition-all duration-500 ease-out" />}
-                      {linePath && <path d={linePath} fill="none" stroke="#059669" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#courtGlow)" className="transition-all duration-500 ease-out" />}
-
-                      {currentPoints.map((pt, idx) => (
-                        <g
-                          key={idx}
-                          className="cursor-pointer group"
-                          onMouseEnter={() => setHoveredPoint({ index: idx, label: pt.label, value: pt.value })}
-                          onClick={() => setHoveredPoint({ index: idx, label: pt.label, value: pt.value })}
-                        >
-                          <circle
-                            cx={pt.x}
-                            cy={pt.y}
-                            r="5"
-                            fill="#ffffff"
-                            stroke="#059669"
-                            strokeWidth="3"
-                            className="transition-transform duration-200 group-hover:scale-150"
-                          />
-                          <circle cx={pt.x} cy={pt.y} r="14" fill="transparent" />
-                        </g>
-                      ))}
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              {/* 5. STATUS REALTIME LAPANGAN */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                      Status Live Lapangan
-                    </h2>
-                    <p className="text-[11px] text-slate-400 font-medium">Kondisi lapangan GOR saat ini</p>
-                  </div>
-                  <Link href="/booking" className="text-xs font-bold text-emerald-700 hover:text-emerald-800">
-                    Buka Kasir
-                  </Link>
-                </div>
-
-                {courts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {courtStatusList.map((court) => {
-                      const isInPlay = court.status === 'IN_PLAY';
-                      const isBooked = court.status === 'BOOKED_SOON';
-                      return (
-                        <div
-                          key={court.id}
-                          className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between space-y-2 ${
-                            isInPlay
-                              ? 'bg-amber-50/50 border-amber-200'
-                              : isBooked
-                              ? 'bg-blue-50/50 border-blue-200'
-                              : 'bg-emerald-50/40 border-emerald-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                              {court.type.split(' ')[0]}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                              isInPlay
-                                ? 'bg-amber-100 text-amber-800'
-                                : isBooked
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {court.statusLabel}
-                            </span>
-                          </div>
-
-                          <div>
-                            <h4 className="font-bold text-xs text-slate-900 truncate">
-                              {court.name}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                              {court.team}
-                            </p>
-                          </div>
-
-                          <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-slate-400">{court.time}</span>
-                            <span className="font-black text-slate-800">{formatRupiah(court.pricePerHour)}/j</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 py-4 text-center">Data lapangan belum tersedia.</p>
-                )}
-              </div>
-
               {/* 6. JADWAL BOOKING TERKINI */}
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between">
@@ -1734,6 +1535,8 @@ export default function DashboardUnifiedPage() {
         isOpen={isOwnerRevenueModalOpen}
         onClose={() => setIsOwnerRevenueModalOpen(false)}
         initialDate={activeDate}
+        initialStartDate={activeDate}
+        initialEndDate={activeDate}
       />
 
       {/* iOS Safari Instruction Modal */}

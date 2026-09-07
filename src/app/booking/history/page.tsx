@@ -18,7 +18,6 @@ import {
   Printer,
   CheckCircle2,
   Clock,
-  Wallet,
   Pencil,
   Trash2,
   AlertTriangle,
@@ -62,7 +61,6 @@ export default function HistoryBookingPage() {
       const d = params.get('date');
       if (d) {
         setSelectedDate(d);
-        setGlobalDate(d);
       } else if (isCustomActive && globalSelectedDate) {
         setSelectedDate(globalSelectedDate);
       }
@@ -328,49 +326,21 @@ export default function HistoryBookingPage() {
         </div>
       </div>
 
-      {/* Revenue Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] uppercase font-bold">Total Uang Masuk</span>
-            <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-          </div>
-          <div className="text-base sm:text-lg font-black text-slate-900">
-            {formatRupiah(totalRevenue)}
-          </div>
-          <span className="text-[10px] text-slate-400 block font-medium">
-            Dari {activeBookings.length} transaksi aktif
+      {/* Revenue Summary Card — Belum Lunas (DP) */}
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+        <div className="space-y-0.5">
+          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+            {isDateActive ? 'DP di Tgl Ini' : 'Belum Lunas (DP)'}
           </span>
-        </div>
-
-        <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] uppercase font-bold">
-              {isDateActive ? 'Pelunasan di Tgl Ini' : 'Lunas / Selesai'}
-            </span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
-          </div>
-          <div className="text-base sm:text-lg font-black text-blue-700">
-            {lunasCount} Nota
-          </div>
-          <span className="text-[10px] text-slate-400 block font-medium">
-            {isDateActive ? 'Pelunasan diterima tgl ini' : 'Pembayaran penuh 100%'}
-          </span>
-        </div>
-
-        <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] uppercase font-bold">
-              {isDateActive ? 'DP di Tgl Ini' : 'Belum Lunas (DP)'}
-            </span>
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-          </div>
           <div className="text-base sm:text-lg font-black text-amber-600">
             {pendingDpCount} Booking
           </div>
-          <span className="text-[10px] text-slate-400 block font-medium">
+          <span className="text-[11px] text-slate-500 font-medium block">
             {isDateActive ? `Dari ${activeBookings.length} transaksi aktif` : `Sisa tagihan: ${formatRupiah(totalPiutang)}`}
           </span>
+        </div>
+        <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
+          <Clock className="w-5 h-5" />
         </div>
       </div>
 

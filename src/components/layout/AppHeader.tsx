@@ -16,6 +16,26 @@ export const AppHeader: React.FC = () => {
   const router = useRouter();
   const { cashierName, selectedShift } = useShiftStore();
   const [isHandoverOpen, setIsHandoverOpen] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const checkRole = () => {
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            setIsOwner(parsed.role === 'owner' || parsed.role === 'admin');
+          } catch {
+            setIsOwner(false);
+          }
+        }
+      };
+      checkRole();
+      window.addEventListener('storage', checkRole);
+      return () => window.removeEventListener('storage', checkRole);
+    }
+  }, []);
 
   const getPageTitle = () => {
     if (pathname === '/kasir' || pathname === '/') return 'Kasir POS Toko & F&B';
@@ -79,23 +99,29 @@ export const AppHeader: React.FC = () => {
             {getPageTitle()}
           </h2>
           <p className="text-[11px] text-slate-500 hidden sm:block">
-            {selectedShift?.name || (cashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')} • Kasir: <strong className="text-slate-800 font-semibold">{cashierName || 'Yuli'}</strong>
+            {isOwner ? (
+              <span>Role: <strong className="text-slate-800 font-semibold">{cashierName || 'Wilson (Owner)'}</strong></span>
+            ) : (
+              <span>{selectedShift?.name || (cashierName?.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang')} • Kasir: <strong className="text-slate-800 font-semibold">{cashierName || 'Yuli'}</strong></span>
+            )}
           </p>
         </div>
       </div>
 
       {/* Right controls */}
       <div className="flex items-center space-x-2">
-        {/* Quick Shift Handover Button */}
-        <button
-          type="button"
-          onClick={() => setIsHandoverOpen(true)}
-          className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#eb4b2b] border border-orange-200/80 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-          title="Pergantian Shift / Serah Terima Kasir"
-        >
-          <Repeat className="w-3.5 h-3.5" />
-          <span>Ganti Shift</span>
-        </button>
+        {/* Quick Shift Handover Button (Hanya Staff Kasir) */}
+        {!isOwner && (
+          <button
+            type="button"
+            onClick={() => setIsHandoverOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#eb4b2b] border border-orange-200/80 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+            title="Pergantian Shift / Serah Terima Kasir"
+          >
+            <Repeat className="w-3.5 h-3.5" />
+            <span>Ganti Shift</span>
+          </button>
+        )}
 
         {/* Fullscreen shortcut for POS */}
         <button

@@ -58,9 +58,12 @@ export default function BookingLapanganPage() {
   useEffect(() => {
     loadCourts();
     loadBookings();
-    const appDateState = useAppDateStore.getState();
-    if (appDateState.isCustomActive && appDateState.selectedDate) {
-      setSelectedDate(appDateState.selectedDate);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const d = params.get('date');
+      if (d) {
+        setSelectedDate(d);
+      }
     }
   }, [loadCourts, loadBookings, setSelectedDate]);
   const [settlementTargetId, setSettlementTargetId] = useState<string | null>(null);

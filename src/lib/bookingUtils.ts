@@ -1,6 +1,13 @@
 import { CourtBooking } from '@/types/booking';
 import { PaymentMethod } from '@/types/pos';
 
+const jakartaDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 /**
  * Konversi ISO timestamp atau Date ke string YYYY-MM-DD di zona waktu Asia/Jakarta (WIB).
  */
@@ -12,17 +19,7 @@ export function toJakartaDateString(isoOrDate?: string | Date | null): string {
   try {
     const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
     if (isNaN(d.getTime())) return '';
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Jakarta',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(d);
-    const y = parts.find((p) => p.type === 'year')?.value;
-    const m = parts.find((p) => p.type === 'month')?.value;
-    const day = parts.find((p) => p.type === 'day')?.value;
-    if (y && m && day) return `${y}-${m}-${day}`;
-    return typeof isoOrDate === 'string' ? isoOrDate.split('T')[0] : '';
+    return jakartaDateFormatter.format(d);
   } catch {
     return typeof isoOrDate === 'string' ? isoOrDate.split('T')[0] : '';
   }

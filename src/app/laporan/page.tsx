@@ -57,6 +57,7 @@ import {
   getBookingAmountInPeriod,
   getBookingPaymentItemsInPeriod,
   getJakartaToday,
+  toJakartaDateString,
 } from '@/lib/bookingUtils';
 
 type PeriodType = 'BULAN_INI' | 'BULAN_LALU' | 'HARI_INI' | 'MINGGU_INI' | 'CUSTOM';
@@ -313,18 +314,22 @@ export default function LaporanPenjualanPage() {
 
   const isLapangan = activeUnit === 'lapangan';
 
+  const activeDateRange = useMemo(
+    () => getDateRange(period, customStartDate, customEndDate),
+    [period, customStartDate, customEndDate]
+  );
+
   // =============================================
   // DERIVED DATA: KANTIN / POS TOKO
   // =============================================
   const kantinData = useMemo(() => {
-    const { start, end, label } = getDateRange(period, customStartDate, customEndDate);
+    const { start, end, label } = activeDateRange;
 
-    const filtered = transactions.filter(
-      (t) =>
-        t.status === 'COMPLETED' &&
-        t.createdAt.split('T')[0] >= start &&
-        t.createdAt.split('T')[0] <= end
-    );
+    const filtered = transactions.filter((t) => {
+      if (t.status !== 'COMPLETED') return false;
+      const txDate = toJakartaDateString(t.createdAt);
+      return txDate >= start && txDate <= end;
+    });
 
     const totalSales = filtered.reduce((s, t) => s + t.grandTotal, 0);
     const totalTx = filtered.length;
@@ -376,12 +381,11 @@ export default function LaporanPenjualanPage() {
 
     // Growth vs previous period
     const prevRange = getPrevDateRange(period, customStartDate, customEndDate);
-    const prevFiltered = transactions.filter(
-      (t) =>
-        t.status === 'COMPLETED' &&
-        t.createdAt.split('T')[0] >= prevRange.start &&
-        t.createdAt.split('T')[0] <= prevRange.end
-    );
+    const prevFiltered = transactions.filter((t) => {
+      if (t.status !== 'COMPLETED') return false;
+      const txDate = toJakartaDateString(t.createdAt);
+      return txDate >= prevRange.start && txDate <= prevRange.end;
+    });
     const prevSales = prevFiltered.reduce((s, t) => s + t.grandTotal, 0);
     const growthPct =
       prevSales > 0 ? (((totalSales - prevSales) / prevSales) * 100).toFixed(1) : null;
@@ -405,7 +409,7 @@ export default function LaporanPenjualanPage() {
   // DERIVED DATA: ARENA LAPANGAN GOR
   // =============================================
   const lapanganData = useMemo(() => {
-    const { start, end, label } = getDateRange(period, customStartDate, customEndDate);
+    const { start, end, label } = activeDateRange;
 
     // Filter booking yang ada uang masuk periode ini ATAU ada jadwal main di periode ini
     const filtered = bookings.filter((b) => {
@@ -990,12 +994,6 @@ export default function LaporanPenjualanPage() {
         onSuccess={handleManualSuccess}
       />
 
-      {/* Modal Rekap Total Omset Hari Ini untuk Owner */}
-      <OwnerDailyRevenueModal
-        isOpen={isOwnerRevenueModalOpen}
-        onClose={() => setIsOwnerRevenueModalOpen(false)}
-      />
-
       {/* Modal Rincian Metode Pembayaran (QRIS / Cash) */}
       <PaymentMethodDetailModal
         isOpen={Boolean(selectedPaymentMethodDetail)}
@@ -1089,7 +1087,9 @@ export default function LaporanPenjualanPage() {
       <OwnerDailyRevenueModal
         isOpen={isOwnerRevenueModalOpen}
         onClose={() => setIsOwnerRevenueModalOpen(false)}
-        initialDate={customStartDate || customDate}
+        initialDate={activeDateRange.start}
+        initialStartDate={activeDateRange.start}
+        initialEndDate={activeDateRange.end}
       />
 
       {/* Modal Pilih Rentang Periode Tanggal (Khusus Owner) */}
@@ -1128,7 +1128,7 @@ function buildKantinChartPoints(
     const amounts = slotDefs.map(({ test }) =>
       filtered
         .filter((t) => {
-          const dateStr = t.createdAt.split('T')[0];
+          const dateStr = toJakartaDateString(t.createdAt);
           const hour = new Date(t.createdAt).getHours();
           return test(dateStr, hour);
         })
@@ -1161,7 +1161,7 @@ function buildKantinChartPoints(
       });
       const amounts = daySlots.map(({ test }) =>
         filtered
-          .filter((t) => test(t.createdAt.split('T')[0]))
+          .filter((t) => test(toJakartaDateString(t.createdAt)))
           .reduce((s, t) => s + t.grandTotal, 0)
       );
       const maxAmt = Math.max(...amounts, 1);
@@ -1186,7 +1186,7 @@ function buildKantinChartPoints(
 
         const amount = filtered
           .filter((t) => {
-            const dateStr = t.createdAt.split('T')[0];
+            const dateStr = toJakartaDateString(t.createdAt);
             return dateStr >= bStartStr && dateStr <= bEndStr;
           })
           .reduce((s, t) => s + t.grandTotal, 0);
@@ -1216,7 +1216,7 @@ function buildKantinChartPoints(
     });
     const amounts = weekSlots.map(({ test }) =>
       filtered
-        .filter((t) => test(t.createdAt.split('T')[0]))
+        .filter((t) => test(toJakartaDateString(t.createdAt)))
         .reduce((s, t) => s + t.grandTotal, 0)
     );
     const maxAmt = Math.max(...amounts, 1);
@@ -1248,7 +1248,10 @@ function buildMonthlyPoints(
     const bStart = `${yr}-${pad(mo)}-${pad(dayStart)}`;
     const bEnd = `${yr}-${pad(mo)}-${pad(dayEnd)}`;
     const amount = filtered
-      .filter((t) => t.createdAt.split('T')[0] >= bStart && t.createdAt.split('T')[0] <= bEnd)
+      .filter((t) => {
+        const txDate = toJakartaDateString(t.createdAt);
+        return txDate >= bStart && txDate <= bEnd;
+      })
       .reduce((s, t) => s + t.grandTotal, 0);
     return { day: String(dayStart), amount };
   });
