@@ -278,7 +278,7 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
         role: 'Kasir',
         actionType: 'CREATE_BOOKING',
         title: 'Input Booking Sewa Lapangan',
-        details: `Kasir ${activeCashier} mencatat sewa lunas #${newBooking.id.slice(0, 8)} untuk ${finalCustomerName} (${courtNameLabel}). Tgl: ${firstDate} (${startTime}-${endTime}), Total: ${formatRupiah(finalTotal)} via ${paymentMethod}.`,
+        details: `Kasir ${activeCashier} mencatat booking ${finalCustomerName} (${courtNameLabel}). Tgl: ${firstDate} (${startTime}-${endTime}), Total: ${formatRupiah(finalTotal)} via ${paymentMethod}.`,
         metadata: {
           bookingId: newBooking.id,
           customerName: finalCustomerName,

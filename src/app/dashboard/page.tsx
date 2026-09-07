@@ -207,7 +207,7 @@ export default function DashboardUnifiedPage() {
     } else if (type === 'void') {
       payload = {
         title: '🚨 Pembatalan Transaksi Kasir (VOID)',
-        body: 'Kasir Yuli membatalkan Transaksi #TX-1049 (Rp 150.000). Alasan: "Customer salah pesan raket".',
+        body: 'Kasir Yuli membatalkan pesanan Raket Yonex & Shuttlecock (Rp 150.000). Alasan: "Customer salah pesan raket".',
         url: '/laporan',
       };
     } else if (type === 'stok') {

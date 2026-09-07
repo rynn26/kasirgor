@@ -125,7 +125,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'CANCEL_BOOKING',
           title: 'Batalkan Reservasi Lapangan',
-          details: `${cashier} membatalkan reservasi #${bookingId.slice(0, 8)} (${target?.customerName || 'Customer'}) - ${target?.courtName || 'Lapangan'} tgl ${target?.date || ''}.`,
+          details: `${cashier} membatalkan booking ${target?.customerName || 'Pelanggan'} (${target?.courtName || 'Lapangan'}). Tgl: ${target?.date || ''} (${target?.startTime || ''}-${target?.endTime || ''}).`,
           metadata: {
             bookingId,
             customerName: target?.customerName,
@@ -161,7 +161,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
             role: 'Kasir',
             actionType: 'EDIT_BOOKING',
             title: 'Perubahan Data Booking Lapangan',
-            details: `Kasir ${cashier} mengubah data booking #${bookingId.slice(0, 8)} (${updated.customerName} - ${updated.courtName || 'Lapangan'}). Tgl Main: ${updated.date}, Jam: ${updated.startTime}-${updated.endTime}, Status: ${updated.status}.`,
+            details: `Kasir ${cashier} mengubah data booking ${updated.customerName} (${updated.courtName || 'Lapangan'}). Tgl Main: ${updated.date}, Jam: ${updated.startTime}-${updated.endTime}, Status: ${updated.status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
             metadata: {
               bookingId,
               customerName: updated.customerName,
@@ -201,7 +201,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'DELETE_BOOKING',
           title: 'Hapus Reservasi Lapangan',
-          details: `${cashier} menghapus reservasi #${bookingId.slice(0, 8)} (${target?.customerName || 'Customer'}) - ${target?.courtName || 'Lapangan'} tgl ${target?.date || ''}.`,
+          details: `${cashier} menghapus data booking ${target?.customerName || 'Pelanggan'} (${target?.courtName || 'Lapangan'}) tgl ${target?.date || ''}.`,
           metadata: {
             bookingId,
             customerName: target?.customerName,

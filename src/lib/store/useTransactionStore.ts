@@ -68,12 +68,15 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         const { useShiftStore } = await import('@/lib/store/useShiftStore');
         const cashier = useShiftStore.getState().cashierName || 'Kasir';
         const itemCount = transaction.items.reduce((s, i) => s + i.quantity, 0);
+        const itemSummary = transaction.items
+          .map((i) => `${i.quantity}x ${i.product?.name || 'Produk'}`)
+          .join(', ');
         recordActivityLog({
           staffName: cashier,
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'CREATE_TRANSACTION',
           title: 'Transaksi Penjualan Kantin',
-          details: `Kasir ${cashier} memproses transaksi nota #${created.invoiceNumber || created.id.slice(0, 8)} senilai Rp ${created.grandTotal.toLocaleString('id-ID')} (${itemCount} item) via ${created.paymentMethod}.`,
+          details: `Kasir ${cashier} memproses penjualan: ${itemSummary || `${itemCount} barang`} senilai Rp ${created.grandTotal.toLocaleString('id-ID')} via ${created.paymentMethod}.`,
           metadata: {
             transactionId: created.id,
             invoiceNumber: created.invoiceNumber,
@@ -107,12 +110,15 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         const { recordActivityLog } = await import('@/lib/db/activityLogs');
         const { useShiftStore } = await import('@/lib/store/useShiftStore');
         const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        const itemSummary = target?.items && target.items.length > 0
+          ? target.items.map((i) => `${i.quantity}x ${i.product?.name || 'Produk'}`).join(', ')
+          : 'produk kantin';
         recordActivityLog({
           staffName: cashier,
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'CANCEL_TRANSACTION',
           title: 'Batalkan Transaksi Kantin',
-          details: `${cashier} membatalkan transaksi nota #${target?.invoiceNumber || id.slice(0, 8)} senilai Rp ${(target?.grandTotal || 0).toLocaleString('id-ID')}.`,
+          details: `${cashier} membatalkan pesanan: ${itemSummary} senilai Rp ${(target?.grandTotal || 0).toLocaleString('id-ID')}.`,
           metadata: {
             transactionId: id,
             invoiceNumber: target?.invoiceNumber,
@@ -142,12 +148,15 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         const { recordActivityLog } = await import('@/lib/db/activityLogs');
         const { useShiftStore } = await import('@/lib/store/useShiftStore');
         const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        const itemSummary = target?.items && target.items.length > 0
+          ? target.items.map((i) => `${i.quantity}x ${i.product?.name || 'Produk'}`).join(', ')
+          : 'produk kantin';
         recordActivityLog({
           staffName: cashier,
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'DELETE_TRANSACTION',
-          title: 'Hapus Nota Transaksi Kantin',
-          details: `${cashier} menghapus nota transaksi #${target?.invoiceNumber || id.slice(0, 8)} senilai Rp ${(target?.grandTotal || 0).toLocaleString('id-ID')}.`,
+          title: 'Hapus Transaksi Kantin',
+          details: `${cashier} menghapus transaksi: ${itemSummary} senilai Rp ${(target?.grandTotal || 0).toLocaleString('id-ID')}.`,
           metadata: {
             transactionId: id,
             invoiceNumber: target?.invoiceNumber,

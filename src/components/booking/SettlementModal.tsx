@@ -111,7 +111,7 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
           role: 'Kasir',
           actionType: 'SETTLE_BOOKING',
           title: 'Pelunasan Booking Lapangan',
-          details: `Kasir ${activeCashier} memproses pelunasan booking #${currentBooking.id.slice(0, 8)} (${currentBooking.customerName}) sebesar ${formatRupiah(totalSettlementDue)} via ${paymentMethod}. Status: LUNAS.`,
+          details: `Kasir ${activeCashier} memproses pelunasan booking ${currentBooking.customerName} (${currentBooking.courtName || 'Lapangan'}) sebesar ${formatRupiah(totalSettlementDue)} via ${paymentMethod}. Status: LUNAS.`,
           metadata: {
             bookingId: currentBooking.id,
             customerName: currentBooking.customerName,
