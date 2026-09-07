@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { CourtBooking, BookingStatus } from '@/types/booking';
 import { PaymentMethod } from '@/types/pos';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
+import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { DAY_NAMES, getMemberDatesInMonth } from '@/lib/memberUtils';
@@ -292,7 +293,6 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
 
       // Record Activity Log
       import('@/lib/db/activityLogs').then(({ recordActivityLog }) => {
-        const { useShiftStore } = require('@/lib/store/useShiftStore');
         const activeCashier = useShiftStore.getState().cashierName || 'Yuli';
         recordActivityLog({
           staffName: activeCashier,

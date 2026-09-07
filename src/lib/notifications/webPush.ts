@@ -19,7 +19,8 @@ export function isUserOwner(): boolean {
     const session = localStorage.getItem('kasir_session');
     if (!session) return false;
     const parsed = JSON.parse(session);
-    return parsed.role === 'owner';
+    const r = (parsed.role || '').toLowerCase();
+    return r === 'owner' || r === 'admin';
   } catch {
     return false;
   }

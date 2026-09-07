@@ -36,7 +36,7 @@ import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { TransactionDetailModal } from '@/components/pos/TransactionDetailModal';
 import { Transaction } from '@/types/pos';
-import { fetchCashierPresence, CashierPresence } from '@/lib/db/activityLogs';
+import { fetchCashierPresence, CashierPresence, fetchActivityLogs, ActivityLog } from '@/lib/db/activityLogs';
 import { getBookingAmountInPeriod, toJakartaDateString } from '@/lib/bookingUtils';
 import {
   requestNotificationPermission,
@@ -48,6 +48,79 @@ import {
 } from '@/lib/notifications/webPush';
 
 type TimeFilter = 'HARI' | 'MINGGU' | 'BULAN';
+
+function formatRelativeTime(isoString: string): string {
+  try {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 45) return 'Baru saja';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} mnt lalu`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour} jam lalu`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay === 1) return 'Kemarin';
+    if (diffDay < 7) return `${diffDay} hari lalu`;
+    const d = new Date(isoString);
+    return `${d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })} ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {
+    return 'Baru saja';
+  }
+}
+
+function getActionBadge(actionType: string) {
+  switch (actionType) {
+    case 'EDIT_BOOKING':
+    case 'EDIT_PRODUCT':
+    case 'MANUAL_EDIT':
+      return {
+        label: 'Perubahan',
+        bg: 'bg-amber-50 text-amber-700 border-amber-200',
+        icon: Repeat,
+      };
+    case 'CREATE_BOOKING':
+      return {
+        label: 'Booking Baru',
+        bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        icon: CalendarCheck,
+      };
+    case 'SETTLE_BOOKING':
+      return {
+        label: 'Pelunasan',
+        bg: 'bg-blue-50 text-blue-700 border-blue-200',
+        icon: Wallet,
+      };
+    case 'SHIFT_START':
+    case 'SHIFT_END':
+    case 'SHIFT_HANDOVER':
+      return {
+        label: 'Ganti Shift',
+        bg: 'bg-purple-50 text-purple-700 border-purple-200',
+        icon: Users,
+      };
+    case 'CREATE_TRANSACTION':
+      return {
+        label: 'Transaksi Kasir',
+        bg: 'bg-rose-50 text-rose-700 border-rose-200',
+        icon: ShoppingCart,
+      };
+    case 'VOID_TRANSACTION':
+    case 'CANCEL_BOOKING':
+    case 'DELETE_BOOKING':
+    case 'DELETE_TRANSACTION':
+      return {
+        label: 'Batal / Void',
+        bg: 'bg-red-50 text-red-700 border-red-200',
+        icon: AlertTriangle,
+      };
+    default:
+      return {
+        label: 'Aktivitas',
+        bg: 'bg-slate-50 text-slate-700 border-slate-200',
+        icon: Bell,
+      };
+  }
+}
 
 export default function DashboardUnifiedPage() {
   const router = useRouter();
@@ -64,6 +137,7 @@ export default function DashboardUnifiedPage() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('HARI');
   const [hoveredPoint, setHoveredPoint] = useState<{ index: number; label: string; value: number } | null>(null);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifTab, setNotifTab] = useState<'feed' | 'summary'>('feed');
   const [isOwnerRevenueModalOpen, setIsOwnerRevenueModalOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [greeting, setGreeting] = useState('Selamat sore');
@@ -71,6 +145,8 @@ export default function DashboardUnifiedPage() {
   const [cashierPresences, setCashierPresences] = useState<CashierPresence[]>([]);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
   const [isIosInstructionOpen, setIsIosInstructionOpen] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && isWebNotificationSupported()) {
@@ -167,8 +243,28 @@ export default function DashboardUnifiedPage() {
     const onPresence = () => {
       fetchCashierPresence().then(setCashierPresences).catch(() => {});
     };
+
+    const loadLogs = () => {
+      fetchActivityLogs().then((logs) => {
+        setActivityLogs(logs);
+      }).catch(() => {});
+    };
+    loadLogs();
+    const logsInterval = setInterval(loadLogs, 8000);
+
+    const onActivityLogged = (e: any) => {
+      const newLog = e.detail as ActivityLog;
+      if (newLog) {
+        setActivityLogs((prev) => [newLog, ...prev.filter((p) => p.id !== newLog.id)].slice(0, 100));
+        setUnreadNotifCount((prev) => prev + 1);
+        loadBookings();
+        loadTransactions();
+      }
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('kasir_presence_updated', onPresence);
+      window.addEventListener('kasir_activity_logged', onActivityLogged);
     }
     const interval = setInterval(onPresence, 10000);
 
@@ -205,7 +301,16 @@ export default function DashboardUnifiedPage() {
         setActiveUnit(savedUnit);
       }
     }
-  }, []);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(logsInterval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('kasir_presence_updated', onPresence);
+        window.removeEventListener('kasir_activity_logged', onActivityLogged);
+      }
+    };
+  }, [loadBookings, loadTransactions, loadCourts, loadProducts]);
 
   const handleSwitchUnit = (unit: 'kantin' | 'lapangan') => {
     setActiveUnit(unit);
@@ -539,19 +644,37 @@ export default function DashboardUnifiedPage() {
                 </div>
               </div>
 
-              {/* Cart Action Button */}
-              <Link
-                href="/keranjang"
-                title="Keranjang"
-                className="p-2.5 rounded-2xl bg-white text-slate-700 hover:text-[#eb4b2b] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center shadow-2xs"
-              >
-                <ShoppingCart className="w-5 h-5 stroke-[1.75]" />
-                {totalCartItems > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#eb4b2b] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-                    {totalCartItems}
-                  </span>
-                )}
-              </Link>
+              {/* Cart & Notification Action Buttons */}
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNotificationOpen(true);
+                    setUnreadNotifCount(0);
+                  }}
+                  className="p-2.5 rounded-2xl bg-white text-slate-700 hover:text-[#eb4b2b] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center shadow-2xs"
+                  title="Notifikasi & Log Aktivitas"
+                >
+                  <Bell className="w-5 h-5 stroke-[1.75]" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#eb4b2b] text-white text-[10px] font-black flex items-center justify-center shadow-xs animate-pulse">
+                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                <Link
+                  href="/keranjang"
+                  title="Keranjang"
+                  className="p-2.5 rounded-2xl bg-white text-slate-700 hover:text-[#eb4b2b] border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center shadow-2xs"
+                >
+                  <ShoppingCart className="w-5 h-5 stroke-[1.75]" />
+                  {totalCartItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#eb4b2b] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                      {totalCartItems}
+                    </span>
+                  )}
+                </Link>
+              </div>
             </div>
 
             {/* Greeting & Shift */}
@@ -660,13 +783,32 @@ export default function DashboardUnifiedPage() {
                 </div>
               </div>
 
-              <Link
-                href="/booking/history"
-                title="Riwayat Booking"
-                className="p-2.5 rounded-2xl bg-white text-slate-700 hover:text-emerald-700 border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center shadow-2xs"
-              >
-                <Repeat className="w-5 h-5 stroke-[1.75]" />
-              </Link>
+              {/* Actions: Notification & History */}
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNotificationOpen(true);
+                    setUnreadNotifCount(0);
+                  }}
+                  className="p-2.5 rounded-2xl bg-white text-slate-700 hover:text-emerald-700 border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center shadow-2xs"
+                  title="Notifikasi & Log Aktivitas"
+                >
+                  <Bell className="w-5 h-5 stroke-[1.75]" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs animate-pulse">
+                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                <Link
+                  href="/booking/history"
+                  title="Riwayat Booking"
+                  className="p-2.5 rounded-2xl bg-white text-slate-700 hover:text-emerald-700 border border-slate-200 transition-colors cursor-pointer relative flex items-center justify-center shadow-2xs"
+                >
+                  <Repeat className="w-5 h-5 stroke-[1.75]" />
+                </Link>
+              </div>
             </div>
 
             {/* Greeting & Shift */}
@@ -845,13 +987,18 @@ export default function DashboardUnifiedPage() {
 
               <button
                 type="button"
-                onClick={() => setIsNotificationOpen(true)}
+                onClick={() => {
+                  setIsNotificationOpen(true);
+                  setUnreadNotifCount(0);
+                }}
                 className="relative p-2 rounded-2xl hover:bg-slate-100 text-[#eb4b2b] transition-all cursor-pointer"
                 title="Notifikasi & Peringatan"
               >
                 <Bell className="w-6 h-6 fill-[#eb4b2b] text-[#eb4b2b]" />
-                {(lowStockCount > 0 || outOfStockCount > 0 || bookingsPendingSettlement > 0) && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-white animate-pulse" />
+                {(unreadNotifCount > 0 || lowStockCount > 0 || outOfStockCount > 0 || bookingsPendingSettlement > 0) && (
+                  <span className="absolute top-1 right-1 px-1.5 py-0.2 min-w-4 h-4 rounded-full bg-red-600 text-white font-black text-[9px] flex items-center justify-center ring-2 ring-white animate-pulse">
+                    {unreadNotifCount > 0 ? (unreadNotifCount > 9 ? '9+' : unreadNotifCount) : ''}
+                  </span>
                 )}
               </button>
             </div>
@@ -1330,22 +1477,27 @@ export default function DashboardUnifiedPage() {
       )}
 
       {/* ============================================================ */}
-      {/* NOTIFICATION MODAL — data real dari DB */}
+      {/* NOTIFICATION & REALTIME ACTIVITY MODAL */}
       {/* ============================================================ */}
       {isNotificationOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-center space-x-2.5">
                 <div className="p-2 rounded-xl bg-red-50 text-[#eb4b2b]">
                   <Bell className="w-5 h-5 fill-[#eb4b2b]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">Notifikasi Owner</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm text-slate-900">Pusat Notifikasi & Log Aktivitas</h3>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Realtime Sync
+                    </span>
+                  </div>
                   <p className="text-[10px] text-slate-400">
-                    {activeUnit === 'lapangan'
-                      ? 'Pembaruan reservasi & operasional lapangan GOR'
-                      : 'Pembaruan performa & inventaris kantin/toko'}
+                    Tersimpan permanen di database Supabase & tersinkronisasi lintas perangkat
                   </p>
                 </div>
               </div>
@@ -1358,166 +1510,259 @@ export default function DashboardUnifiedPage() {
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs">
-              {/* NOTIFIKASI KHUSUS UNIT LAPANGAN */}
-              {activeUnit === 'lapangan' ? (
-                <>
-                  {/* Pendapatan & Booking Lapangan Hari Ini */}
-                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
-                    <div className="flex items-center justify-between font-bold">
-                      <span className="flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                        Sewa Lapangan Hari Ini
-                      </span>
+            {/* Sub-tabs: Feed Aktivitas vs Ringkasan Operasional */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl my-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setNotifTab('feed')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  notifTab === 'feed'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5 text-[#eb4b2b]" />
+                <span>Riwayat Realtime</span>
+                {activityLogs.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-black">
+                    {activityLogs.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setNotifTab('summary')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  notifTab === 'summary'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Ringkasan & Push HP</span>
+              </button>
+            </div>
+
+            {/* Scrollable Content Body */}
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+              {notifTab === 'feed' ? (
+                /* FEED AKTIVITAS REALTIME DARI SUPABASE */
+                activityLogs.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <Bell className="w-6 h-6" />
                     </div>
-                    <p className="text-[11px] text-emerald-800">
-                      {todayCourtBookings.length > 0
-                        ? `${todayCourtBookings.length} booking tercatat • Total ${formatRupiah(totalBookingRevenue)}.`
-                        : 'Belum ada booking jadwal lapangan untuk hari ini.'}
+                    <p className="font-bold text-slate-600 text-xs">Belum Ada Aktivitas Terbaru</p>
+                    <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                      Setiap kali kasir melakukan booking, mengubah jadwal, ganti shift, atau transaksi, notifikasi akan langsung tercatat di sini secara realtime.
                     </p>
                   </div>
+                ) : (
+                  <div className="space-y-2">
+                    {activityLogs.slice(0, 35).map((log) => {
+                      const badge = getActionBadge(log.actionType);
+                      const IconComp = badge.icon;
+                      return (
+                        <div
+                          key={log.id}
+                          className="p-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 transition-all space-y-1.5 shadow-2xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`p-1.5 rounded-xl shrink-0 border ${badge.bg}`}>
+                                <IconComp className="w-3.5 h-3.5" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-slate-900 text-xs truncate">
+                                  {log.title}
+                                </h4>
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
+                                  <span className="font-semibold text-slate-600">{log.staffName} ({log.role})</span>
+                                  <span>•</span>
+                                  <span>{formatRelativeTime(log.timestamp)}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border ${badge.bg}`}>
+                              {badge.label}
+                            </span>
+                          </div>
 
-                  {/* Status Pelunasan */}
-                  {bookingsPendingSettlement > 0 ? (
-                    <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                        Perlu Pelunasan
+                          <p className="text-[11px] text-slate-600 pl-7 leading-relaxed bg-slate-50/70 p-2 rounded-xl border border-slate-100">
+                            {log.details}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* TAB 2: RINGKASAN OPERASIONAL & PUSH HP */
+                <div className="space-y-2.5">
+                  {/* NOTIFIKASI KHUSUS UNIT LAPANGAN */}
+                  {activeUnit === 'lapangan' ? (
+                    <>
+                      {/* Pendapatan & Booking Lapangan Hari Ini */}
+                      <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                            Sewa Lapangan Hari Ini
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800">
+                          {todayCourtBookings.length > 0
+                            ? `${todayCourtBookings.length} booking tercatat • Total ${formatRupiah(totalBookingRevenue)}.`
+                            : 'Belum ada booking jadwal lapangan untuk hari ini.'}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-amber-800">
-                        {bookingsPendingSettlement} booking lapangan masih menunggu pelunasan.
-                      </p>
-                    </div>
+
+                      {/* Status Pelunasan */}
+                      {bookingsPendingSettlement > 0 ? (
+                        <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                            Perlu Pelunasan
+                          </div>
+                          <p className="text-[11px] text-amber-800">
+                            {bookingsPendingSettlement} booking lapangan masih menunggu pelunasan.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Pelunasan Aman
+                          </div>
+                          <p className="text-[11px] text-emerald-800">
+                            Semua booking lapangan yang tercatat sudah lunas.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Okupansi Lapangan */}
+                      <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-blue-900 space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
+                          Status Okupansi Lapangan
+                        </div>
+                        <p className="text-[11px] text-blue-800">
+                          {courtsInPlay > 0
+                            ? `${courtsInPlay} dari ${courts.length || 4} lapangan sedang aktif digunakan saat ini.`
+                            : 'Saat ini belum ada pertandingan yang sedang berjalan.'}
+                        </p>
+                      </div>
+                    </>
                   ) : (
-                    <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        Pelunasan Aman
+                    /* NOTIFIKASI KHUSUS UNIT KANTIN / POS */
+                    <>
+                      {/* Stok Menipis */}
+                      {lowStockCount > 0 || outOfStockCount > 0 ? (
+                        <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                              Peringatan Stok
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-amber-800">
+                            {outOfStockCount > 0 && `${outOfStockCount} produk habis stok. `}
+                            {lowStockCount > 0 && `${lowStockCount} produk stok menipis (≤ 15).`}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Stok Aman
+                          </div>
+                          <p className="text-[11px] text-emerald-800">Semua produk kantin memiliki stok yang cukup.</p>
+                        </div>
+                      )}
+
+                      {/* Penjualan Hari Ini */}
+                      <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                            Penjualan Hari Ini
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800">
+                          {summary.totalTransactions > 0
+                            ? `${summary.totalTransactions} transaksi • Total ${formatRupiah(todayRevenue)}.`
+                            : 'Belum ada transaksi kantin hari ini.'}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-emerald-800">
-                        Semua booking lapangan yang tercatat sudah lunas.
-                      </p>
-                    </div>
+                    </>
                   )}
 
-                  {/* Okupansi Lapangan */}
-                  <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-200/80 text-blue-900 space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
-                      Status Okupansi Lapangan
-                    </div>
-                    <p className="text-[11px] text-blue-800">
-                      {courtsInPlay > 0
-                        ? `${courtsInPlay} dari ${courts.length || 4} lapangan sedang aktif digunakan saat ini.`
-                        : 'Saat ini belum ada pertandingan yang sedang berjalan.'}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                /* NOTIFIKASI KHUSUS UNIT KANTIN / POS */
-                <>
-                  {/* Stok Menipis */}
-                  {lowStockCount > 0 || outOfStockCount > 0 ? (
-                    <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-900 space-y-1">
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="flex items-center gap-1.5">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                          Peringatan Stok
+                  {/* PUSH NOTIFIKASI WEB BROWSER / HP UNTUK OWNER */}
+                  {role === 'owner' && (
+                    <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Radio className="w-3.5 h-3.5 text-[#eb4b2b] animate-pulse" />
+                          Web Push Notification HP
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            pushPermission === 'granted'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : pushPermission === 'denied'
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {pushPermission === 'granted'
+                            ? '● Aktif'
+                            : pushPermission === 'denied'
+                            ? 'Izin Ditolak'
+                            : 'Belum Aktif'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-amber-800">
-                        {outOfStockCount > 0 && `${outOfStockCount} produk habis stok. `}
-                        {lowStockCount > 0 && `${lowStockCount} produk stok menipis (≤ 15).`}
+
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Pop-up langsung di layar HP/Desktop (seperti notifikasi Play Store) saat ada booking baru, perubahan jadwal, pelunasan, atau pembatalan kasir tanpa aplikasi pihak ketiga.
                       </p>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        Stok Aman
+
+                      <div className="pt-1">
+                        {pushPermission !== 'granted' ? (
+                          <button
+                            type="button"
+                            onClick={handleEnablePushNotification}
+                            className="w-full py-2 px-3 rounded-xl bg-[#eb4b2b] hover:bg-[#d93f20] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                          >
+                            <Bell className="w-3.5 h-3.5" />
+                            Aktifkan Notifikasi HP Saya
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleTestPushNotification('booking')}
+                            className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                          >
+                            <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+                            🧪 Uji Coba Munculkan Notifikasi Pop-up
+                          </button>
+                        )}
                       </div>
-                      <p className="text-[11px] text-emerald-800">Semua produk kantin memiliki stok yang cukup.</p>
                     </div>
                   )}
-
-                  {/* Penjualan Hari Ini */}
-                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-emerald-900 space-y-1">
-                    <div className="flex items-center justify-between font-bold">
-                      <span className="flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                        Penjualan Hari Ini
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-emerald-800">
-                      {summary.totalTransactions > 0
-                        ? `${summary.totalTransactions} transaksi • Total ${formatRupiah(todayRevenue)}.`
-                        : 'Belum ada transaksi kantin hari ini.'}
-                    </p>
-                  </div>
-                </>
+                </div>
               )}
             </div>
 
-            {/* PUSH NOTIFIKASI WEB BROWSER / HP UNTUK OWNER */}
-            {role === 'owner' && (
-              <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Radio className="w-3.5 h-3.5 text-[#eb4b2b] animate-pulse" />
-                    Web Push Notification HP
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      pushPermission === 'granted'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : pushPermission === 'denied'
-                        ? 'bg-rose-100 text-rose-700'
-                        : 'bg-amber-100 text-amber-700'
-                    }`}
-                  >
-                    {pushPermission === 'granted'
-                      ? '● Aktif'
-                      : pushPermission === 'denied'
-                      ? 'Izin Ditolak'
-                      : 'Belum Aktif'}
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Pop-up langsung di layar HP/Desktop (seperti notifikasi Play Store) saat ada booking baru, pelunasan, atau pembatalan kasir tanpa aplikasi pihak ketiga.
-                </p>
-
-                <div className="pt-1">
-                  {pushPermission !== 'granted' ? (
-                    <button
-                      type="button"
-                      onClick={handleEnablePushNotification}
-                      className="w-full py-2 px-3 rounded-xl bg-[#eb4b2b] hover:bg-[#d93f20] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
-                    >
-                      <Bell className="w-3.5 h-3.5" />
-                      Aktifkan Notifikasi HP Saya
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleTestPushNotification('booking')}
-                      className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                    >
-                      <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
-                      🧪 Uji Coba Munculkan Notifikasi Pop-up
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsNotificationOpen(false)}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer transition-colors"
-            >
-              Tutup
-            </button>
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-100 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsNotificationOpen(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -73,7 +73,46 @@ export const OwnerNotificationManager: React.FC = () => {
     let realtimeChannel: any = null;
     try {
       realtimeChannel = supabase
-        .channel('owner_realtime_alerts')
+        .channel('kasir_global_events')
+        .on('broadcast', { event: 'activity_log' }, (data: any) => {
+          if (!isUserOwner()) return;
+          const log = data?.payload;
+          if (!log) return;
+
+          // Dispatch local event so UI components immediately update their notification list!
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('kasir_activity_logged', { detail: log }));
+          }
+
+          const actionType = log.actionType || log.action_type || '';
+          let title = '📢 Notifikasi Kasir GOR';
+          if (
+            actionType.includes('DELETE') ||
+            actionType.includes('VOID') ||
+            actionType.includes('CANCEL')
+          ) {
+            title = '🚨 ' + (log.title || 'Pembatalan Kasir');
+          } else if (actionType === 'EDIT_BOOKING') {
+            title = '🔄 ' + (log.title || 'Perubahan Data Booking');
+          } else if (actionType === 'SHIFT_HANDOVER') {
+            title = '🔄 ' + (log.title || 'Pergantian Shift');
+          } else if (actionType === 'CREATE_BOOKING') {
+            title = '🏸 Booking Lapangan Baru';
+          } else if (actionType === 'SETTLE_BOOKING') {
+            title = '💰 Pelunasan Sewa Lapangan';
+          } else if (actionType === 'CREATE_TRANSACTION') {
+            title = '🛒 Penjualan Toko Baru Selesai';
+          } else {
+            title = 'ℹ️ ' + (log.title || 'Aktivitas Kasir');
+          }
+
+          sendWebPushNotificationToOwner({
+            title,
+            body: log.details || '',
+            tag: log.id || 'act-' + Date.now(),
+            url: actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+          });
+        })
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'products' },
@@ -104,48 +143,6 @@ export const OwnerNotificationManager: React.FC = () => {
                 body: `Stok produk "${newRow.name}" tersisa ${currentStock} ${newRow.unit || 'pcs'} (Batas minimum: ${minStock}). Segera lakukan pemesanan ulang.`,
                 url: '/produk',
                 tag: `stock-low-${newRow.id}`,
-              });
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'activity_logs' },
-          (payload) => {
-            if (!isUserOwner()) return;
-            const log = payload.new as any;
-            if (!log) return;
-
-            const actionType = log.action_type || '';
-            if (
-              actionType === 'DELETE_BOOKING' ||
-              actionType === 'CANCEL_BOOKING' ||
-              actionType === 'DELETE_TRANSACTION' ||
-              actionType === 'VOID_TRANSACTION' ||
-              actionType === 'CREATE_BOOKING' ||
-              actionType === 'SETTLE_BOOKING' ||
-              actionType === 'CREATE_TRANSACTION'
-            ) {
-              let title = '📢 Notifikasi Kasir GOR';
-              if (
-                actionType.includes('DELETE') ||
-                actionType.includes('VOID') ||
-                actionType.includes('CANCEL')
-              ) {
-                title = '🚨 ' + (log.title || 'Pembatalan Kasir (VOID)');
-              } else if (actionType === 'CREATE_BOOKING') {
-                title = '🏸 Booking Lapangan Baru';
-              } else if (actionType === 'SETTLE_BOOKING') {
-                title = '💰 Pelunasan Sewa Lapangan';
-              } else if (actionType === 'CREATE_TRANSACTION') {
-                title = '🛒 Penjualan Toko Baru Selesai';
-              }
-
-              sendWebPushNotificationToOwner({
-                title,
-                body: log.details || '',
-                tag: log.id || 'act-' + Date.now(),
-                url: actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
               });
             }
           }

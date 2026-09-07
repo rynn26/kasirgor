@@ -125,31 +125,43 @@ export async function recordActivityLog(
     metadata: entry.metadata || {},
   };
 
-  // 1. Try writing to Supabase table `activity_logs` (non-blocking)
+  // 1. Try writing to Supabase table `activity_logs` & broadcast to all connected devices
   try {
-    Promise.resolve(
-      supabase
-        .from('activity_logs')
-        .insert({
-          id: newLog.id,
-          created_at: newLog.timestamp,
-          staff_name: newLog.staffName,
-          staff_email: newLog.staffEmail || null,
-          role: newLog.role,
-          action_type: newLog.actionType,
-          title: newLog.title,
-          details: newLog.details,
-          metadata: newLog.metadata,
-        })
-    ).catch(() => {});
-  } catch {}
+    supabase
+      .from('activity_logs')
+      .insert({
+        id: newLog.id,
+        created_at: newLog.timestamp,
+        staff_name: newLog.staffName,
+        staff_email: newLog.staffEmail || null,
+        role: newLog.role,
+        action_type: newLog.actionType,
+        title: newLog.title,
+        details: newLog.details,
+        metadata: newLog.metadata,
+      })
+      .then(
+        () => {},
+        (err: any) => console.error('Supabase activity_logs insert error:', err)
+      );
+
+    // Broadcast across all devices via Supabase Realtime channel
+    const realtimeChannel = supabase.channel('kasir_global_events');
+    realtimeChannel.send({
+      type: 'broadcast',
+      event: 'activity_log',
+      payload: newLog,
+    });
+  } catch (err) {
+    console.error('Error dispatching realtime activity log:', err);
+  }
 
   // 2. Persist to localStorage for guaranteed immediate persistence and tab-sync
   if (typeof window !== 'undefined') {
     try {
       const existingStr = localStorage.getItem(ACTIVITY_LOGS_STORAGE_KEY);
       const existing: ActivityLog[] = existingStr ? JSON.parse(existingStr) : SEED_ACTIVITY_LOGS;
-      const updated = [newLog, ...existing].slice(0, 500); // retain last 500 logs
+      const updated = [newLog, ...existing.filter((item) => item.id !== newLog.id)].slice(0, 500); // retain last 500 logs
       localStorage.setItem(ACTIVITY_LOGS_STORAGE_KEY, JSON.stringify(updated));
 
       // Dispatch custom event for real-time reactivity in current tab
@@ -164,8 +176,11 @@ export async function recordActivityLog(
         newLog.actionType === 'DELETE_TRANSACTION' ||
         newLog.actionType === 'VOID_TRANSACTION' ||
         newLog.actionType === 'CREATE_BOOKING' ||
+        newLog.actionType === 'EDIT_BOOKING' ||
         newLog.actionType === 'SETTLE_BOOKING' ||
-        newLog.actionType === 'CREATE_TRANSACTION'
+        newLog.actionType === 'SHIFT_HANDOVER' ||
+        newLog.actionType === 'CREATE_TRANSACTION' ||
+        newLog.actionType === 'MANUAL_EDIT'
       ) {
         import('@/lib/notifications/webPush').then(({ notifyOwner }) => {
           let title = '📢 Notifikasi Kasir GOR';
@@ -175,12 +190,18 @@ export async function recordActivityLog(
             newLog.actionType.includes('CANCEL')
           ) {
             title = '🚨 ' + newLog.title;
+          } else if (newLog.actionType === 'EDIT_BOOKING') {
+            title = '🔄 ' + newLog.title;
+          } else if (newLog.actionType === 'SHIFT_HANDOVER') {
+            title = '🔄 ' + newLog.title;
           } else if (newLog.actionType === 'CREATE_BOOKING') {
             title = '🏸 Booking Lapangan Baru';
           } else if (newLog.actionType === 'SETTLE_BOOKING') {
             title = '💰 Pelunasan Sewa Lapangan';
           } else if (newLog.actionType === 'CREATE_TRANSACTION') {
             title = '🛒 Penjualan Toko Baru Selesai';
+          } else {
+            title = 'ℹ️ ' + newLog.title;
           }
 
           notifyOwner({

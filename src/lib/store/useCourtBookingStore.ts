@@ -149,6 +149,30 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
         selectedBooking: state.selectedBooking?.id === bookingId ? updated : state.selectedBooking,
         isLoading: false,
       }));
+
+      // Record Activity Log if not cancelled (cancelled has its own log)
+      try {
+        if (data.status !== 'CANCELLED') {
+          const { recordActivityLog } = await import('@/lib/db/activityLogs');
+          const { useShiftStore } = await import('@/lib/store/useShiftStore');
+          const cashier = useShiftStore.getState().cashierName || 'Yuli';
+          recordActivityLog({
+            staffName: cashier,
+            role: 'Kasir',
+            actionType: 'EDIT_BOOKING',
+            title: 'Perubahan Data Booking Lapangan',
+            details: `Kasir ${cashier} mengubah data booking #${bookingId.slice(0, 8)} (${updated.customerName} - ${updated.courtName || 'Lapangan'}). Tgl Main: ${updated.date}, Jam: ${updated.startTime}-${updated.endTime}, Status: ${updated.status}.`,
+            metadata: {
+              bookingId,
+              customerName: updated.customerName,
+              courtName: updated.courtName,
+              date: updated.date,
+              status: updated.status,
+            },
+          });
+        }
+      } catch {}
+
       return updated;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal memperbarui booking', isLoading: false });
