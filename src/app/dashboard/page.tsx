@@ -1779,9 +1779,10 @@ export default function DashboardUnifiedPage() {
       <OwnerDailyRevenueModal
         isOpen={isOwnerRevenueModalOpen}
         onClose={() => setIsOwnerRevenueModalOpen(false)}
-        initialDate={activeDate}
-        initialStartDate={activeDate}
-        initialEndDate={activeDate}
+        initialDate={role === 'kasir' ? todayStr : activeDate}
+        initialStartDate={role === 'kasir' ? todayStr : activeDate}
+        initialEndDate={role === 'kasir' ? todayStr : activeDate}
+        isOwner={role !== 'kasir'}
       />
 
       {/* iOS Safari Instruction Modal */}

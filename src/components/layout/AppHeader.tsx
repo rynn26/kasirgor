@@ -7,15 +7,18 @@ import {
   Maximize2,
   ShoppingBag,
   ArrowLeft,
-  Repeat
+  Repeat,
+  Wallet
 } from 'lucide-react';
 import { ShiftHandoverModal } from '@/components/shift/ShiftHandoverModal';
+import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 
 export const AppHeader: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { cashierName, selectedShift } = useShiftStore();
   const [isHandoverOpen, setIsHandoverOpen] = useState(false);
+  const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
 
   React.useEffect(() => {
@@ -112,15 +115,27 @@ export const AppHeader: React.FC = () => {
       <div className="flex items-center space-x-2">
         {/* Quick Shift Handover Button (Hanya Staff Kasir) */}
         {!isOwner && (
-          <button
-            type="button"
-            onClick={() => setIsHandoverOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#eb4b2b] border border-orange-200/80 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-            title="Pergantian Shift / Serah Terima Kasir"
-          >
-            <Repeat className="w-3.5 h-3.5" />
-            <span>Ganti Shift</span>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setIsRevenueModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs border border-amber-600"
+              title="Lihat Total Omset Hari Ini"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Rekap Omset Hari Ini</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsHandoverOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#eb4b2b] border border-orange-200/80 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              title="Pergantian Shift / Serah Terima Kasir"
+            >
+              <Repeat className="w-3.5 h-3.5" />
+              <span>Ganti Shift</span>
+            </button>
+          </>
         )}
 
         {/* Fullscreen shortcut for POS */}
@@ -137,6 +152,13 @@ export const AppHeader: React.FC = () => {
       <ShiftHandoverModal
         isOpen={isHandoverOpen}
         onClose={() => setIsHandoverOpen(false)}
+      />
+
+      {/* Rekap Omset Hari Ini Modal (Role Kasir) */}
+      <OwnerDailyRevenueModal
+        isOpen={isRevenueModalOpen}
+        onClose={() => setIsRevenueModalOpen(false)}
+        isOwner={false}
       />
     </header>
   );

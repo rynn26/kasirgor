@@ -29,6 +29,7 @@ interface OwnerDailyRevenueModalProps {
   initialStartDate?: string;
   initialEndDate?: string;
   onDateChange?: (start: string, end: string) => void;
+  isOwner?: boolean;
 }
 
 export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
@@ -38,6 +39,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
   initialStartDate,
   initialEndDate,
   onDateChange,
+  isOwner: isOwnerProp,
 }) => {
   const { transactions } = useTransactionStore();
   const { bookings } = useCourtBookingStore();
@@ -53,39 +55,77 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 
   const todayStr = useMemo(() => getJakartaToday(), []);
 
+  // Role detection: if explicitly passed or read from session
+  const [isOwnerUser, setIsOwnerUser] = useState<boolean>(isOwnerProp ?? true);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const checkRole = () => {
+        if (typeof isOwnerProp === 'boolean') {
+          setIsOwnerUser(isOwnerProp);
+          return;
+        }
+        const session = localStorage.getItem('kasir_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            const role = (parsed.role || '').toLowerCase();
+            setIsOwnerUser(role === 'owner' || role === 'admin');
+          } catch {
+            setIsOwnerUser(false);
+          }
+        } else {
+          setIsOwnerUser(false);
+        }
+      };
+      checkRole();
+      window.addEventListener('storage', checkRole);
+      return () => window.removeEventListener('storage', checkRole);
+    }
+  }, [isOwnerProp]);
+
   const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
   const [selectedDate, setSelectedDate] = useState<string>(initialDate || globalSelectedDate || todayStr);
   const [startDate, setStartDate] = useState<string>(initialStartDate || initialDate || globalCustomStartDate || todayStr);
   const [endDate, setEndDate] = useState<string>(initialEndDate || initialDate || globalCustomEndDate || todayStr);
   const [isCopied, setIsCopied] = useState(false);
   const dateInputRef = React.useRef<HTMLInputElement>(null);
+  const prevIsOpenRef = React.useRef<boolean>(false);
 
   React.useEffect(() => {
-    if (isOpen) {
-      const s = initialStartDate || initialDate || globalCustomStartDate || globalSelectedDate || todayStr;
-      const e = initialEndDate || initialDate || globalCustomEndDate || globalSelectedDate || todayStr;
-
-      if (s !== e) {
-        setDateMode('range');
-        const [realS, realE] = s <= e ? [s, e] : [e, s];
-        setStartDate(realS);
-        setEndDate(realE);
-        setSelectedDate(realS);
-      } else {
+    // Hanya inisialisasi ketika modal baru saja dibuka (transisi dari tertutup -> terbuka)
+    if (isOpen && !prevIsOpenRef.current) {
+      if (!isOwnerUser) {
         setDateMode('single');
-        setSelectedDate(s);
-        setStartDate(s);
-        setEndDate(s);
+        setSelectedDate(todayStr);
+        setStartDate(todayStr);
+        setEndDate(todayStr);
+      } else {
+        const s = initialStartDate || initialDate || globalCustomStartDate || globalSelectedDate || todayStr;
+        const e = initialEndDate || initialDate || globalCustomEndDate || globalSelectedDate || todayStr;
+
+        if (s !== e) {
+          setDateMode('range');
+          const [realS, realE] = s <= e ? [s, e] : [e, s];
+          setStartDate(realS);
+          setEndDate(realE);
+          setSelectedDate(realS);
+        } else {
+          setDateMode('single');
+          setSelectedDate(s);
+          setStartDate(s);
+          setEndDate(s);
+        }
       }
     }
-  }, [isOpen, initialDate, initialStartDate, initialEndDate, globalSelectedDate, globalCustomStartDate, globalCustomEndDate, todayStr]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, isOwnerUser, initialDate, initialStartDate, initialEndDate, globalSelectedDate, globalCustomStartDate, globalCustomEndDate, todayStr]);
 
   const handleSingleDateChange = (newDate: string) => {
     if (!newDate) return;
     setSelectedDate(newDate);
     setStartDate(newDate);
     setEndDate(newDate);
-    setGlobalSelectedDate(newDate);
     onDateChange?.(newDate, newDate);
   };
 
@@ -93,42 +133,37 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     setSelectedDate(todayStr);
     setStartDate(todayStr);
     setEndDate(todayStr);
-    setGlobalSelectedDate(todayStr);
     onDateChange?.(todayStr, todayStr);
   };
 
   const handleStartDateChange = (newStart: string) => {
+    if (!newStart) return;
     setStartDate(newStart);
-    if (newStart && endDate) {
-      const [s, e] = newStart <= endDate ? [newStart, endDate] : [endDate, newStart];
-      setGlobalDateRange(s, e);
-      onDateChange?.(s, e);
-    }
+    onDateChange?.(newStart, endDate);
   };
 
   const handleEndDateChange = (newEnd: string) => {
+    if (!newEnd) return;
     setEndDate(newEnd);
-    if (startDate && newEnd) {
-      const [s, e] = startDate <= newEnd ? [startDate, newEnd] : [newEnd, startDate];
-      setGlobalDateRange(s, e);
-      onDateChange?.(s, e);
-    }
+    onDateChange?.(startDate, newEnd);
   };
 
   const handleModeChange = (newMode: 'single' | 'range') => {
     setDateMode(newMode);
     if (newMode === 'single') {
-      setGlobalSelectedDate(selectedDate);
       onDateChange?.(selectedDate, selectedDate);
     } else {
-      const [s, e] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
-      setGlobalDateRange(s, e);
-      onDateChange?.(s, e);
+      const s = startDate || selectedDate || todayStr;
+      const e = endDate || selectedDate || todayStr;
+      const [realS, realE] = s <= e ? [s, e] : [e, s];
+      setStartDate(realS);
+      setEndDate(realE);
+      onDateChange?.(realS, realE);
     }
   };
 
-  const effectiveStart = dateMode === 'single' ? selectedDate : (startDate <= endDate ? startDate : endDate);
-  const effectiveEnd = dateMode === 'single' ? selectedDate : (startDate <= endDate ? endDate : startDate);
+  const effectiveStart = !isOwnerUser ? todayStr : (dateMode === 'single' ? selectedDate : (startDate <= endDate ? startDate : endDate));
+  const effectiveEnd = !isOwnerUser ? todayStr : (dateMode === 'single' ? selectedDate : (startDate <= endDate ? endDate : startDate));
 
   // Perhitungan Data Pendapatan Berdasarkan Tanggal/Rentang yang Dipilih
   const revenueSummary = useMemo(() => {
@@ -314,7 +349,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
   };
 
   const handleCopySummary = () => {
-    const text = `📊 *REKAP OMSET HARIAN GOR*
+    const text = `📊 *${isOwnerUser ? 'REKAP OMSET HARIAN GOR' : 'REKAP OMSET HARIAN GOR (HARI INI)'}*
 📅 Tanggal: ${formattedDateLabel}
 
 💵 *CASH (Uang Fisik di Kas): ${formatRupiah(revenueSummary.totalCash)}*
@@ -355,13 +390,18 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
         <div className="px-5 py-4 sm:px-7 sm:py-5 bg-white border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Rekap Omset Harian
+              {isOwnerUser ? 'Rekap Omset Harian' : 'Rekap Omset Hari Ini'}
             </h2>
+            {!isOwnerUser && (
+              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                Monitoring total omset kasir hari ini (Kantin + Booking)
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Quick Button Hari Ini jika sedang melihat tanggal lampau */}
-            {dateMode === 'single' && selectedDate !== todayStr && (
+            {/* Quick Button Hari Ini jika sedang melihat tanggal lampau (Hanya Owner) */}
+            {isOwnerUser && dateMode === 'single' && selectedDate !== todayStr && (
               <button
                 type="button"
                 onClick={handleQuickToday}
@@ -372,31 +412,38 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
               </button>
             )}
 
-            {/* Date Pill Picker */}
-            <div className="relative">
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  if (e.target.value) handleSingleDateChange(e.target.value);
-                }}
-                onClick={(e) => {
-                  try {
-                    (e.currentTarget as HTMLInputElement).showPicker?.();
-                  } catch {}
-                }}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                title="Pilih Tanggal"
-              />
-              <button
-                type="button"
-                className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer"
-              >
-                <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
-                <span className="truncate">{formattedDateLabel}</span>
-              </button>
-            </div>
+            {/* Date Pill Picker (Owner) vs Badge Hari Ini Terkunci (Kasir) */}
+            {isOwnerUser ? (
+              <div className="relative">
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    if (e.target.value) handleSingleDateChange(e.target.value);
+                  }}
+                  onClick={(e) => {
+                    try {
+                      (e.currentTarget as HTMLInputElement).showPicker?.();
+                    } catch {}
+                  }}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                  title="Pilih Tanggal"
+                />
+                <button
+                  type="button"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span className="truncate">{formattedDateLabel}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-amber-50 border border-amber-200/90 text-amber-900 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-2xs select-none">
+                <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="truncate">Hari Ini ({formattedDateLabel})</span>
+              </div>
+            )}
 
             {/* Close Button */}
             <button
@@ -415,38 +462,40 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
         {/* ============================================================ */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
           
-          {/* Opsi Switch Mode Harian / Rentang (Opsional untuk Fleksibilitas) */}
-          <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-2xl border border-slate-200/80 shadow-2xs">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Mode Laporan:
-            </span>
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => handleModeChange('single')}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  dateMode === 'single'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Harian
-              </button>
-              <button
-                type="button"
-                onClick={() => handleModeChange('range')}
-                className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                  dateMode === 'range'
-                    ? 'bg-white text-slate-900 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Rentang Tanggal
-              </button>
+          {/* Opsi Switch Mode Harian / Rentang (HANYA UNTUK OWNER) */}
+          {isOwnerUser && (
+            <div className="flex items-center justify-between bg-white px-3.5 py-2 rounded-2xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Mode Laporan:
+              </span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('single')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    dateMode === 'single'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Harian
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('range')}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    dateMode === 'range'
+                      ? 'bg-white text-slate-900 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Rentang Tanggal
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {dateMode === 'range' && (
+          {isOwnerUser && dateMode === 'range' && (
             <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">

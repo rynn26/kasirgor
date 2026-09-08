@@ -183,8 +183,6 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
   if (!isOpen || !booking) return null;
 
   const maxCourts = selectedSport === 'Pickleball' ? 2 : 4;
-  const availableCourts = courts.slice(0, maxCourts);
-
   // Calculate Duration
   const startHour = parseInt(startTime.split(':')[0], 10);
   const endHour = parseInt(endTime.split(':')[0], 10);
@@ -209,22 +207,6 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
     }
   };
 
-  const handleToggleCourt = (courtId: string) => {
-    if (selectedCourtIds.includes(courtId)) {
-      if (selectedCourtIds.length > 1) {
-        const next = selectedCourtIds.filter((id) => id !== courtId);
-        setSelectedCourtIds(next);
-        setCourtCount(next.length);
-      }
-    } else {
-      if (selectedCourtIds.length < maxCourts) {
-        const next = [...selectedCourtIds, courtId];
-        setSelectedCourtIds(next);
-        setCourtCount(next.length);
-      }
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -235,10 +217,13 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const selectedCourtsNames = courts
-        .filter((c) => selectedCourtIds.includes(c.id))
-        .map((c) => c.name)
-        .join(' & ') || `${courtCount} Lapangan (${selectedSport})`;
+      const finalCourtName = booking.courtName || (
+        courts
+          .filter((c) => selectedCourtIds.includes(c.id))
+          .map((c) => c.name)
+          .join(' & ') || `${courtCount} Lapangan (${selectedSport})`
+      );
+      const finalCourtId = booking.courtId || selectedCourtIds[0] || courts[0]?.id || '';
 
       const finalAmountPaid = status === 'SETTLED' ? totalSewa : dpAmount;
       const finalRemaining = Math.max(0, totalSewa - finalAmountPaid);
@@ -270,8 +255,8 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         bookingDate,
         date,
         dpPaidAt: bookingDate ? `${bookingDate}T12:00:00+07:00` : booking.dpPaidAt,
-        courtId: selectedCourtIds[0] || booking.courtId || courts[0]?.id || '',
-        courtName: selectedCourtsNames,
+        courtId: finalCourtId,
+        courtName: finalCourtName,
         courtPricePerHour: baseRatePerHour,
         startTime,
         endTime,
@@ -299,7 +284,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
           role: 'Kasir',
           actionType: 'EDIT_BOOKING',
           title: 'Edit Data Booking Lapangan',
-          details: `Kasir ${activeCashier} mengubah booking ${customerName.trim()} (${selectedCourtsNames || selectedSport}). Tgl Main: ${date}, Jam: ${startTime}-${endTime}, Total: ${formatRupiah(totalSewa)}, Status: ${status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
+          details: `Kasir ${activeCashier} mengubah booking ${customerName.trim()} (${finalCourtName || selectedSport}). Tgl Main: ${date}, Jam: ${startTime}-${endTime}, Total: ${formatRupiah(totalSewa)}, Status: ${status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
           metadata: {
             bookingId: booking.id,
             customerName: customerName.trim(),
@@ -332,7 +317,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
               Edit Transaksi Booking
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Perbaiki kesalahan nama, jadwal, nomor lapangan, atau pembayaran
+              Perbaiki kesalahan nama, jadwal, atau pembayaran
             </p>
           </div>
           <button
@@ -606,10 +591,15 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-800 flex items-center gap-1">
-                <span>Jam Selesai</span>
-                <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-slate-800 flex items-center gap-1">
+                  <span>Jam Selesai</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <span className="text-[11px] text-slate-500 font-semibold">
+                  Durasi: {calculatedDuration} Jam
+                </span>
+              </div>
               <select
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
@@ -619,38 +609,6 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                   <option key={t} value={t}>{t} WIB</option>
                 ))}
               </select>
-            </div>
-          </div>
-
-          {/* Court Selection */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between">
-              <label className="font-bold text-slate-800">
-                Pilih Lapangan ({selectedCourtIds.length} dipilih, max {maxCourts}):
-              </label>
-              <span className="text-[11px] text-slate-500 font-semibold">
-                Durasi: {calculatedDuration} Jam
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {availableCourts.map((court) => {
-                const isChecked = selectedCourtIds.includes(court.id);
-                return (
-                  <button
-                    key={court.id}
-                    type="button"
-                    onClick={() => handleToggleCourt(court.id)}
-                    className={`p-2.5 rounded-xl border text-left font-bold flex items-center justify-between transition-all cursor-pointer ${
-                      isChecked
-                        ? 'bg-red-50/60 border-[#b92b10] text-[#b92b10]'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span>{court.name.split(' ')[0]} {court.name.split(' ')[1]}</span>
-                    {isChecked && <Check className="w-4 h-4 stroke-[3]" />}
-                  </button>
-                );
-              })}
             </div>
           </div>
 

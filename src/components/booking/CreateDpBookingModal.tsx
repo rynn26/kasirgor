@@ -101,7 +101,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const [feeBreakdown, setFeeBreakdown] = useState<Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }>>([]);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
-  const [cashReceived, setCashReceived] = useState<number>(0);
 
   const finalTotal = Math.max(0, courtFee - (discountAmount || 0));
 
@@ -132,7 +131,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       setDurationHours(initialDuration || 1);
       setIsManualFee(false);
       setDiscountAmount(0);
-      setCashReceived(0);
     }
   }, [initialCourtId, initialStartTime, initialDate, initialDuration, isOpen, todayStr, courts]);
 
@@ -179,17 +177,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
   const endHourNum = startHourNum + durationHours;
   const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
 
-  const quickNominals = [
-    finalTotal,
-    50000,
-    100000,
-    150000,
-    200000,
-    300000,
-  ].filter((v, i, a) => v > 0 && a.indexOf(v) === i && v >= finalTotal);
-
-  const cashChange = Math.max(0, (cashReceived || 0) - finalTotal);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -199,10 +186,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
     if (finalTotal < 0) {
       showToast('Total biaya sewa tidak boleh negatif');
       return;
-    }
-
-    if (paymentMethod === 'CASH' && (cashReceived || 0) < finalTotal) {
-      setCashReceived(finalTotal);
     }
 
     const courtNameLabel = isPickleball
@@ -769,44 +752,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
                 })}
               </div>
             </div>
-
-            {/* If Cash: Quick Cash and Change */}
-            {paymentMethod === 'CASH' && (
-              <div className="p-3 bg-red-50/50 border border-red-100 rounded-2xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-slate-700">
-                    Uang Tunai Diterima
-                  </label>
-                  <span className="text-[11px] font-bold text-[#b92b10]">
-                    Kembalian: {formatRupiah(cashChange)}
-                  </span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">Rp</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={cashReceived ? formatNumber(cashReceived) : ''}
-                    onChange={(e) => setCashReceived(parseNumberInput(e.target.value))}
-                    placeholder={formatNumber(finalTotal) || '0'}
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10]"
-                  />
-                </div>
-                {/* Quick cash pills */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {quickNominals.map((nom) => (
-                    <button
-                      key={nom}
-                      type="button"
-                      onClick={() => setCashReceived(nom)}
-                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-red-50 text-slate-700 text-[10px] font-bold border border-slate-200 transition-colors cursor-pointer"
-                    >
-                      {nom === finalTotal ? 'Uang Pas' : formatRupiah(nom)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Action Buttons */}

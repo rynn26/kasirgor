@@ -605,17 +605,15 @@ export default function LaporanPenjualanPage() {
             </p>
           </div>
           <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
-            {isOwner && (
-              <button
-                type="button"
-                onClick={() => setIsOwnerRevenueModalOpen(true)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600"
-                title="Lihat Rekap Total Omset Hari Ini (Kantin + DP + Pelunasan Lapangan)"
-              >
-                <Wallet className="w-3.5 h-3.5" />
-                <span>Rekap Omset</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setIsOwnerRevenueModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600"
+              title="Lihat Rekap Total Omset Hari Ini (Kantin + DP + Pelunasan Lapangan)"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              <span>{isOwner ? 'Rekap Omset' : 'Rekap Omset Hari Ini'}</span>
+            </button>
 
             {!isLapangan && (
               <button
@@ -1087,9 +1085,10 @@ export default function LaporanPenjualanPage() {
       <OwnerDailyRevenueModal
         isOpen={isOwnerRevenueModalOpen}
         onClose={() => setIsOwnerRevenueModalOpen(false)}
-        initialDate={activeDateRange.start}
-        initialStartDate={activeDateRange.start}
-        initialEndDate={activeDateRange.end}
+        initialDate={isOwner ? activeDateRange.start : undefined}
+        initialStartDate={isOwner ? activeDateRange.start : undefined}
+        initialEndDate={isOwner ? activeDateRange.end : undefined}
+        isOwner={isOwner}
       />
 
       {/* Modal Pilih Rentang Periode Tanggal (Khusus Owner) */}
