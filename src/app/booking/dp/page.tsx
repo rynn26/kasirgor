@@ -206,7 +206,7 @@ export default function InputDpBookingPage() {
 
     const finalCustomerName = customerName.trim() || 'Penyewa Umum';
     const finalPhone = phone.trim() || '-';
-    const finalDp = dpAmount > 0 ? Math.min(dpAmount, netTotalSewa) : netTotalSewa;
+    const finalDp = typeof dpAmount === 'number' && dpAmount >= 0 ? Math.min(dpAmount, netTotalSewa) : 0;
 
     const selectedCourtsNames = courts
       .filter((c) => selectedCourtIds.includes(c.id))
@@ -691,6 +691,13 @@ export default function InputDpBookingPage() {
                 <span className="text-red-500">*</span>
               </span>
               <div className="flex items-center gap-1 text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setDpAmount(0)}
+                  className="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+                >
+                  DP Rp 0
+                </button>
                 <button
                   type="button"
                   onClick={() => handleSetDpPercent(0.5)}

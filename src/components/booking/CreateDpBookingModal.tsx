@@ -215,8 +215,10 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       second: '2-digit',
       hour12: false,
     }).format(new Date()).replace(/\./g, ':');
+
+    const todayJakarta = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
     const settleTimeIso = bookingDate
-      ? `${bookingDate}T12:00:00+07:00`
+      ? (bookingDate === todayJakarta ? new Date().toISOString() : `${bookingDate}T${timeStr}+07:00`)
       : new Date().toISOString();
 
     const newBooking = await addBooking({

@@ -668,7 +668,9 @@ export default function LaporanPenjualanPage() {
           </div>
         </div>
 
-        {isOwner ? (
+        {!isRoleChecked ? (
+          <div className="h-10 bg-slate-100/70 rounded-2xl animate-pulse" />
+        ) : isOwner ? (
           /* ============================================================ */
           /* FITUR PILIH RENTANG TANGGAL (KHUSUS OWNER) */
           /* ============================================================ */

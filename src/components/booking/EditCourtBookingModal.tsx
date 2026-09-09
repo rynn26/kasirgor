@@ -8,7 +8,7 @@ import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { DAY_NAMES, getMemberDatesInMonth } from '@/lib/memberUtils';
-import { getBookingTxDate, getBookingSettleDate, getJakartaToday } from '@/lib/bookingUtils';
+import { getBookingTxDate, getBookingSettleDate, getJakartaToday, toJakartaDateString } from '@/lib/bookingUtils';
 import {
   X,
   User,
@@ -100,18 +100,32 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       }
       setSelectedMemberDayIndex(initialDayIdx);
 
-      setBookingDate(getBookingTxDate(booking));
+      const currentTxDate = getBookingTxDate(booking);
+      setBookingDate(currentTxDate);
       setDate(booking.date || '');
       setStartTime(booking.startTime || '19:00');
       setEndTime(booking.endTime || '21:00');
-      setTotalSewa(booking.totalAmount || booking.courtFee || 160000);
-      setDpAmount(booking.dpAmount || 0);
-      setDpPaymentMethod(booking.dpPaymentMethod || 'QRIS');
-      setSettlementPaymentMethod(booking.settlementPaymentMethod || 'QRIS');
-      const initSettle = booking.status === 'SETTLED'
-        ? getBookingSettleDate(booking)
-        : (booking.settlementPaidAt ? getBookingSettleDate(booking) : getBookingTxDate(booking));
-      setSettlementPaidDate(initSettle);
+      const curTotal = booking.totalAmount || booking.courtFee || 160000;
+      setTotalSewa(curTotal);
+      setDpPaymentMethod(booking.dpPaymentMethod || booking.settlementPaymentMethod || 'QRIS');
+      setSettlementPaymentMethod(booking.settlementPaymentMethod || booking.dpPaymentMethod || 'QRIS');
+
+      const rawSettleDate = booking.settlementPaidAt
+        ? toJakartaDateString(booking.settlementPaidAt)
+        : (booking.status === 'SETTLED' ? currentTxDate : getJakartaToday());
+      const resolvedSettleDate = rawSettleDate || currentTxDate;
+      setSettlementPaidDate(resolvedSettleDate);
+
+      let initialDp = booking.dpAmount || 0;
+      if (booking.status === 'SETTLED' && resolvedSettleDate !== currentTxDate) {
+        if (booking.settlementAmount && booking.settlementAmount >= curTotal) {
+          initialDp = 0;
+        } else if (booking.dpAmount >= curTotal) {
+          initialDp = 0;
+        }
+      }
+      setDpAmount(initialDp);
+
       setStatus(booking.status);
       setNotes(booking.notes || '');
 
@@ -225,8 +239,31 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
       );
       const finalCourtId = booking.courtId || selectedCourtIds[0] || courts[0]?.id || '';
 
-      const finalAmountPaid = status === 'SETTLED' ? totalSewa : dpAmount;
-      const finalRemaining = Math.max(0, totalSewa - finalAmountPaid);
+      const isSettled = status === 'SETTLED';
+      const isDiffDate = isSettled && Boolean(settlementPaidDate) && Boolean(bookingDate) && settlementPaidDate !== bookingDate;
+
+      let finalDpAmount = dpAmount;
+      let finalSettlementAmount: number | undefined = undefined;
+
+      if (isSettled) {
+        if (isDiffDate) {
+          if (finalDpAmount >= totalSewa) {
+            finalDpAmount = 0;
+            finalSettlementAmount = totalSewa;
+          } else {
+            finalSettlementAmount = Math.max(0, totalSewa - finalDpAmount);
+          }
+        } else {
+          finalDpAmount = totalSewa;
+          finalSettlementAmount = totalSewa;
+        }
+      } else if (status === 'DP_PAID') {
+        finalSettlementAmount = undefined;
+      }
+
+      const finalAmountPaid = isSettled ? totalSewa : finalDpAmount;
+      const finalRemaining = isSettled ? 0 : Math.max(0, totalSewa - finalDpAmount);
+      const finalPaymentMethod = dpPaymentMethod;
 
       const isMember = selectedSport === 'Badminton' && memberType === 'MEMBER';
       const finalCommunityName = selectedSport === 'Badminton'
@@ -244,6 +281,18 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         }
       }
 
+      const now = new Date();
+      const currentTimeIso = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour12: false });
+      const todayJakarta = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
+      const finalDpPaidAt = bookingDate
+        ? (bookingDate === todayJakarta ? now.toISOString() : `${bookingDate}T${currentTimeIso}+07:00`)
+        : booking.dpPaidAt;
+
+      const finalSettlementPaidAt = isSettled
+        ? (settlementPaidDate === todayJakarta ? now.toISOString() : `${settlementPaidDate}T${currentTimeIso}+07:00`)
+        : undefined;
+
       const updated = await updateBooking(booking.id, {
         customerName: customerName.trim(),
         phone: phone.trim() || '0812-0000-0000',
@@ -254,7 +303,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         memberDates: isMember ? memberSchedule.dates : undefined,
         bookingDate,
         date,
-        dpPaidAt: bookingDate ? `${bookingDate}T12:00:00+07:00` : booking.dpPaidAt,
+        dpPaidAt: finalDpPaidAt,
         courtId: finalCourtId,
         courtName: finalCourtName,
         courtPricePerHour: baseRatePerHour,
@@ -263,11 +312,11 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
         durationHours: calculatedDuration,
         courtFee: totalSewa,
         totalAmount: totalSewa,
-        dpAmount: dpAmount,
-        dpPaymentMethod: dpPaymentMethod,
-        settlementAmount: status === 'SETTLED' ? (dpAmount < totalSewa ? totalSewa - dpAmount : totalSewa) : undefined,
-        settlementPaymentMethod: status === 'SETTLED' ? settlementPaymentMethod : undefined,
-        settlementPaidAt: status === 'SETTLED' ? `${settlementPaidDate}T12:00:00+07:00` : undefined,
+        dpAmount: finalDpAmount,
+        dpPaymentMethod: finalPaymentMethod,
+        settlementAmount: isSettled ? finalSettlementAmount : undefined,
+        settlementPaymentMethod: isSettled ? finalPaymentMethod : undefined,
+        settlementPaidAt: finalSettlementPaidAt,
         amountPaidTotal: finalAmountPaid,
         remainingBalance: finalRemaining,
         status: status,
@@ -685,7 +734,10 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setDpPaymentMethod(m.id as PaymentMethod)}
+                      onClick={() => {
+                        setDpPaymentMethod(m.id as PaymentMethod);
+                        setSettlementPaymentMethod(m.id as PaymentMethod);
+                      }}
                       className={`py-2 px-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-[#b92b10] text-white border-[#b92b10] shadow-2xs'
@@ -708,7 +760,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
             )}
 
             {status === 'SETTLED' && (
-              <div className="space-y-1.5 pt-2 border-t border-slate-100 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
+              <div className="space-y-2 pt-2 border-t border-slate-100 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
                 <label className="font-bold text-emerald-950 text-xs flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-emerald-700" />
@@ -727,6 +779,59 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                 <p className="text-[10px] text-emerald-700 font-medium">
                   Tanggal pelunasan ini akan tercatat pada laporan kasir & omset harian.
                 </p>
+
+                {settlementPaidDate !== bookingDate && (
+                  <div className="mt-2 pt-2 border-t border-emerald-200/60 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-900">Porsi DP di Tgl Booking:</span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDpAmount(0)}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                            dpAmount === 0
+                              ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                              : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          DP Rp 0 (Lunas di Pelunasan)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDpAmount(Math.round(totalSewa * 0.5))}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                            dpAmount > 0
+                              ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                              : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          Ada DP
+                        </button>
+                      </div>
+                    </div>
+                    {dpAmount > 0 && (
+                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                        <div>
+                          <span className="text-[10px] text-slate-600 block">Nominal DP ({bookingDate}):</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={dpAmount ? formatNumber(dpAmount) : ''}
+                            onChange={(e) => setDpAmount(Math.min(totalSewa, parseNumberInput(e.target.value)))}
+                            placeholder="Contoh: 100.000"
+                            className="w-full py-1.5 px-2 bg-white border border-emerald-300 rounded-lg text-slate-900 font-bold"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-600 block">Pelunasan ({settlementPaidDate}):</span>
+                          <div className="py-1.5 px-2 bg-white border border-emerald-300 rounded-lg text-emerald-800 font-bold">
+                            {formatRupiah(Math.max(0, totalSewa - dpAmount))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

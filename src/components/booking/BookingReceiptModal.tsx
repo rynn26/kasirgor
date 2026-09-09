@@ -59,7 +59,7 @@ export const BookingReceiptModal: React.FC<BookingReceiptModalProps> = ({
 
     const bookingDateStr = booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : '');
 
-    const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0);
+    const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0) || !booking.dpAmount;
     const settleDateStr = booking.settlementPaidAt || booking.dpPaidAt || booking.createdAt;
 
     // Format tanggal dengan jam realtime sekarang (WIB)
@@ -83,7 +83,7 @@ Waktu: *${booking.startTime} - ${booking.endTime} WIB* (${booking.durationHours}
 ----------------------------------------
 Total Biaya Sewa: ${formatRupiah(booking.courtFee)}
 ${booking.additionalItems.length > 0 ? `Tambahan: ${booking.additionalItems.map(i => `${i.name} (${i.qty}x)`).join(', ')}\n` : ''}Total Tagihan: ${formatRupiah(booking.totalAmount)}
-${isDirectLunas ? `Bayar Lunas: ${formatRupiah(booking.amountPaidTotal || booking.totalAmount)} (${booking.dpPaymentMethod || 'TUNAI'})` : `DP Terbayar: ${formatRupiah(booking.dpAmount)} (${booking.dpPaymentMethod || 'TUNAI'})\nPelunasan: ${formatRupiah(booking.settlementAmount || 0)} (${booking.settlementPaymentMethod || 'TUNAI'})`}
+${isDirectLunas ? `Bayar Lunas: ${formatRupiah(booking.amountPaidTotal || booking.totalAmount)} (${booking.settlementPaymentMethod || booking.dpPaymentMethod || 'TUNAI'})` : `DP Terbayar: ${formatRupiah(booking.dpAmount)} (${booking.dpPaymentMethod || 'TUNAI'})\nPelunasan: ${formatRupiah(booking.settlementAmount || 0)} (${booking.settlementPaymentMethod || 'TUNAI'})`}
 ${isLunas ? `*STATUS: SUDAH LUNAS* ✅\nTanggal Pelunasan: *${formatDate(settleDateStr)}*` : `*SISA PELUNASAN: ${formatRupiah(booking.remainingBalance)}* ⚠️\n(Harap dilunasi sebelum bermain)`}
 ----------------------------------------
 Harap hadir 10 menit sebelum jadwal bermain.
@@ -101,12 +101,13 @@ Terima kasih telah bermain di ${shopName}!`;
 
     const isMember = booking.memberType === 'MEMBER' || booking.communityName?.includes('Member');
     const bookingDateStr = booking.bookingDate || (booking.dpPaidAt ? booking.dpPaidAt.split('T')[0] : '');
-    const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0);
+    const isDirectLunas = booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0) || !booking.dpAmount;
     const settleDateStr = booking.settlementPaidAt || booking.dpPaidAt || booking.createdAt;
 
     const paymentDetails = isDirectLunas
-      ? `💳 *Bayar Lunas*: ${formatRupiah(booking.amountPaidTotal || booking.totalAmount)} (${booking.dpPaymentMethod || 'CASH'})\n` +
-        `✅ *Status*: LUNAS\n`
+      ? `💳 *Bayar Lunas*: ${formatRupiah(booking.amountPaidTotal || booking.totalAmount)} (${booking.settlementPaymentMethod || booking.dpPaymentMethod || 'CASH'})\n` +
+        `✅ *Status*: LUNAS\n` +
+        `🏁 *Tgl Pelunasan*: ${formatDate(settleDateStr)}\n`
       : isLunas
       ? `💳 *DP Terbayar*: ${formatRupiah(booking.dpAmount)} (${booking.dpPaymentMethod || 'CASH'})\n` +
         `💵 *Pelunasan*: ${formatRupiah(booking.settlementAmount || Math.max(0, (booking.amountPaidTotal || 0) - (booking.dpAmount || 0)))} (${booking.settlementPaymentMethod || 'CASH'})\n` +
@@ -260,10 +261,10 @@ Terima kasih telah bermain di ${shopName}!`;
                 <span>{formatRupiah(booking.totalAmount)}</span>
               </div>
 
-              {/* Jika lunas langsung tanpa pelunasan terpisah */}
-              {booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0) ? (
+              {/* Jika lunas langsung tanpa pelunasan terpisah atau DP Rp 0 */}
+              {booking.dpAmount >= booking.totalAmount || (!booking.settlementAmount || booking.settlementAmount === 0) || !booking.dpAmount ? (
                 <div className="flex justify-between text-gray-700">
-                  <span>Bayar Lunas ({booking.dpPaymentMethod || 'TUNAI'}):</span>
+                  <span>Bayar Lunas ({booking.settlementPaymentMethod || booking.dpPaymentMethod || 'TUNAI'}):</span>
                   <span className="font-semibold text-emerald-700">-{formatRupiah(booking.amountPaidTotal || booking.totalAmount)}</span>
                 </div>
               ) : (

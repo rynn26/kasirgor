@@ -46,20 +46,71 @@ export function getBookingTxDate(b: CourtBooking): string {
 
 /**
  * Tanggal uang pelunasan diterima (tanggal pelunasan kasir).
- * Jika belum dilunasi, fallback ke tanggal DP.
+ * Jika ada settlementPaidAt, prioritaskan tanggal tersebut.
+ * Jika belum dilunasi atau belum diisi, fallback ke tanggal booking/DP.
  */
 export function getBookingSettleDate(b: CourtBooking): string {
-  // Jika transaksi sewa langsung lunas tanpa pelunasan terpisah, tanggal pelunasan adalah tanggal transaksi
-  const isDirectLunas = b.status === 'SETTLED' && (
-    (b.dpAmount || 0) >= (b.totalAmount || 0) ||
-    !b.settlementAmount ||
-    b.settlementAmount === 0
-  );
-  if (isDirectLunas) {
-    return getBookingTxDate(b);
+  if (b.settlementPaidAt) {
+    const sDate = toJakartaDateString(b.settlementPaidAt);
+    if (sDate) return sDate;
   }
-  if (b.settlementPaidAt) return toJakartaDateString(b.settlementPaidAt);
   return getBookingTxDate(b);
+}
+
+/**
+ * Pecah porsi pembayaran riil (DP vs Pelunasan) secara akurat berdasarkan tanggal transaksi.
+ */
+export function getBookingPaymentBreakdown(b: CourtBooking): {
+  txDate: string;
+  settleDate: string;
+  realDp: number;
+  realSettle: number;
+  isSameDate: boolean;
+} {
+  const totalPaid = b.amountPaidTotal || 0;
+  const txDate = getBookingTxDate(b);
+  const settleDate = getBookingSettleDate(b);
+  const isSameDate = txDate === settleDate;
+
+  let realDp = 0;
+  let realSettle = 0;
+
+  if (b.status === 'SETTLED') {
+    const rawDp = b.dpAmount || 0;
+    const rawSettle = b.settlementAmount || 0;
+
+    // Kasus 1: DP dan Pelunasan bertahap (rawDp + rawSettle == totalPaid)
+    if (rawDp > 0 && rawSettle > 0 && rawDp + rawSettle === totalPaid) {
+      realDp = rawDp;
+      realSettle = rawSettle;
+    } else if (rawSettle > 0 && rawSettle < totalPaid) {
+      realSettle = rawSettle;
+      realDp = Math.max(0, totalPaid - realSettle);
+    } else if (rawDp > 0 && rawDp < totalPaid) {
+      realDp = rawDp;
+      realSettle = Math.max(0, totalPaid - rawDp);
+    } else if (!isSameDate) {
+      // Dilunasi di hari berbeda dari booking (misal bayar lunas di minggu ke-2)
+      realDp = 0;
+      realSettle = totalPaid;
+    } else {
+      // Direct Lunas di hari yang sama
+      realDp = totalPaid;
+      realSettle = 0;
+    }
+  } else {
+    // DP_PAID / CONFIRMED
+    realDp = Math.min(b.dpAmount || 0, totalPaid);
+    realSettle = 0;
+  }
+
+  return {
+    txDate,
+    settleDate,
+    realDp,
+    realSettle,
+    isSameDate,
+  };
 }
 
 /**
@@ -69,24 +120,15 @@ export function getBookingSettleDate(b: CourtBooking): string {
  */
 export function getBookingAmountInPeriod(b: CourtBooking, start: string, end: string): number {
   if (b.status === 'CANCELLED') return 0;
-  const totalPaid = b.amountPaidTotal || 0;
-  const dpAmt = b.dpAmount || 0;
-  const realDp = Math.min(dpAmt, totalPaid);
-  const realSettle = Math.max(0, totalPaid - realDp);
-
-  const txDate = getBookingTxDate(b);
-  const settleDate = getBookingSettleDate(b);
+  const { txDate, settleDate, realDp, realSettle } = getBookingPaymentBreakdown(b);
 
   let amt = 0;
   const isDpInPeriod = txDate >= start && txDate <= end;
   const isSettleInPeriod = settleDate >= start && settleDate <= end;
 
-  // Uang DP dihitung pada tanggal transaksi DP
   if (isDpInPeriod && realDp > 0) {
     amt += realDp;
   }
-
-  // Uang pelunasan dihitung pada tanggal pelunasan
   if (isSettleInPeriod && realSettle > 0) {
     amt += realSettle;
   }
@@ -108,16 +150,7 @@ export function getBookingPaymentItemsInPeriod(
   date: string;
 }> {
   if (b.status === 'CANCELLED') return [];
-  const totalPaid = b.amountPaidTotal || 0;
-  const dpAmt = b.dpAmount || 0;
-  const realDp = Math.min(dpAmt, totalPaid);
-  const realSettle = Math.max(0, totalPaid - realDp);
-
-  const txDate = getBookingTxDate(b);
-  const settleDate = getBookingSettleDate(b);
-
-  const isDpInPeriod = txDate >= start && txDate <= end;
-  const isSettleInPeriod = settleDate >= start && settleDate <= end;
+  const { txDate, settleDate, realDp, realSettle, isSameDate } = getBookingPaymentBreakdown(b);
 
   const results: Array<{
     type: 'DP' | 'PELUNASAN' | 'LUNAS_LANGSUNG';
@@ -126,34 +159,25 @@ export function getBookingPaymentItemsInPeriod(
     date: string;
   }> = [];
 
-  // Jika tidak ada pelunasan terpisah (hanya 1 kali bayar penuh di awal atau hanya DP belum lunas)
-  if (realSettle === 0) {
-    if (isDpInPeriod && realDp > 0) {
-      results.push({
-        type: b.remainingBalance === 0 ? 'LUNAS_LANGSUNG' : 'DP',
-        amount: realDp,
-        method: b.dpPaymentMethod || b.settlementPaymentMethod || 'CASH',
-        date: txDate,
-      });
-    }
-  } else {
-    // Ada 2 porsi pembayaran: DP dan Pelunasan (bisa di hari yang sama atau berbeda)
-    if (isDpInPeriod && realDp > 0) {
-      results.push({
-        type: 'DP',
-        amount: realDp,
-        method: b.dpPaymentMethod || 'CASH',
-        date: txDate,
-      });
-    }
-    if (isSettleInPeriod && realSettle > 0) {
-      results.push({
-        type: 'PELUNASAN',
-        amount: realSettle,
-        method: b.settlementPaymentMethod || b.dpPaymentMethod || 'CASH',
-        date: settleDate,
-      });
-    }
+  const isDpInPeriod = txDate >= start && txDate <= end;
+  const isSettleInPeriod = settleDate >= start && settleDate <= end;
+
+  if (isDpInPeriod && realDp > 0) {
+    results.push({
+      type: isSameDate && realSettle === 0 ? 'LUNAS_LANGSUNG' : 'DP',
+      amount: realDp,
+      method: b.dpPaymentMethod || (isSameDate ? b.settlementPaymentMethod : undefined) || 'CASH',
+      date: txDate,
+    });
+  }
+
+  if (isSettleInPeriod && realSettle > 0) {
+    results.push({
+      type: isSameDate && realDp === 0 ? 'LUNAS_LANGSUNG' : 'PELUNASAN',
+      amount: realSettle,
+      method: b.settlementPaymentMethod || b.dpPaymentMethod || 'CASH',
+      date: settleDate,
+    });
   }
 
   return results;

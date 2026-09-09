@@ -118,15 +118,41 @@ function mapDbToBooking(
     courtFee: Number(row.court_fee),
     additionalItems,
     totalAmount: Number(row.total_amount),
-    dpAmount: Number(row.dp_amount),
+    dpAmount: (() => {
+      const dpAmt = Number(row.dp_amount || 0);
+      const settleAmt = Number(row.settlement_amount || 0);
+      const paidTot = Number(row.amount_paid_total || 0);
+      const txD = row.booking_date || (row.dp_paid_at ? toJakartaDateString(row.dp_paid_at) : row.date);
+      const settleD = row.settlement_paid_at ? toJakartaDateString(row.settlement_paid_at) : '';
+
+      // Jika lunas dan tanggal pelunasan berbeda dari tanggal booking, dan terdapat data ganda
+      if (row.status === 'SETTLED' && settleD && settleD !== txD && dpAmt + settleAmt > paidTot) {
+        if (settleAmt >= paidTot) return 0;
+        return Math.max(0, paidTot - settleAmt);
+      }
+      return dpAmt;
+    })(),
     dpPaymentMethod: (row.dp_payment_method as PaymentMethod) || undefined,
     dpPaidAt: row.dp_paid_at || undefined,
     dpCashier: row.dp_cashier || undefined,
     settlementAmount: (() => {
       const rawSettlement = row.settlement_amount ? Number(row.settlement_amount) : 0;
-      const dpAmt = Number(row.dp_amount);
-      const paidTot = Number(row.amount_paid_total);
-      // Jika DP + Settlement melebihi total bayar (akibat data ganda saat Sewa Langsung)
+      const dpAmt = Number(row.dp_amount || 0);
+      const paidTot = Number(row.amount_paid_total || 0);
+      const txD = row.booking_date || (row.dp_paid_at ? toJakartaDateString(row.dp_paid_at) : row.date);
+      const settleD = row.settlement_paid_at ? toJakartaDateString(row.settlement_paid_at) : '';
+
+      // Jika ada tanggal pelunasan terpisah di tanggal berbeda
+      if (row.status === 'SETTLED' && settleD && settleD !== txD) {
+        if (rawSettlement >= paidTot && dpAmt >= paidTot) {
+          return paidTot;
+        }
+        if (rawSettlement > 0) return rawSettlement;
+        const remainingSettle = Math.max(0, paidTot - dpAmt);
+        return remainingSettle > 0 ? remainingSettle : paidTot;
+      }
+
+      // Jika DP + Settlement melebihi total bayar (akibat data ganda saat Sewa Langsung di hari yang sama)
       if (rawSettlement > 0 && dpAmt + rawSettlement > paidTot && paidTot > 0) {
         const remainingSettle = Math.max(0, paidTot - dpAmt);
         return remainingSettle > 0 ? remainingSettle : undefined;
@@ -276,13 +302,13 @@ export async function createBooking(
       total_amount: booking.totalAmount,
       dp_amount: booking.dpAmount,
       dp_payment_method: booking.dpPaymentMethod || null,
-      dp_paid_at: booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T12:00:00.000Z` : null),
+      dp_paid_at: booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T${new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour12: false })}+07:00` : null),
       dp_cashier: booking.dpCashier || null,
       amount_paid_total: booking.amountPaidTotal,
       remaining_balance: booking.remainingBalance,
       settlement_amount: booking.settlementAmount || (booking.status === 'SETTLED' ? booking.totalAmount : null),
       settlement_payment_method: booking.settlementPaymentMethod || booking.dpPaymentMethod || null,
-      settlement_paid_at: booking.settlementPaidAt || (booking.status === 'SETTLED' ? (booking.dpPaidAt || (booking.bookingDate ? `${booking.bookingDate}T12:00:00.000Z` : new Date().toISOString())) : null),
+      settlement_paid_at: booking.settlementPaidAt || (booking.status === 'SETTLED' ? (booking.dpPaidAt || new Date().toISOString()) : null),
       settlement_cashier: booking.settlementCashier || booking.dpCashier || null,
       status: booking.status,
       notes: booking.notes || null,
@@ -463,7 +489,7 @@ export async function updateBooking(
   if (data.bookingDate !== undefined) {
     updatePayload.booking_date = data.bookingDate;
     if (data.dpPaidAt === undefined) {
-      updatePayload.dp_paid_at = `${data.bookingDate}T12:00:00.000Z`;
+      updatePayload.dp_paid_at = `${data.bookingDate}T${new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour12: false })}+07:00`;
     }
   }
   if (data.dpPaidAt !== undefined) updatePayload.dp_paid_at = data.dpPaidAt;
