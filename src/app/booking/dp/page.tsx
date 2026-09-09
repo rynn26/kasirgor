@@ -70,7 +70,7 @@ export default function InputDpBookingPage() {
   const [endTime, setEndTime] = useState('21:00');
   const [courtCount, setCourtCount] = useState(1);
   const [selectedCourtIds, setSelectedCourtIds] = useState<string[]>([]);
-  const [dpAmount, setDpAmount] = useState<number>(100000);
+  const [dpAmount, setDpAmount] = useState<number | ''>(100000);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('QRIS');
 
   // Auto calculate member weekly sessions in month
@@ -116,7 +116,7 @@ export default function InputDpBookingPage() {
   const [baseRatePerHour, setBaseRatePerHour] = useState<number>(75000);
   const [feeBreakdown, setFeeBreakdown] = useState<Array<{ hour: string; price: number; period: 'Pagi' | 'Malam' }>>([]);
   const netTotalSewa = Math.max(0, totalSewa - (discountAmount || 0));
-  const sisaPembayaran = Math.max(0, netTotalSewa - (dpAmount || 0));
+  const sisaPembayaran = Math.max(0, netTotalSewa - (typeof dpAmount === 'number' ? dpAmount : 0));
 
   // Dynamic fee calculation based on time, month, sport type, and member type
   useEffect(() => {
@@ -197,7 +197,7 @@ export default function InputDpBookingPage() {
 
   // Quick DP Percentage Helpers
   const handleSetDpPercent = (pct: number) => {
-    const calculated = Math.round(totalSewa * pct);
+    const calculated = Math.round(netTotalSewa * pct);
     setDpAmount(calculated);
   };
 
@@ -206,7 +206,7 @@ export default function InputDpBookingPage() {
 
     const finalCustomerName = customerName.trim() || 'Penyewa Umum';
     const finalPhone = phone.trim() || '-';
-    const finalDp = typeof dpAmount === 'number' && dpAmount >= 0 ? Math.min(dpAmount, netTotalSewa) : 0;
+    const finalDp = typeof dpAmount === 'number' ? Math.max(0, Math.min(dpAmount, netTotalSewa)) : 0;
 
     const selectedCourtsNames = courts
       .filter((c) => selectedCourtIds.includes(c.id))
@@ -694,21 +694,33 @@ export default function InputDpBookingPage() {
                 <button
                   type="button"
                   onClick={() => setDpAmount(0)}
-                  className="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
+                    dpAmount === 0
+                      ? 'bg-amber-500 text-white font-black shadow-xs border border-amber-600'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}
                 >
                   DP Rp 0
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSetDpPercent(0.5)}
-                  className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
+                    typeof dpAmount === 'number' && dpAmount > 0 && dpAmount === Math.round(netTotalSewa * 0.5)
+                      ? 'bg-slate-800 text-white font-black shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
                 >
                   DP 50%
                 </button>
                 <button
                   type="button"
                   onClick={() => setDpAmount(netTotalSewa)}
-                  className="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 cursor-pointer"
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-all ${
+                    typeof dpAmount === 'number' && dpAmount > 0 && dpAmount === netTotalSewa
+                      ? 'bg-emerald-600 text-white font-black shadow-xs'
+                      : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                  }`}
                 >
                   Lunas 100%
                 </button>
@@ -719,10 +731,16 @@ export default function InputDpBookingPage() {
               <input
                 type="text"
                 inputMode="numeric"
-                required
-                value={dpAmount ? formatNumber(dpAmount) : ''}
-                onChange={(e) => setDpAmount(parseNumberInput(e.target.value))}
-                placeholder="Contoh: 150.000"
+                value={typeof dpAmount === 'number' ? (dpAmount === 0 ? '0' : formatNumber(dpAmount)) : ''}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(/[^0-9]/g, '');
+                  if (clean === '') {
+                    setDpAmount('');
+                  } else {
+                    setDpAmount(parseInt(clean, 10));
+                  }
+                }}
+                placeholder="0"
                 className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-900 focus:outline-none focus:border-[#b92b10] focus:bg-white"
               />
             </div>

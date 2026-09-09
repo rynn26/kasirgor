@@ -711,9 +711,12 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                   <input
                     type="text"
                     inputMode="numeric"
-                    value={dpAmount ? formatNumber(dpAmount) : ''}
-                    onChange={(e) => setDpAmount(parseNumberInput(e.target.value))}
-                    placeholder="Contoh: 80.000"
+                    value={typeof dpAmount === 'number' ? (dpAmount === 0 ? '0' : formatNumber(dpAmount)) : ''}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/[^0-9]/g, '');
+                      setDpAmount(clean === '' ? 0 : parseInt(clean, 10));
+                    }}
+                    placeholder="0"
                     className="w-full py-2 px-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 font-bold focus:outline-none focus:border-[#b92b10]"
                   />
                 </div>
@@ -816,9 +819,13 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
                           <input
                             type="text"
                             inputMode="numeric"
-                            value={dpAmount ? formatNumber(dpAmount) : ''}
-                            onChange={(e) => setDpAmount(Math.min(totalSewa, parseNumberInput(e.target.value)))}
-                            placeholder="Contoh: 100.000"
+                            value={typeof dpAmount === 'number' ? (dpAmount === 0 ? '0' : formatNumber(dpAmount)) : ''}
+                            onChange={(e) => {
+                              const clean = e.target.value.replace(/[^0-9]/g, '');
+                              const val = clean === '' ? 0 : parseInt(clean, 10);
+                              setDpAmount(Math.min(totalSewa, val));
+                            }}
+                            placeholder="0"
                             className="w-full py-1.5 px-2 bg-white border border-emerald-300 rounded-lg text-slate-900 font-bold"
                           />
                         </div>
