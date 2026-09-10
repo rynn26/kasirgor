@@ -22,7 +22,6 @@ import {
   Repeat,
   Wallet,
   Radio,
-  Volume2,
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
@@ -172,57 +171,6 @@ export default function DashboardUnifiedPage() {
     } else {
       setPushPermission('denied');
       showToast('Izin notifikasi belum diizinkan di browser Anda.');
-    }
-  };
-
-  const handleTestPushNotification = async (type: 'booking' | 'pelunasan' | 'void' | 'stok' | 'general' = 'booking') => {
-    // If iOS and opened inside regular Safari tab, Apple requires Add to Home Screen first!
-    if (isIOS() && !isStandalone()) {
-      setIsIosInstructionOpen(true);
-      return;
-    }
-
-    // If not granted yet, automatically request permission first!
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
-      const granted = await requestNotificationPermission();
-      if (!granted) {
-        showToast('Mohon izinkan (Allow) notifikasi di browser Anda.');
-        return;
-      }
-      setPushPermission('granted');
-    }
-
-    let payload = {
-      title: '🏸 Booking Lapangan Baru',
-      body: 'Menambahkan DP sewa Lapangan Badminton 1 untuk Bpk. Hendra (Rp 80.000 via QRIS).',
-      url: '/booking',
-    };
-
-    if (type === 'pelunasan') {
-      payload = {
-        title: '💰 Pelunasan Sewa Lapangan',
-        body: 'Pelunasan sewa Lapangan Futsal A sebesar Rp 120.000 (Tunai) - Tim Garuda.',
-        url: '/booking',
-      };
-    } else if (type === 'void') {
-      payload = {
-        title: '🚨 Pembatalan Transaksi Kasir (VOID)',
-        body: 'Kasir Yuli membatalkan pesanan Raket Yonex & Shuttlecock (Rp 150.000). Alasan: "Customer salah pesan raket".',
-        url: '/laporan',
-      };
-    } else if (type === 'stok') {
-      payload = {
-        title: '⚠️ Peringatan: Stok Menipis!',
-        body: 'Stok produk "Shuttlecock Yonex Aerosensa" tersisa 3 slop (Batas aman: 15). Segera lakukan restock!',
-        url: '/produk',
-      };
-    }
-
-    const sent = await sendWebPushNotificationToOwner(payload);
-    if (sent) {
-      showToast('Notifikasi pop-up berhasil dimunculkan!');
-    } else {
-      showToast('Gagal memunculkan notifikasi. Pastikan izin browser diaktifkan.');
     }
   };
 
@@ -1004,69 +952,6 @@ export default function DashboardUnifiedPage() {
             </div>
           </div>
 
-          {/* TEMPORARY TESTING BAR FOR OWNER NOTIFICATION */}
-          <div className="p-3.5 bg-white rounded-2xl border-2 border-dashed border-[#eb4b2b]/40 shadow-xs space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#eb4b2b] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#eb4b2b]"></span>
-                </span>
-                <span className="text-xs font-bold text-slate-800">
-                  Uji Coba Notifikasi HP (Owner)
-                </span>
-                <span className="text-[10px] bg-red-100 text-[#eb4b2b] font-bold px-1.5 py-0.2 rounded-md">
-                  Testing
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium">
-                (Dapat dihapus kapan saja)
-              </span>
-            </div>
-
-            <p className="text-[11px] text-slate-500">
-              Klik salah satu tombol di bawah untuk memunculkan notifikasi pop-up di layar HP/komputer Anda:
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
-              <button
-                type="button"
-                onClick={() => handleTestPushNotification('booking')}
-                className="py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
-              >
-                <span>🏸</span>
-                <span className="truncate">Tes Booking DP</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleTestPushNotification('pelunasan')}
-                className="py-2 px-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
-              >
-                <span>💰</span>
-                <span className="truncate">Tes Pelunasan</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleTestPushNotification('void')}
-                className="py-2 px-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
-              >
-                <span>🚨</span>
-                <span className="truncate">Tes Void Kasir</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleTestPushNotification('stok')}
-                className="py-2 px-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
-              >
-                <span>⚠️</span>
-                <span className="truncate">Tes Stok Menipis</span>
-              </button>
-            </div>
-          </div>
-
           {activeUnit === 'kantin' ? (
             /* ============================================================ */
             /* OWNER VIEW A: DASHBOARD OWNER KANTIN / KASIR TOKO */
@@ -1737,14 +1622,10 @@ export default function DashboardUnifiedPage() {
                             Aktifkan Notifikasi HP Saya
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleTestPushNotification('booking')}
-                            className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                          >
-                            <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
-                            🧪 Uji Coba Munculkan Notifikasi Pop-up
-                          </button>
+                          <div className="w-full py-2 px-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Notifikasi Web HP Siap & Aktif
+                          </div>
                         )}
                       </div>
                     </div>
