@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Store,
@@ -41,9 +41,17 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
   onDateChange,
   isOwner: isOwnerProp,
 }) => {
-  const { transactions } = useTransactionStore();
-  const { bookings } = useCourtBookingStore();
+  const { transactions, loadTransactions } = useTransactionStore();
+  const { bookings, loadBookings } = useCourtBookingStore();
   const { showToast } = useToastStore();
+
+  // Sinkronkan data terbaru dari database setiap kali modal dibuka
+  useEffect(() => {
+    if (isOpen) {
+      loadBookings();
+      loadTransactions();
+    }
+  }, [isOpen, loadBookings, loadTransactions]);
 
   const {
     selectedDate: globalSelectedDate,

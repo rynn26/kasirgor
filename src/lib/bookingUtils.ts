@@ -100,7 +100,8 @@ export function getBookingPaymentBreakdown(b: CourtBooking): {
     }
   } else {
     // DP_PAID / CONFIRMED
-    realDp = Math.min(b.dpAmount || 0, totalPaid);
+    const rawDp = b.dpAmount || 0;
+    realDp = totalPaid > 0 ? (rawDp > 0 ? Math.min(rawDp, totalPaid) : totalPaid) : rawDp;
     realSettle = 0;
   }
 
@@ -163,8 +164,15 @@ export function getBookingPaymentItemsInPeriod(
   const isSettleInPeriod = settleDate >= start && settleDate <= end;
 
   if (isDpInPeriod && realDp > 0) {
+    // Hanya diklasifikasikan LUNAS_LANGSUNG jika status booking sudah SETTLED,
+    // tidak ada sisa tagihan, dan tidak ada pelunasan bertahap terpisah.
+    const isDirectLunas =
+      b.status === 'SETTLED' &&
+      realSettle === 0 &&
+      (b.remainingBalance === 0 || !b.remainingBalance);
+
     results.push({
-      type: isSameDate && realSettle === 0 ? 'LUNAS_LANGSUNG' : 'DP',
+      type: isDirectLunas ? 'LUNAS_LANGSUNG' : 'DP',
       amount: realDp,
       method: b.dpPaymentMethod || (isSameDate ? b.settlementPaymentMethod : undefined) || 'CASH',
       date: txDate,
