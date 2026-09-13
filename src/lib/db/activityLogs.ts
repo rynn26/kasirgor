@@ -147,10 +147,14 @@ export async function recordActivityLog(
 
     // Broadcast across all devices via Supabase Realtime channel
     const realtimeChannel = supabase.channel('kasir_global_events');
-    realtimeChannel.send({
-      type: 'broadcast',
-      event: 'activity_log',
-      payload: newLog,
+    realtimeChannel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        realtimeChannel.send({
+          type: 'broadcast',
+          event: 'activity_log',
+          payload: newLog,
+        });
+      }
     });
   } catch (err) {
     console.error('Error dispatching realtime activity log:', err);

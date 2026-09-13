@@ -19,8 +19,10 @@ export const ProductTable: React.FC = () => {
   const { products } = useProductStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCat, setSelectedCat] = useState<string>('Semua');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(true);
+
+  const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) || null : null;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -99,7 +101,7 @@ export const ProductTable: React.FC = () => {
             return (
               <div
                 key={prod.id}
-                onClick={() => setSelectedProduct(prod)}
+                onClick={() => setSelectedProductId(prod.id)}
                 className="bg-white rounded-3xl p-4 border border-slate-200 hover:border-[#eb4b2b]/60 shadow-xs hover:shadow-md flex flex-col justify-between space-y-3 transition-all cursor-pointer group"
               >
                 {/* Top: Category & Status Badge */}
@@ -207,7 +209,7 @@ export const ProductTable: React.FC = () => {
       <ProductDetailModal
         isOpen={Boolean(selectedProduct)}
         product={selectedProduct}
-        onClose={() => setSelectedProduct(null)}
+        onClose={() => setSelectedProductId(null)}
         isOwner={isOwner}
       />
     </div>

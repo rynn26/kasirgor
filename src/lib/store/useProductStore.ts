@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Product, ProductCategory } from '@/types/pos';
-import { fetchProducts, createProduct, updateProduct, deleteProduct, updateStock } from '@/lib/db/products';
+import { fetchProducts, createProduct, updateProduct, deleteProduct, updateStock, setStockExact } from '@/lib/db/products';
 
 interface ProductState {
   products: Product[];
@@ -16,6 +16,7 @@ interface ProductState {
   updateProduct: (id: string, updatedFields: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   updateStock: (id: string, delta: number) => Promise<void>;
+  setStockExact: (id: string, newStock: number) => Promise<void>;
   filteredProducts: () => Product[];
 }
 
@@ -118,6 +119,46 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal update stok' });
+      throw err;
+    }
+  },
+
+  setStockExact: async (id, exactStock) => {
+    try {
+      const prod = get().products.find((p) => p.id === id);
+      const { newStock } = await setStockExact(id, exactStock);
+      set((state) => ({
+        products: state.products.map((p) =>
+          p.id === id
+            ? { ...p, stock: newStock, isAvailable: newStock > 0 }
+            : p
+        ),
+      }));
+
+      if (prod) {
+        const threshold = prod.minimumStock ?? 15;
+        if (newStock === 0) {
+          import('@/lib/notifications/webPush').then(({ notifyOwner }) => {
+            notifyOwner({
+              title: '🚨 Peringatan: Stok Habis!',
+              body: `Stok produk "${prod.name}" telah HABIS (0 ${prod.unit || 'pcs'}). Segera lakukan restock!`,
+              url: '/produk',
+              tag: `stock-empty-${id}`,
+            });
+          }).catch(() => {});
+        } else if (newStock <= threshold) {
+          import('@/lib/notifications/webPush').then(({ notifyOwner }) => {
+            notifyOwner({
+              title: '⚠️ Peringatan: Stok Menipis!',
+              body: `Stok produk "${prod.name}" tersisa ${newStock} ${prod.unit || 'pcs'} (Batas minimum: ${threshold}). Segera lakukan pemesanan ulang.`,
+              url: '/produk',
+              tag: `stock-low-${id}`,
+            });
+          }).catch(() => {});
+        }
+      }
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Gagal mengubah stok' });
       throw err;
     }
   },

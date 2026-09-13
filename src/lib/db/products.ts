@@ -158,6 +158,22 @@ export async function updateStock(
   return { newStock };
 }
 
+export async function setStockExact(
+  id: string,
+  stock: number
+): Promise<{ newStock: number }> {
+  const newStock = Math.max(0, Math.floor(stock));
+  const isAvailable = newStock > 0;
+
+  const { error } = await supabase
+    .from('products')
+    .update({ stock: newStock, is_available: isAvailable })
+    .eq('id', id);
+
+  if (error) throw error;
+  return { newStock };
+}
+
 export async function updateStocksBatch(
   updates: Array<{ id: string; delta: number }>
 ): Promise<void> {

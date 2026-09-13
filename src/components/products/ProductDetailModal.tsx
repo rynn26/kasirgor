@@ -37,7 +37,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   isOwner = true,
 }) => {
-  const { updateProduct, deleteProduct, updateStock } = useProductStore();
+  const { updateProduct, deleteProduct, updateStock, setStockExact } = useProductStore();
   const { showToast } = useToastStore();
 
   const [name, setName] = useState('');
@@ -52,26 +52,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingCustomStock, setIsEditingCustomStock] = useState(false);
   const [customStockInput, setCustomStockInput] = useState('');
+  const [lastLoadedProductId, setLastLoadedProductId] = useState<string | null>(null);
+
+  const isSavingRef = React.useRef(false);
 
   useEffect(() => {
-    if (product) {
-      setName(product.name);
-      let cat = product.category;
-      if (cat === 'Makanan' || cat === 'Snack & Cemilan') cat = 'Makanan & Snack';
-      if (cat === 'Peralatan & Raket' || cat === 'Aksesoris & Grip' || cat === 'Pakaian & Kaos Kaki') cat = 'Perlengkapan Olahraga';
-      setCategory(cat);
-      setSku(product.sku);
-      setPrice(product.price ? String(product.price) : '');
-      setCostPrice(product.costPrice ? String(product.costPrice) : '');
-      setStock(product.stock);
-      setCustomStockInput(String(product.stock));
+    if (!isOpen) {
+      setLastLoadedProductId(null);
       setIsEditingCustomStock(false);
-      setMinimumStock(product.minimumStock !== undefined && product.minimumStock !== null ? String(product.minimumStock) : '5');
-      setUnit(product.unit || 'pcs');
-      setDescription(product.description || '');
-      setIsEditing(false);
+      return;
     }
-  }, [product]);
+
+    if (product) {
+      if (product.id !== lastLoadedProductId) {
+        setLastLoadedProductId(product.id);
+        setName(product.name);
+        let cat = product.category;
+        if (cat === 'Makanan' || cat === 'Snack & Cemilan') cat = 'Makanan & Snack';
+        if (cat === 'Peralatan & Raket' || cat === 'Aksesoris & Grip' || cat === 'Pakaian & Kaos Kaki') cat = 'Perlengkapan Olahraga';
+        setCategory(cat);
+        setSku(product.sku);
+        setPrice(product.price ? String(product.price) : '');
+        setCostPrice(product.costPrice ? String(product.costPrice) : '');
+        setStock(product.stock);
+        setCustomStockInput(String(product.stock));
+        setIsEditingCustomStock(false);
+        setMinimumStock(product.minimumStock !== undefined && product.minimumStock !== null ? String(product.minimumStock) : '5');
+        setUnit(product.unit || 'pcs');
+        setDescription(product.description || '');
+        setIsEditing(false);
+      } else if (!isEditingCustomStock) {
+        // Sync latest stock if user is not actively typing
+        setStock(product.stock);
+        setCustomStockInput(String(product.stock));
+      }
+    }
+  }, [product, isOpen, lastLoadedProductId, isEditingCustomStock]);
 
   if (!isOpen || !product) return null;
 
@@ -82,13 +98,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    isSavingRef.current = true;
+    setIsEditingCustomStock(false);
+
     if (!name.trim()) {
       showToast('Nama produk wajib diisi');
+      isSavingRef.current = false;
       return;
     }
     if (numPrice <= 0) {
       showToast('Harga jual harus lebih dari 0');
+      isSavingRef.current = false;
       return;
+    }
+
+    let finalStock = stock;
+    const parsedCustom = parseInt(customStockInput, 10);
+    if (!isNaN(parsedCustom) && parsedCustom >= 0) {
+      finalStock = parsedCustom;
     }
 
     const parsedMinStock = parseInt(minimumStock, 10);
@@ -101,17 +128,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         sku,
         price: numPrice > 0 ? numPrice : product.price,
         costPrice: numCost > 0 ? numCost : (numCost === 0 ? undefined : product.costPrice),
-        stock,
+        stock: finalStock,
         minimumStock: minStockToSave,
         unit,
         description: description.trim() || undefined,
-        isAvailable: stock > 0,
+        isAvailable: finalStock > 0,
       });
       showToast(`Produk "${name}" berhasil diperbarui`);
       setIsEditing(false);
       onClose();
     } catch (err) {
       showToast('Gagal memperbarui produk. Coba lagi.');
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
@@ -136,14 +165,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       await updateStock(product.id, delta);
       showToast(`Stok "${product.name}" disesuaikan menjadi ${newStock} ${unit}`);
     } catch (err) {
-      setStock(stock); // revert on error
-      setCustomStockInput(String(stock));
+      setStock(product.stock); // revert on error
+      setCustomStockInput(String(product.stock));
       showToast('Gagal menyesuaikan stok. Coba lagi.');
     }
   };
 
   const handleCommitCustomStock = async () => {
-    if (!isEditingCustomStock) return;
+    if (!isEditingCustomStock || isSavingRef.current) return;
     setIsEditingCustomStock(false);
     const parsed = parseInt(customStockInput, 10);
     if (isNaN(parsed) || parsed < 0) {
@@ -151,10 +180,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       return;
     }
     if (parsed === stock) return;
-    const delta = parsed - stock;
     setStock(parsed);
     try {
-      await updateStock(product.id, delta);
+      await setStockExact(product.id, parsed);
       showToast(`Stok "${product.name}" diubah menjadi ${parsed} ${unit}`);
     } catch (err) {
       setStock(product.stock);

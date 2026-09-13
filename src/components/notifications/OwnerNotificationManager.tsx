@@ -115,6 +115,62 @@ export const OwnerNotificationManager: React.FC = () => {
         })
         .on(
           'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'activity_logs' },
+          (payload) => {
+            if (!isUserOwner()) return;
+            const log = payload.new as any;
+            if (!log) return;
+
+            // Dispatch local event for instant UI update
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('kasir_activity_logged', {
+                  detail: {
+                    id: log.id,
+                    timestamp: log.created_at,
+                    staffName: log.staff_name,
+                    role: log.role,
+                    actionType: log.action_type,
+                    title: log.title,
+                    details: log.details,
+                    metadata: log.metadata,
+                  },
+                })
+              );
+            }
+
+            const actionType = log.action_type || '';
+            let title = '📢 Notifikasi Kasir GOR';
+            if (
+              actionType.includes('DELETE') ||
+              actionType.includes('VOID') ||
+              actionType.includes('CANCEL')
+            ) {
+              title = '🚨 ' + (log.title || 'Pembatalan Kasir');
+            } else if (actionType === 'EDIT_BOOKING') {
+              title = '🔄 ' + (log.title || 'Perubahan Data Booking');
+            } else if (actionType === 'SHIFT_HANDOVER') {
+              title = '🔄 ' + (log.title || 'Pergantian Shift');
+            } else if (actionType === 'CREATE_BOOKING') {
+              title = '🏸 Booking Lapangan Baru';
+            } else if (actionType === 'SETTLE_BOOKING') {
+              title = '💰 Pelunasan Sewa Lapangan';
+            } else if (actionType === 'CREATE_TRANSACTION') {
+              title = '🛒 Penjualan Toko Baru Selesai';
+            } else {
+              title = 'ℹ️ ' + (log.title || 'Aktivitas Kasir');
+            }
+
+            sendWebPushNotificationToOwner({
+              title,
+              body: log.details || '',
+              tag: log.id || 'act-' + Date.now(),
+              url: actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+            });
+          }
+        )
+        .on(
+          'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'products' },
           (payload) => {
             if (!isUserOwner()) return;

@@ -145,7 +145,10 @@ export async function sendWebPushNotificationToOwner(
   // Try service worker registration first (works best on Android Chrome & PWA)
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 500)),
+      ]);
       if (reg && reg.showNotification) {
         await reg.showNotification(payload.title, options);
         return true;
@@ -161,7 +164,8 @@ export async function sendWebPushNotificationToOwner(
       n.close();
     };
     return true;
-  } catch {
+  } catch (err) {
+    console.error('Notification display error:', err);
     return false;
   }
 }

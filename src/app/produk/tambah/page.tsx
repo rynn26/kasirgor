@@ -65,6 +65,7 @@ export default function TambahProdukOwnerPage() {
 
     try {
       const numStock = Number(stock) || 0;
+      const numMinStock = Number(minStock) || 0;
       const autoSku = `PRD-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await addProduct({
@@ -74,6 +75,7 @@ export default function TambahProdukOwnerPage() {
         price: numPrice,
         costPrice: numCostPrice > 0 ? numCostPrice : undefined,
         stock: numStock,
+        minimumStock: numMinStock >= 0 ? numMinStock : undefined,
         unit: unit || 'pcs',
         description: description.trim() || undefined,
         isAvailable: numStock > 0,
