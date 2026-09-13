@@ -80,6 +80,35 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
         bookings: [newBooking, ...state.bookings],
         isLoading: false,
       }));
+
+      // Record Activity Log so Owner automatically receives Push Notification
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = data.dpCashier || useShiftStore.getState().cashierName || 'Kasir / Owner';
+        const isLunas = newBooking.status === 'SETTLED' || (newBooking.remainingBalance ?? 0) === 0;
+        const totalRp = (newBooking.totalAmount || 0).toLocaleString('id-ID');
+        const dpRp = (newBooking.dpAmount || 0).toLocaleString('id-ID');
+        await recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'CREATE_BOOKING',
+          title: isLunas ? 'Booking Lapangan Baru (Lunas)' : 'Booking Lapangan Baru (DP)',
+          details: `${cashier} mencatat booking ${newBooking.customerName || 'Penyewa'} (${newBooking.courtName || 'Lapangan'}). Tgl: ${newBooking.date} (${newBooking.startTime}-${newBooking.endTime}). ${isLunas ? `Total: Rp ${totalRp} (Lunas)` : `DP Masuk: Rp ${dpRp} dari Total: Rp ${totalRp}`}.`,
+          metadata: {
+            bookingId: newBooking.id,
+            customerName: newBooking.customerName,
+            courtName: newBooking.courtName,
+            date: newBooking.date,
+            totalAmount: newBooking.totalAmount,
+            dpAmount: newBooking.dpAmount,
+            status: newBooking.status,
+          },
+        });
+      } catch (logErr) {
+        console.error('Failed to log booking activity:', logErr);
+      }
+
       return newBooking;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal membuat booking', isLoading: false });
@@ -95,6 +124,31 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
         bookings: state.bookings.map((b) => (b.id === bookingId ? updated : b)),
         isLoading: false,
       }));
+
+      // Record Activity Log so Owner automatically receives Push Notification
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = data.cashier || useShiftStore.getState().cashierName || 'Kasir / Owner';
+        const settleRp = (data.settlementAmount || 0).toLocaleString('id-ID');
+        await recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'SETTLE_BOOKING',
+          title: 'Pelunasan Sewa Lapangan',
+          details: `Kasir ${cashier} menerima pelunasan booking ${updated.customerName || 'Penyewa'} (${updated.courtName || 'Lapangan'}) sebesar Rp ${settleRp} via ${data.paymentMethod || 'CASH'}. Status: LUNAS.`,
+          metadata: {
+            bookingId,
+            customerName: updated.customerName,
+            courtName: updated.courtName,
+            settlementAmount: data.settlementAmount,
+            paymentMethod: data.paymentMethod,
+          },
+        });
+      } catch (logErr) {
+        console.error('Failed to log settlement activity:', logErr);
+      }
+
       return updated;
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal menyelesaikan booking', isLoading: false });

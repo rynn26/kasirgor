@@ -48,6 +48,28 @@ export const useProductStore = create<ProductState>((set, get) => ({
         products: [newProduct, ...state.products],
         isLoading: false,
       }));
+
+      // Record Activity Log so Owner automatically receives Push Notification
+      try {
+        const { recordActivityLog } = await import('@/lib/db/activityLogs');
+        const { useShiftStore } = await import('@/lib/store/useShiftStore');
+        const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+        await recordActivityLog({
+          staffName: cashier,
+          role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+          actionType: 'CREATE_PRODUCT',
+          title: 'Produk Baru Ditambahkan',
+          details: `${cashier} menambahkan produk baru "${newProduct.name}" (${newProduct.category}) dengan stok ${newProduct.stock} ${newProduct.unit || 'pcs'}.`,
+          metadata: {
+            productId: newProduct.id,
+            name: newProduct.name,
+            price: newProduct.price,
+            stock: newProduct.stock,
+          },
+        });
+      } catch (logErr) {
+        console.error('Failed to log addProduct activity:', logErr);
+      }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal menambah produk', isLoading: false });
       throw err;
@@ -136,6 +158,31 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }));
 
       if (prod) {
+        // Record Activity Log so Owner automatically receives Push Notification
+        try {
+          if (prod.stock !== newStock) {
+            const { recordActivityLog } = await import('@/lib/db/activityLogs');
+            const { useShiftStore } = await import('@/lib/store/useShiftStore');
+            const cashier = useShiftStore.getState().cashierName || 'Kasir / Owner';
+            const isIncrease = newStock > prod.stock;
+            await recordActivityLog({
+              staffName: cashier,
+              role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
+              actionType: 'EDIT_PRODUCT',
+              title: isIncrease ? 'Penambahan Stok Produk' : 'Pengurangan / Penyesuaian Stok',
+              details: `${cashier} memperbarui stok "${prod.name}" dari ${prod.stock} menjadi ${newStock} ${prod.unit || 'pcs'}.`,
+              metadata: {
+                productId: id,
+                name: prod.name,
+                oldStock: prod.stock,
+                newStock,
+              },
+            });
+          }
+        } catch (logErr) {
+          console.error('Failed to log stock activity:', logErr);
+        }
+
         const threshold = prod.minimumStock ?? 15;
         if (newStock === 0) {
           import('@/lib/notifications/webPush').then(({ notifyOwner }) => {

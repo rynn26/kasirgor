@@ -97,20 +97,33 @@ export const OwnerNotificationManager: React.FC = () => {
           } else if (actionType === 'SHIFT_HANDOVER') {
             title = '🔄 ' + (log.title || 'Pergantian Shift');
           } else if (actionType === 'CREATE_BOOKING') {
-            title = '🏸 Booking Lapangan Baru';
+            title = '🏸 ' + (log.title || 'Booking Lapangan Baru');
           } else if (actionType === 'SETTLE_BOOKING') {
-            title = '💰 Pelunasan Sewa Lapangan';
+            title = '💰 ' + (log.title || 'Pelunasan Sewa Lapangan');
           } else if (actionType === 'CREATE_TRANSACTION') {
-            title = '🛒 Penjualan Toko Baru Selesai';
+            title = '🛒 ' + (log.title || 'Penjualan Toko Baru Selesai');
+          } else if (actionType === 'CREATE_PRODUCT') {
+            title = '📦 ' + (log.title || 'Produk Baru Ditambahkan');
+          } else if (actionType === 'EDIT_PRODUCT') {
+            title = '✏️ ' + (log.title || 'Pembaruan Stok / Produk');
           } else {
             title = 'ℹ️ ' + (log.title || 'Aktivitas Kasir');
+          }
+
+          let url = '/dashboard';
+          if (actionType.includes('BOOKING')) {
+            url = '/booking/history';
+          } else if (actionType.includes('PRODUCT') || actionType.includes('STOCK')) {
+            url = '/produk';
+          } else if (actionType.includes('TRANSACTION')) {
+            url = '/laporan';
           }
 
           sendWebPushNotificationToOwner({
             title,
             body: log.details || '',
             tag: log.id || 'act-' + Date.now(),
-            url: actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+            url,
           });
         })
         .on(
@@ -152,20 +165,33 @@ export const OwnerNotificationManager: React.FC = () => {
             } else if (actionType === 'SHIFT_HANDOVER') {
               title = '🔄 ' + (log.title || 'Pergantian Shift');
             } else if (actionType === 'CREATE_BOOKING') {
-              title = '🏸 Booking Lapangan Baru';
+              title = '🏸 ' + (log.title || 'Booking Lapangan Baru');
             } else if (actionType === 'SETTLE_BOOKING') {
-              title = '💰 Pelunasan Sewa Lapangan';
+              title = '💰 ' + (log.title || 'Pelunasan Sewa Lapangan');
             } else if (actionType === 'CREATE_TRANSACTION') {
-              title = '🛒 Penjualan Toko Baru Selesai';
+              title = '🛒 ' + (log.title || 'Penjualan Toko Baru Selesai');
+            } else if (actionType === 'CREATE_PRODUCT') {
+              title = '📦 ' + (log.title || 'Produk Baru Ditambahkan');
+            } else if (actionType === 'EDIT_PRODUCT') {
+              title = '✏️ ' + (log.title || 'Pembaruan Stok / Produk');
             } else {
               title = 'ℹ️ ' + (log.title || 'Aktivitas Kasir');
+            }
+
+            let url = '/dashboard';
+            if (actionType.includes('BOOKING')) {
+              url = '/booking/history';
+            } else if (actionType.includes('PRODUCT') || actionType.includes('STOCK')) {
+              url = '/produk';
+            } else if (actionType.includes('TRANSACTION')) {
+              url = '/laporan';
             }
 
             sendWebPushNotificationToOwner({
               title,
               body: log.details || '',
               tag: log.id || 'act-' + Date.now(),
-              url: actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+              url,
             });
           }
         )

@@ -184,6 +184,8 @@ export async function recordActivityLog(
         newLog.actionType === 'SETTLE_BOOKING' ||
         newLog.actionType === 'SHIFT_HANDOVER' ||
         newLog.actionType === 'CREATE_TRANSACTION' ||
+        newLog.actionType === 'CREATE_PRODUCT' ||
+        newLog.actionType === 'EDIT_PRODUCT' ||
         newLog.actionType === 'MANUAL_EDIT'
       ) {
         import('@/lib/notifications/webPush').then(({ notifyOwner }) => {
@@ -199,20 +201,33 @@ export async function recordActivityLog(
           } else if (newLog.actionType === 'SHIFT_HANDOVER') {
             title = '🔄 ' + newLog.title;
           } else if (newLog.actionType === 'CREATE_BOOKING') {
-            title = '🏸 Booking Lapangan Baru';
+            title = '🏸 ' + newLog.title;
           } else if (newLog.actionType === 'SETTLE_BOOKING') {
-            title = '💰 Pelunasan Sewa Lapangan';
+            title = '💰 ' + newLog.title;
           } else if (newLog.actionType === 'CREATE_TRANSACTION') {
-            title = '🛒 Penjualan Toko Baru Selesai';
+            title = '🛒 ' + newLog.title;
+          } else if (newLog.actionType === 'CREATE_PRODUCT') {
+            title = '📦 ' + newLog.title;
+          } else if (newLog.actionType === 'EDIT_PRODUCT') {
+            title = '✏️ ' + newLog.title;
           } else {
             title = 'ℹ️ ' + newLog.title;
+          }
+
+          let url = '/dashboard';
+          if (newLog.actionType.includes('BOOKING')) {
+            url = '/booking/history';
+          } else if (newLog.actionType.includes('PRODUCT') || newLog.actionType.includes('STOCK')) {
+            url = '/produk';
+          } else if (newLog.actionType.includes('TRANSACTION')) {
+            url = '/laporan';
           }
 
           notifyOwner({
             title,
             body: newLog.details,
             tag: newLog.id,
-            url: newLog.actionType.includes('BOOKING') ? '/booking/history' : '/laporan',
+            url,
           });
         }).catch(() => {});
       }

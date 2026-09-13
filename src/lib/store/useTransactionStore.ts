@@ -62,21 +62,23 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         isLoading: false,
       }));
 
-      // Record Activity Log
+      // Record Activity Log so Owner automatically receives Push Notification
       try {
         const { recordActivityLog } = await import('@/lib/db/activityLogs');
         const { useShiftStore } = await import('@/lib/store/useShiftStore');
-        const cashier = useShiftStore.getState().cashierName || 'Kasir';
-        const itemCount = transaction.items.reduce((s, i) => s + i.quantity, 0);
-        const itemSummary = transaction.items
-          .map((i) => `${i.quantity}x ${i.product?.name || 'Produk'}`)
+        const cashier = transaction.cashierName || useShiftStore.getState().cashierName || 'Kasir / Owner';
+        const items = transaction.items || [];
+        const itemCount = items.reduce((s, i) => s + (i?.quantity || 1), 0);
+        const itemSummary = items
+          .map((i) => `${i?.quantity || 1}x ${i?.product?.name || 'Item'}`)
           .join(', ');
-        recordActivityLog({
+        const totalRp = (created.grandTotal || 0).toLocaleString('id-ID');
+        await recordActivityLog({
           staffName: cashier,
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'CREATE_TRANSACTION',
           title: 'Transaksi Penjualan Kantin',
-          details: `Kasir ${cashier} memproses penjualan: ${itemSummary || `${itemCount} barang`} senilai Rp ${created.grandTotal.toLocaleString('id-ID')} via ${created.paymentMethod}.`,
+          details: `Kasir ${cashier} memproses penjualan: ${itemSummary || `${itemCount} barang`} senilai Rp ${totalRp} via ${created.paymentMethod}.`,
           metadata: {
             transactionId: created.id,
             invoiceNumber: created.invoiceNumber,
@@ -84,7 +86,9 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
             paymentMethod: created.paymentMethod,
           },
         });
-      } catch {}
+      } catch (logErr) {
+        console.error('Failed to log transaction activity:', logErr);
+      }
 
       return created;
     } catch (err) {
