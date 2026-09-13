@@ -255,26 +255,6 @@ export const CreateDpBookingModal: React.FC<CreateDpBookingModalProps> = ({
       notes: finalNotes,
     });
 
-    // Record Activity Log
-    import('@/lib/db/activityLogs').then(({ recordActivityLog }) => {
-      const activeCashier = cashierName || 'Yuli';
-      recordActivityLog({
-        staffName: activeCashier,
-        role: 'Kasir',
-        actionType: 'CREATE_BOOKING',
-        title: 'Input Booking Sewa Lapangan',
-        details: `Kasir ${activeCashier} mencatat booking ${finalCustomerName} (${courtNameLabel}). Tgl: ${firstDate} (${startTime}-${endTime}), Total: ${formatRupiah(finalTotal)} via ${paymentMethod}.`,
-        metadata: {
-          bookingId: newBooking.id,
-          customerName: finalCustomerName,
-          court: courtNameLabel,
-          sport: isPickleball ? 'Pickleball' : 'Badminton',
-          total: finalTotal,
-          paymentMethod,
-        },
-      });
-    });
-
     showToast('Sewa lapangan LUNAS berhasil dicatat!');
     onSuccess(newBooking);
   };

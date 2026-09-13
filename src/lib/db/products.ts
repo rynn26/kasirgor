@@ -146,7 +146,9 @@ export async function updateStock(
 
   if (fetchError) throw fetchError;
 
-  const newStock = Math.max(0, Number(current.stock) + delta);
+  const currentStock = Math.max(0, Math.floor(Number(current?.stock) || 0));
+  const numericDelta = Math.floor(Number(delta) || 0);
+  const newStock = Math.max(0, currentStock + numericDelta);
   const isAvailable = newStock > 0;
 
   const { error: updateError } = await supabase
@@ -162,7 +164,7 @@ export async function setStockExact(
   id: string,
   stock: number
 ): Promise<{ newStock: number }> {
-  const newStock = Math.max(0, Math.floor(stock));
+  const newStock = Math.max(0, Math.floor(Number(stock) || 0));
   const isAvailable = newStock > 0;
 
   const { error } = await supabase

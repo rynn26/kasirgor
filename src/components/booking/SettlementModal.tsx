@@ -103,24 +103,6 @@ export const SettlementModal: React.FC<SettlementModalProps> = ({
       });
       showToast(`Pelunasan ${currentBooking.customerName} via ${paymentMethod === 'QRIS' ? 'QRIS' : 'Cash'} berhasil diproses!`);
 
-      // Record Activity Log
-      import('@/lib/db/activityLogs').then(({ recordActivityLog }) => {
-        const activeCashier = cashierName || 'Yuli';
-        recordActivityLog({
-          staffName: activeCashier,
-          role: 'Kasir',
-          actionType: 'SETTLE_BOOKING',
-          title: 'Pelunasan Booking Lapangan',
-          details: `Kasir ${activeCashier} memproses pelunasan booking ${currentBooking.customerName} (${currentBooking.courtName || 'Lapangan'}) sebesar ${formatRupiah(totalSettlementDue)} via ${paymentMethod}. Status: LUNAS.`,
-          metadata: {
-            bookingId: currentBooking.id,
-            customerName: currentBooking.customerName,
-            settlementAmount: totalSettlementDue,
-            paymentMethod,
-          },
-        });
-      });
-
       onSuccess(updated);
     } catch {
       showToast('Gagal memproses pelunasan. Coba lagi.');

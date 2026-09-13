@@ -109,9 +109,27 @@ export function playNotificationChime() {
   } catch {}
 }
 
+// In-memory sliding window cache to prevent duplicate / spammed notifications (5 second debounce)
+const recentNotifCache = new Map<string, number>();
+
+function isDuplicateNotification(key: string): boolean {
+  const now = Date.now();
+  for (const [k, time] of recentNotifCache.entries()) {
+    if (now - time > 5000) {
+      recentNotifCache.delete(k);
+    }
+  }
+  if (recentNotifCache.has(key)) {
+    return true;
+  }
+  recentNotifCache.set(key, now);
+  return false;
+}
+
 /**
  * Send Web Push Notification to Owner.
  * Will NOT display if current user is not Owner.
+ * Deduplicates automatically to prevent notification spam.
  */
 export async function sendWebPushNotificationToOwner(
   payload: OwnerNotificationPayload
@@ -129,13 +147,19 @@ export async function sendWebPushNotificationToOwner(
     return false;
   }
 
+  // Deduplication check: ignore if identical notification arrived in the last 5s
+  const dedupKey = payload.tag || `${payload.title}::${payload.body}`;
+  if (isDuplicateNotification(dedupKey)) {
+    return false;
+  }
+
   playNotificationChime();
 
   const options: Record<string, any> = {
     body: payload.body,
     icon: payload.icon || '/icon.svg',
     badge: '/icon.svg',
-    tag: payload.tag || 'kasir-owner-' + Date.now(),
+    tag: dedupKey,
     vibrate: [200, 100, 200],
     data: {
       url: payload.url || '/dashboard',

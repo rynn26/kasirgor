@@ -48,6 +48,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const todayStr = getJakartaToday();
   const [transactionDate, setTransactionDate] = useState(todayStr);
   const [isOwner, setIsOwner] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = React.useRef(false);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [cashReceived, setCashReceived] = useState<number>(grandTotal);
@@ -83,7 +85,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handleProcessPayment = async () => {
-    if (isUnderpaid || items.length === 0) return;
+    if (isUnderpaid || items.length === 0 || isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    setIsProcessing(true);
 
     const finalAmountPaid = paymentMethod === 'CASH' ? cashReceived : grandTotal;
     const finalChange = paymentMethod === 'CASH' ? change : 0;
@@ -148,6 +152,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       onClose();
     } catch (err) {
       console.error('Gagal menyimpan transaksi:', err);
+    } finally {
+      isProcessingRef.current = false;
+      setIsProcessing(false);
     }
   };
 
@@ -297,15 +304,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="p-4 bg-white border-t border-slate-200">
           <button
             type="button"
-            disabled={isUnderpaid || items.length === 0}
+            disabled={isUnderpaid || items.length === 0 || isProcessing}
             onClick={handleProcessPayment}
             className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all cursor-pointer ${
-              isUnderpaid || items.length === 0
+              isUnderpaid || items.length === 0 || isProcessing
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-[#b92b10] hover:bg-[#a3250d] active:scale-[0.99] text-white shadow-lg shadow-[#b92b10]/25'
             }`}
           >
-            <span>SELESAIKAN PEMBAYARAN</span>
+            <span>{isProcessing ? 'MEMPROSES TRANSAKSI...' : 'SELESAIKAN PEMBAYARAN'}</span>
           </button>
         </div>
       </div>

@@ -308,13 +308,13 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                     className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-red-500 hover:shadow-xs transition-all cursor-pointer group space-y-2"
                   >
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="min-w-0 pr-2">
                         <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-1">
-                          {t.customerName ? t.customerName : 'Pelanggan Umum'}
+                          {itemsSummary || (t.customerName && t.customerName !== 'Pelanggan Umum' ? t.customerName : 'Produk Penjualan')}
                         </h4>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <span className={`text-xs sm:text-sm font-black ${
                           isCash ? 'text-amber-600' : 'text-[#a62512]'
                         }`}>
@@ -327,8 +327,10 @@ export const PaymentMethodDetailModal: React.FC<PaymentMethodDetailModalProps> =
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                      <span className="line-clamp-1 text-slate-600 font-medium">
-                        {itemsSummary}
+                      <span className="line-clamp-1 text-slate-500 font-medium">
+                        {t.customerName && t.customerName !== 'Pelanggan Umum'
+                          ? `${t.customerName} • ${t.invoiceNumber ? `#${t.invoiceNumber}` : `Kasir: ${t.cashierName || 'Kasir'}`}`
+                          : (t.invoiceNumber ? `#${t.invoiceNumber}` : `Kasir: ${t.cashierName || 'Kasir'}`)}
                       </span>
                       
                       <div className="flex items-center gap-1 text-slate-400 group-hover:text-[#a62512] font-bold text-[11px] transition-colors shrink-0 ml-2">

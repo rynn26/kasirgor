@@ -328,6 +328,12 @@ export const CategorySalesDetailModal: React.FC<CategorySalesDetailModalProps> =
                   const txDate = m.tx.createdAt ? m.tx.createdAt.split('T')[0] : '';
                   const txTime = m.tx.createdAt ? m.tx.createdAt.split('T')[1]?.slice(0, 5) : '';
 
+                  const categoryFilteredItems = m.tx.items
+                    .filter((i) => normalizeProductCategory(i.product.category).toLowerCase() === categoryName.toLowerCase());
+                  const categoryItemsSummary = categoryFilteredItems
+                    .map((i) => `${i.product.name} (${i.quantity}x)`)
+                    .join(', ');
+
                   return (
                     <div
                       key={m.tx.id || idx}
@@ -335,12 +341,12 @@ export const CategorySalesDetailModal: React.FC<CategorySalesDetailModalProps> =
                       className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:border-[#a62512]/60 hover:shadow-xs transition-all cursor-pointer group space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-900 group-hover:text-[#a62512] transition-colors">
-                              {m.tx.customerName || 'Pelanggan Umum'}
+                            <span className="text-xs font-bold text-slate-900 group-hover:text-[#a62512] transition-colors truncate">
+                              {categoryItemsSummary || (m.tx.customerName && m.tx.customerName !== 'Pelanggan Umum' ? m.tx.customerName : 'Produk Penjualan')}
                             </span>
-                            <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                               {m.tx.paymentMethod}
                             </span>
                           </div>
@@ -372,13 +378,12 @@ export const CategorySalesDetailModal: React.FC<CategorySalesDetailModalProps> =
                         </div>
                       </div>
 
-                      {/* Items preview in this receipt */}
+                      {/* Invoice and link */}
                       <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
                         <span className="text-slate-500 truncate max-w-[240px]">
-                          {m.tx.items
-                            .filter((i) => normalizeProductCategory(i.product.category).toLowerCase() === categoryName.toLowerCase())
-                            .map((i) => `${i.product.name} (${i.quantity}x)`)
-                            .join(', ')}
+                          {m.tx.customerName && m.tx.customerName !== 'Pelanggan Umum'
+                            ? `${m.tx.customerName} • #${m.tx.invoiceNumber}`
+                            : `#${m.tx.invoiceNumber}`}
                         </span>
                         <span className="text-[#a62512] font-bold group-hover:underline flex items-center gap-0.5 shrink-0">
                           Lihat Nota

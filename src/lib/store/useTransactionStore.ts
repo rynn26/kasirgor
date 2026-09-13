@@ -109,6 +109,20 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
         isLoading: false,
       }));
 
+      // Restore product stock back to inventory if transaction was COMPLETED
+      if (target && target.status !== 'CANCELLED' && target.items && target.items.length > 0) {
+        try {
+          const { updateStock } = await import('@/lib/db/products');
+          for (const item of target.items) {
+            if (item?.product?.id && item?.quantity) {
+              await updateStock(item.product.id, item.quantity);
+            }
+          }
+        } catch (stockErr) {
+          console.error('Failed to restore stock on cancelTransaction:', stockErr);
+        }
+      }
+
       // Record Activity Log
       try {
         const { recordActivityLog } = await import('@/lib/db/activityLogs');

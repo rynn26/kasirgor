@@ -79,52 +79,10 @@ export const OwnerNotificationManager: React.FC = () => {
           const log = data?.payload;
           if (!log) return;
 
-          // Dispatch local event so UI components immediately update their notification list!
+          // Dispatch local event so UI components immediately update their notification counter/list
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('kasir_activity_logged', { detail: log }));
           }
-
-          const actionType = log.actionType || log.action_type || '';
-          let title = '📢 Notifikasi Kasir GOR';
-          if (
-            actionType.includes('DELETE') ||
-            actionType.includes('VOID') ||
-            actionType.includes('CANCEL')
-          ) {
-            title = '🚨 ' + (log.title || 'Pembatalan Kasir');
-          } else if (actionType === 'EDIT_BOOKING') {
-            title = '🔄 ' + (log.title || 'Perubahan Data Booking');
-          } else if (actionType === 'SHIFT_HANDOVER') {
-            title = '🔄 ' + (log.title || 'Pergantian Shift');
-          } else if (actionType === 'CREATE_BOOKING') {
-            title = '🏸 ' + (log.title || 'Booking Lapangan Baru');
-          } else if (actionType === 'SETTLE_BOOKING') {
-            title = '💰 ' + (log.title || 'Pelunasan Sewa Lapangan');
-          } else if (actionType === 'CREATE_TRANSACTION') {
-            title = '🛒 ' + (log.title || 'Penjualan Toko Baru Selesai');
-          } else if (actionType === 'CREATE_PRODUCT') {
-            title = '📦 ' + (log.title || 'Produk Baru Ditambahkan');
-          } else if (actionType === 'EDIT_PRODUCT') {
-            title = '✏️ ' + (log.title || 'Pembaruan Stok / Produk');
-          } else {
-            title = 'ℹ️ ' + (log.title || 'Aktivitas Kasir');
-          }
-
-          let url = '/dashboard';
-          if (actionType.includes('BOOKING')) {
-            url = '/booking/history';
-          } else if (actionType.includes('PRODUCT') || actionType.includes('STOCK')) {
-            url = '/produk';
-          } else if (actionType.includes('TRANSACTION')) {
-            url = '/laporan';
-          }
-
-          sendWebPushNotificationToOwner({
-            title,
-            body: log.details || '',
-            tag: log.id || 'act-' + Date.now(),
-            url,
-          });
         })
         .on(
           'postgres_changes',
