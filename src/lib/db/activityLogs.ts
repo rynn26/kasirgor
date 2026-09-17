@@ -187,6 +187,24 @@ export async function recordActivityLog(
 
     // Broadcast across all devices via Supabase Realtime channel
     broadcastActivityToOwner(newLog);
+
+    // Call backend Web Push API so devices with closed browsers receive OS push notifications
+    if (typeof window !== 'undefined') {
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newLog.title,
+          body: newLog.details,
+          url: newLog.actionType.includes('BOOKING')
+            ? '/booking/history'
+            : newLog.actionType.includes('PRODUCT')
+            ? '/produk'
+            : '/laporan',
+          tag: newLog.id,
+        }),
+      }).catch(() => {});
+    }
   } catch (err) {
     console.error('Error dispatching realtime activity log:', err);
   }

@@ -4,14 +4,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   Bell, 
   X, 
-  CheckCircle2, 
-  Volume2, 
-  ExternalLink, 
   ShoppingCart, 
   Calendar, 
   AlertTriangle, 
-  ArrowRight,
-  ShieldCheck
+  ArrowRight
 } from 'lucide-react';
 import {
   isUserOwner,
@@ -20,7 +16,7 @@ import {
   requestNotificationPermission,
   sendWebPushNotificationToOwner,
   playNotificationChime,
-  OwnerNotificationPayload,
+  subscribeToPushService,
 } from '@/lib/notifications/webPush';
 
 import { supabase } from '@/lib/supabase/client';
@@ -42,39 +38,26 @@ export const OwnerNotificationManager: React.FC = () => {
   const [showPromptBanner, setShowPromptBanner] = useState(false);
   const [floatingAlert, setFloatingAlert] = useState<FloatingAlertData | null>(null);
 
-  // Set of recently handled log IDs to avoid duplicate alerts (valid for 15s)
-  const processedLogIdsRef = useRef<Map<string, number>>(new Map());
-  const lastSeenTimeRef = useRef<string>(new Date(Date.now() - 5000).toISOString());
+  // Permanent Set of processed log IDs during this session — NEVER DELETED to prevent spam
+  const processedLogIdsRef = useRef<Set<string>>(new Set());
+  // Timestamp when this page was opened: activities created BEFORE this time will NOT pop up or chime
+  const sessionStartTimeRef = useRef<number>(Date.now() - 1000);
+  const lastAlertTimeRef = useRef<number>(0);
   const alertTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Central handler for all incoming activity logs
-  const handleIncomingActivity = (log: any) => {
+  // Central handler for live incoming activities
+  const handleIncomingActivity = (log: any, isRealtimeLive = true) => {
     if (!isUserOwner() || !log) return;
 
-    const logId = log.id || `log-${Date.now()}-${Math.random()}`;
-    const now = Date.now();
+    const logId = String(log.id || `log-${Date.now()}`);
 
-    // Clean old entries in cache (> 15s)
-    for (const [id, time] of processedLogIdsRef.current.entries()) {
-      if (now - time > 15000) {
-        processedLogIdsRef.current.delete(id);
-      }
-    }
-
+    // Strict deduplication: if already processed in this browser session, ignore completely
     if (processedLogIdsRef.current.has(logId)) {
       return;
     }
-    processedLogIdsRef.current.set(logId, now);
+    processedLogIdsRef.current.add(logId);
 
-    // Update last seen timestamp
-    if (log.timestamp || log.created_at) {
-      const t = log.timestamp || log.created_at;
-      if (t > lastSeenTimeRef.current) {
-        lastSeenTimeRef.current = t;
-      }
-    }
-
-    // 1. Dispatch custom event so live UI (Dashboard counters, tables) update immediately
+    // 1. Dispatch custom event so live UI (Dashboard counters, tables) update silently
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('kasir_activity_logged', {
@@ -92,7 +75,14 @@ export const OwnerNotificationManager: React.FC = () => {
       );
     }
 
-    // 2. Determine title & target navigation URL
+    // ANTI-SPAM & ANTI-FLOOD GUARD:
+    // If the activity was created before this page session started, DO NOT pop up banner or play sound!
+    const logTimestamp = new Date(log.timestamp || log.created_at || Date.now()).getTime();
+    if (!isRealtimeLive || logTimestamp < sessionStartTimeRef.current) {
+      return;
+    }
+
+    // Determine title & target navigation URL
     const actionType = log.actionType || log.action_type || '';
     let title = '📢 Notifikasi Kasir GOR';
     if (
@@ -128,10 +118,14 @@ export const OwnerNotificationManager: React.FC = () => {
       url = '/laporan';
     }
 
-    // 3. Play audio chime so owner hears sound immediately
-    playNotificationChime();
+    // Throttle audio chime (at least 2 seconds between chimes to prevent loud overlapping spam)
+    const now = Date.now();
+    if (now - lastAlertTimeRef.current > 2000) {
+      playNotificationChime();
+      lastAlertTimeRef.current = now;
+    }
 
-    // 4. Show In-App Floating Notification Banner at the top of the screen
+    // Show In-App Floating Notification Banner at top of the screen
     setFloatingAlert({
       id: logId,
       title,
@@ -148,9 +142,9 @@ export const OwnerNotificationManager: React.FC = () => {
     }
     alertTimerRef.current = setTimeout(() => {
       setFloatingAlert(null);
-    }, 7000);
+    }, 6000);
 
-    // 5. Trigger Web Push Notification for OS / system tray
+    // Trigger Web Push Notification for OS system tray (if permission granted and tab in background)
     sendWebPushNotificationToOwner({
       title,
       body: log.details || '',
@@ -168,9 +162,20 @@ export const OwnerNotificationManager: React.FC = () => {
       return;
     }
 
+    // Set baseline session time to now
+    sessionStartTimeRef.current = Date.now() - 1000;
+
     // Register service worker for PWA push
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then(() => {
+          // If already granted, ensure subscription is synced to server
+          if (getNotificationPermission() === 'granted') {
+            subscribeToPushService().catch(() => {});
+          }
+        })
+        .catch(() => {});
     }
 
     if (isWebNotificationSupported()) {
@@ -184,31 +189,20 @@ export const OwnerNotificationManager: React.FC = () => {
       }
     }
 
-    // 1. BroadcastChannel listener for notifications dispatched across tabs on same device
+    // 1. BroadcastChannel listener for notifications dispatched across tabs on the same computer
     let channel: BroadcastChannel | null = null;
     try {
       if ('BroadcastChannel' in window) {
         channel = new BroadcastChannel('kasir_owner_notifications');
         channel.onmessage = (event) => {
           if (event.data) {
-            handleIncomingActivity(event.data);
+            handleIncomingActivity(event.data, true);
           }
         };
       }
     } catch {}
 
-    // 2. Storage event listener fallback (same device across tabs)
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'kasir_last_owner_notification' && e.newValue) {
-        try {
-          const payload = JSON.parse(e.newValue);
-          handleIncomingActivity(payload);
-        } catch {}
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-
-    // 3. Supabase Realtime listener for cross-device alerts
+    // 2. Supabase Realtime listener for cross-device alerts
     let realtimeChannel: any = null;
     try {
       realtimeChannel = supabase
@@ -217,7 +211,7 @@ export const OwnerNotificationManager: React.FC = () => {
         })
         .on('broadcast', { event: 'activity_log' }, (data: any) => {
           if (data?.payload) {
-            handleIncomingActivity(data.payload);
+            handleIncomingActivity(data.payload, true);
           }
         })
         .on(
@@ -235,7 +229,7 @@ export const OwnerNotificationManager: React.FC = () => {
                 title: log.title,
                 details: log.details,
                 metadata: log.metadata,
-              });
+              }, true);
             }
           }
         )
@@ -247,32 +241,34 @@ export const OwnerNotificationManager: React.FC = () => {
             const oldRow = payload.old as any;
             if (!newRow) return;
 
-            // Only trigger if stock was reduced
+            // Only trigger if stock was actually reduced
             if (oldRow && oldRow.stock !== undefined && newRow.stock >= oldRow.stock) {
               return;
             }
 
             const currentStock = Number(newRow.stock || 0);
             const minStock = Number(newRow.minimum_stock || 15);
+            // Deduplication slot: 5-minute window per product ID
+            const slot = Math.floor(Date.now() / (5 * 60 * 1000));
 
             if (currentStock === 0) {
               handleIncomingActivity({
-                id: `stock-0-${newRow.id}-${Date.now()}`,
+                id: `stock-0-${newRow.id}-${slot}`,
                 title: '🚨 Peringatan: Stok Habis!',
                 details: `Stok produk "${newRow.name}" telah HABIS (0 ${newRow.unit || 'pcs'}). Segera lakukan restock!`,
                 actionType: 'STOCK_EMPTY',
                 staffName: 'Sistem',
                 role: 'Sistem',
-              });
+              }, true);
             } else if (currentStock <= minStock) {
               handleIncomingActivity({
-                id: `stock-low-${newRow.id}-${Date.now()}`,
+                id: `stock-low-${newRow.id}-${slot}`,
                 title: '⚠️ Peringatan: Stok Menipis!',
                 details: `Stok produk "${newRow.name}" tersisa ${currentStock} ${newRow.unit || 'pcs'} (Batas minimum: ${minStock}).`,
                 actionType: 'STOCK_LOW',
                 staffName: 'Sistem',
                 role: 'Sistem',
-              });
+              }, true);
             }
           }
         )
@@ -281,40 +277,9 @@ export const OwnerNotificationManager: React.FC = () => {
       console.error('Supabase realtime subscription error:', err);
     }
 
-    // 4. Fallback Polling (Every 10 seconds)
-    // Ensures that even if WebSocket sleeps or drops, new activities in Supabase are reliably received!
-    const pollInterval = setInterval(async () => {
-      if (!isUserOwner()) return;
-      try {
-        const { data, error } = await supabase
-          .from('activity_logs')
-          .select('*')
-          .gt('created_at', lastSeenTimeRef.current)
-          .order('created_at', { ascending: true })
-          .limit(10);
-
-        if (!error && data && data.length > 0) {
-          data.forEach((row: any) => {
-            handleIncomingActivity({
-              id: row.id,
-              timestamp: row.created_at,
-              staffName: row.staff_name,
-              role: row.role,
-              actionType: row.action_type,
-              title: row.title,
-              details: row.details,
-              metadata: row.metadata,
-            });
-          });
-        }
-      } catch {}
-    }, 10000);
-
     return () => {
       if (channel) channel.close();
       if (realtimeChannel) supabase.removeChannel(realtimeChannel);
-      window.removeEventListener('storage', handleStorage);
-      clearInterval(pollInterval);
       if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
     };
   }, []);
@@ -324,7 +289,9 @@ export const OwnerNotificationManager: React.FC = () => {
     if (granted) {
       setPermission('granted');
       setShowPromptBanner(false);
-      // Send immediate welcome test notification!
+      // Register web push subscription to backend
+      await subscribeToPushService();
+      // Send single welcome alert
       handleIncomingActivity({
         id: `welcome-${Date.now()}`,
         title: '🏆 Kasir GOR - Notifikasi HP Aktif!',
@@ -332,7 +299,7 @@ export const OwnerNotificationManager: React.FC = () => {
         actionType: 'TEST_NOTIFICATION',
         staffName: 'Sistem',
         role: 'Owner',
-      });
+      }, true);
     } else {
       setPermission('denied');
       setShowPromptBanner(false);

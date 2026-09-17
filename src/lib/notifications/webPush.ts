@@ -71,6 +71,55 @@ export function getNotificationPermission(): NotificationPermission {
   return Notification.permission;
 }
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+export async function subscribeToPushService(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (!reg.pushManager) return false;
+
+    const vapidKey =
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+      'BFw4-xpYKhrCFo8VrGCiXHm0jyvNwhbAWUK75Bb_oMCXIRYjUVqKwGNj7hw0Vr3Jb_m6vH8d9trPwaOQY2iYImM';
+    const convertedKey = urlBase64ToUint8Array(vapidKey);
+
+    let subscription = await reg.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedKey,
+      });
+    }
+
+    if (subscription) {
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: subscription.toJSON(),
+          role: 'owner',
+        }),
+      });
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Error subscribing to PushService:', err);
+    return false;
+  }
+}
+
 /**
  * Request permission from browser for Web Push Notifications.
  */
@@ -83,6 +132,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
       if ('serviceWorker' in navigator) {
         try {
           await navigator.serviceWorker.register('/sw.js');
+          await subscribeToPushService();
         } catch {}
       }
       return true;
