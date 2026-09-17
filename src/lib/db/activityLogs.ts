@@ -103,9 +103,49 @@ const SEED_ACTIVITY_LOGS: ActivityLog[] = [
     role: 'Kasir',
     actionType: 'CREATE_BOOKING',
     title: 'Booking Lapangan Baru',
-    details: 'Menambahkan DP sewa Lapangan Badminton 1 untuk Bpk. Hendra (Rp 80.000 via QRIS).',
+    details: 'Menambahkan DP sewa untuk Bpk. Hendra (Rp 80.000 via QRIS).',
   },
 ];
+
+// Singleton Realtime Broadcast channel instance
+let broadcastChannelInstance: any = null;
+
+function getBroadcastChannel() {
+  if (!broadcastChannelInstance && typeof window !== 'undefined') {
+    broadcastChannelInstance = supabase.channel('kasir_global_events', {
+      config: { broadcast: { ack: true } },
+    });
+    broadcastChannelInstance.subscribe();
+  }
+  return broadcastChannelInstance;
+}
+
+export async function broadcastActivityToOwner(log: ActivityLog) {
+  try {
+    const channel = getBroadcastChannel();
+    if (!channel) return;
+
+    if (channel.state === 'joined') {
+      await channel.send({
+        type: 'broadcast',
+        event: 'activity_log',
+        payload: log,
+      });
+    } else {
+      channel.subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'activity_log',
+            payload: log,
+          });
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Error dispatching realtime broadcast:', err);
+  }
+}
 
 /**
  * Record an activity / audit log to Supabase and fallback to localStorage
@@ -146,16 +186,7 @@ export async function recordActivityLog(
       );
 
     // Broadcast across all devices via Supabase Realtime channel
-    const realtimeChannel = supabase.channel('kasir_global_events');
-    realtimeChannel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        realtimeChannel.send({
-          type: 'broadcast',
-          event: 'activity_log',
-          payload: newLog,
-        });
-      }
-    });
+    broadcastActivityToOwner(newLog);
   } catch (err) {
     console.error('Error dispatching realtime activity log:', err);
   }

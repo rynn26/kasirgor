@@ -333,7 +333,7 @@ export const EditCourtBookingModal: React.FC<EditCourtBookingModalProps> = ({
           role: 'Kasir',
           actionType: 'EDIT_BOOKING',
           title: 'Edit Data Booking Lapangan',
-          details: `Kasir ${activeCashier} mengubah booking ${customerName.trim()} (${finalCourtName || selectedSport}). Tgl Main: ${date}, Jam: ${startTime}-${endTime}, Total: ${formatRupiah(totalSewa)}, Status: ${status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
+          details: `Kasir ${activeCashier} mengubah booking ${customerName.trim()}. Tgl Main: ${date}, Jam: ${startTime}-${endTime}, Total: ${formatRupiah(totalSewa)}, Status: ${status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
           metadata: {
             bookingId: booking.id,
             customerName: customerName.trim(),

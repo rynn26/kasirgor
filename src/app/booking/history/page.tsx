@@ -229,7 +229,7 @@ export default function HistoryBookingPage() {
         role: staffRole,
         actionType: isCancel ? 'CANCEL_BOOKING' : 'DELETE_BOOKING',
         title: isCancel ? `Void Booking Lapangan oleh ${staffName}` : `Hapus Booking Lapangan oleh ${staffName}`,
-        details: `Alasan: "${reason}". Booking: ${deletingBooking.customerName || 'Penyewa'} (${deletingBooking.courtName || 'Lapangan'}, ${deletingBooking.startTime}-${deletingBooking.endTime}, Total: ${formatRupiah(deletingBooking.totalAmount)}).`,
+        details: `Alasan: "${reason}". Booking: ${deletingBooking.customerName || 'Penyewa'} (${deletingBooking.startTime}-${deletingBooking.endTime}, Total: ${formatRupiah(deletingBooking.totalAmount)}).`,
         metadata: {
           bookingId: deletingBooking.id,
           reason,

@@ -94,7 +94,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'CREATE_BOOKING',
           title: isLunas ? 'Booking Lapangan Baru (Lunas)' : 'Booking Lapangan Baru (DP)',
-          details: `${cashier} mencatat booking ${newBooking.customerName || 'Penyewa'} (${newBooking.courtName || 'Lapangan'}). Tgl: ${newBooking.date} (${newBooking.startTime}-${newBooking.endTime}). ${isLunas ? `Total: Rp ${totalRp} (Lunas)` : `DP Masuk: Rp ${dpRp} dari Total: Rp ${totalRp}`}.`,
+          details: `${cashier} mencatat booking ${newBooking.customerName || 'Penyewa'}. Tgl: ${newBooking.date} (${newBooking.startTime}-${newBooking.endTime}). ${isLunas ? `Total: Rp ${totalRp} (Lunas)` : `DP Masuk: Rp ${dpRp} dari Total: Rp ${totalRp}`}.`,
           metadata: {
             bookingId: newBooking.id,
             customerName: newBooking.customerName,
@@ -136,7 +136,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'SETTLE_BOOKING',
           title: 'Pelunasan Sewa Lapangan',
-          details: `Kasir ${cashier} menerima pelunasan booking ${updated.customerName || 'Penyewa'} (${updated.courtName || 'Lapangan'}) sebesar Rp ${settleRp} via ${data.paymentMethod || 'CASH'}. Status: LUNAS.`,
+          details: `Kasir ${cashier} menerima pelunasan booking ${updated.customerName || 'Penyewa'} sebesar Rp ${settleRp} via ${data.paymentMethod || 'CASH'}. Status: LUNAS.`,
           metadata: {
             bookingId,
             customerName: updated.customerName,
@@ -179,7 +179,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'CANCEL_BOOKING',
           title: 'Batalkan Reservasi Lapangan',
-          details: `${cashier} membatalkan booking ${target?.customerName || 'Pelanggan'} (${target?.courtName || 'Lapangan'}). Tgl: ${target?.date || ''} (${target?.startTime || ''}-${target?.endTime || ''}).`,
+          details: `${cashier} membatalkan booking ${target?.customerName || 'Pelanggan'}. Tgl: ${target?.date || ''} (${target?.startTime || ''}-${target?.endTime || ''}).`,
           metadata: {
             bookingId,
             customerName: target?.customerName,
@@ -215,7 +215,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
             role: 'Kasir',
             actionType: 'EDIT_BOOKING',
             title: 'Perubahan Data Booking Lapangan',
-            details: `Kasir ${cashier} mengubah data booking ${updated.customerName} (${updated.courtName || 'Lapangan'}). Tgl Main: ${updated.date}, Jam: ${updated.startTime}-${updated.endTime}, Status: ${updated.status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
+            details: `Kasir ${cashier} mengubah data booking ${updated.customerName}. Tgl Main: ${updated.date}, Jam: ${updated.startTime}-${updated.endTime}, Status: ${updated.status === 'SETTLED' ? 'LUNAS' : 'DP'}.`,
             metadata: {
               bookingId,
               customerName: updated.customerName,
@@ -255,7 +255,7 @@ export const useCourtBookingStore = create<CourtBookingState>((set, get) => ({
           role: cashier.toLowerCase() === 'owner' ? 'Owner' : 'Kasir',
           actionType: 'DELETE_BOOKING',
           title: 'Hapus Reservasi Lapangan',
-          details: `${cashier} menghapus data booking ${target?.customerName || 'Pelanggan'} (${target?.courtName || 'Lapangan'}) tgl ${target?.date || ''}.`,
+          details: `${cashier} menghapus data booking ${target?.customerName || 'Pelanggan'} tgl ${target?.date || ''}.`,
           metadata: {
             bookingId,
             customerName: target?.customerName,
