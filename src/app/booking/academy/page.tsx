@@ -335,12 +335,7 @@ export default function AcademyBookingPage() {
                     }`}>
                       👶
                     </div>
-                    <div>
-                      <div className="text-xs font-black leading-tight">Anak</div>
-                      <div className={`text-[10px] ${category === 'ANAK' ? 'text-white/80' : 'text-slate-400'}`}>
-                        Usia 6 - 13 tahun
-                      </div>
-                    </div>
+                    <span className="text-xs font-black">Anak</span>
                   </div>
                   {category === 'ANAK' && (
                     <Check className="w-4 h-4 stroke-[3] text-white shrink-0" />
@@ -363,12 +358,7 @@ export default function AcademyBookingPage() {
                     }`}>
                       🧑
                     </div>
-                    <div>
-                      <div className="text-xs font-black leading-tight">Dewasa</div>
-                      <div className={`text-[10px] ${category === 'DEWASA' ? 'text-white/80' : 'text-slate-400'}`}>
-                        Usia 14 tahun+
-                      </div>
-                    </div>
+                    <span className="text-xs font-black">Dewasa</span>
                   </div>
                   {category === 'DEWASA' && (
                     <Check className="w-4 h-4 stroke-[3] text-white shrink-0" />

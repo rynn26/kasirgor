@@ -53,7 +53,7 @@ export const AcademyReceiptModal: React.FC<AcademyReceiptModalProps> = ({
 
     const programTitle = isBadminton ? 'SINYO BADMINTON ACADEMY' : 'SINYO PICKLEBALL ACADEMY';
     const detailProgram = isBadminton 
-      ? `Kategori: *${transaction.category === 'ANAK' ? 'Anak (6-13 thn)' : 'Dewasa (14+ thn)'}*\nPaket: *${transaction.package} Pertemuan*\nBulan Latihan: *${transaction.trainingMonth || '-'}*`
+      ? `Kategori: *${transaction.category === 'ANAK' ? 'Anak' : 'Dewasa'}*\nPaket: *${transaction.package} Pertemuan*\nBulan Latihan: *${transaction.trainingMonth || '-'}*`
       : `Waktu: *${transaction.sessionTime === 'PAGI_SIANG' ? 'Pagi - Siang (08.00 - 17.00)' : 'Sore - Malam (17.00 - 23.00)'}*\nPeriode: *${transaction.periodStart || '-'} s/d ${transaction.periodEnd || '-'}*`;
 
     let paymentBreakdown = `Total Biaya: ${formatRupiah(transaction.feeAmount)}\n`;
@@ -161,7 +161,7 @@ Terima kasih telah bergabung bersama Sinyo Academy!`;
                 <>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Kategori:</span>
-                    <span className="font-semibold">{transaction.category === 'ANAK' ? 'Anak (6-13 thn)' : 'Dewasa (14+ thn)'}</span>
+                    <span className="font-semibold">{transaction.category === 'ANAK' ? 'Anak' : 'Dewasa'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Paket:</span>
