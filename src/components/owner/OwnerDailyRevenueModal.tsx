@@ -275,7 +275,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 
     academyTransactions.forEach((tx) => {
       // Porsi DP (atau bayar langsung saat pendaftaran)
-      const dpDate = tx.createdAt.slice(0, 10);
+      const dpDate = toJakartaDateString(tx.createdAt);
       if (dpDate >= effectiveStart && dpDate <= effectiveEnd && tx.dpAmount > 0) {
         if (tx.paymentMethod === 'CASH') {
           academyDpCash += tx.dpAmount;
@@ -286,7 +286,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 
       // Porsi Pelunasan (Settlement)
       if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
-        const settleDate = tx.settledAt.slice(0, 10);
+        const settleDate = toJakartaDateString(tx.settledAt);
         if (settleDate >= effectiveStart && settleDate <= effectiveEnd) {
           const method = tx.settlementPaymentMethod || tx.paymentMethod;
           if (method === 'CASH') {
@@ -307,7 +307,7 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     let mabarQris = 0;
 
     mabarTransactions.forEach((tx) => {
-      const txDate = tx.date || tx.createdAt.slice(0, 10);
+      const txDate = tx.date ? tx.date : toJakartaDateString(tx.createdAt);
       if (txDate >= effectiveStart && txDate <= effectiveEnd) {
         mabarCash += (tx.nominalCash || 0);
         mabarQris += (tx.nominalQris || 0);

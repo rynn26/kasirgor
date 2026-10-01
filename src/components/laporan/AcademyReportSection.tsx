@@ -18,6 +18,7 @@ import { AcademyTransaction, AcademyProgram } from '@/types/academy';
 import { AcademyReceiptModal } from '@/components/academy/AcademyReceiptModal';
 import { AcademySettlementModal } from '@/components/academy/AcademySettlementModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
+import { toJakartaDateString } from '@/lib/bookingUtils';
 
 interface AcademyReportSectionProps {
   dateRange: { start: string; end: string; label: string };
@@ -73,7 +74,7 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
     const items: AcademyPaymentItem[] = [];
 
     transactions.forEach((tx) => {
-      const dpDate = tx.createdAt.slice(0, 10);
+      const dpDate = toJakartaDateString(tx.createdAt);
       const isDpInPeriod = dpDate >= start && dpDate <= end;
 
       // 1. Porsi DP (atau bayar lunas langsung saat pendaftaran)
@@ -91,7 +92,7 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
 
       // 2. Porsi Pelunasan (jika ada dan tanggal pelunasan masuk rentang periode)
       if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
-        const settleDate = tx.settledAt.slice(0, 10);
+        const settleDate = toJakartaDateString(tx.settledAt);
         if (settleDate >= start && settleDate <= end) {
           items.push({
             id: `${tx.id}_settle`,

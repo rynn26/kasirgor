@@ -118,10 +118,10 @@ export default function AcademyBookingPage() {
       const activeCashier = cashierName || 'Yuli';
       const activeShift = selectedShift?.name || (activeCashier.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang');
 
-      const nowTime = new Date().toTimeString().slice(0, 8);
-      const createdIso = registrationDate
-        ? `${registrationDate}T${nowTime}.000Z`
-        : new Date().toISOString();
+      const timeStr = new Date().toTimeString().slice(0, 8);
+      const createdIso = registrationDate === todayJakarta
+        ? new Date().toISOString()
+        : `${registrationDate}T${timeStr}+07:00`;
 
       const created = await createAcademyTransaction({
         customerName: customerName.trim(),
