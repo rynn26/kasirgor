@@ -112,7 +112,7 @@ let broadcastChannelInstance: any = null;
 
 function getBroadcastChannel() {
   if (!broadcastChannelInstance && typeof window !== 'undefined') {
-    broadcastChannelInstance = supabase.channel('kasir_global_events', {
+    broadcastChannelInstance = supabase.channel('kasir_global_broadcast', {
       config: { broadcast: { ack: true } },
     });
     broadcastChannelInstance.subscribe();

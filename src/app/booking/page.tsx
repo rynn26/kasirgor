@@ -24,7 +24,8 @@ import {
   Calendar,
   History as HistoryIcon,
   Plus,
-  Settings
+  Settings,
+  Users
 } from 'lucide-react';
 import { CreateDpBookingModal } from '@/components/booking/CreateDpBookingModal';
 import { SettlementModal } from '@/components/booking/SettlementModal';
@@ -229,7 +230,7 @@ export default function BookingLapanganPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           
           {/* Card 1: DP Booking Lapangan */}
           <Link
@@ -321,6 +322,60 @@ export default function BookingLapanganPage() {
               <ChevronRight className="w-4 h-4 stroke-[2.5]" />
             </div>
           </button>
+
+          {/* Card 4: Pembayaran Sinyo Academy */}
+          <Link
+            href="/booking/academy"
+            className="group relative p-5 bg-white hover:bg-purple-50/40 rounded-3xl border border-slate-200 hover:border-purple-500/50 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer text-left flex items-center justify-between"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/25 group-hover:scale-105 transition-transform">
+                <Users className="w-7 h-7 stroke-[2.2]" />
+              </div>
+              <div>
+                <span className="inline-block px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider mb-1">
+                  Sinyo Academy
+                </span>
+                <h3 className="text-base font-black text-slate-900 group-hover:text-purple-800 transition-colors">
+                  Pembayaran Sinyo Academy
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5 line-clamp-1">
+                  Catat pembayaran pelatihan bulutangkis / pickleball
+                </p>
+              </div>
+            </div>
+
+            <div className="w-8 h-8 rounded-full bg-slate-50 group-hover:bg-purple-600 group-hover:text-white text-slate-400 flex items-center justify-center transition-colors">
+              <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </Link>
+
+          {/* Card 5: Open Mabar */}
+          <Link
+            href="/booking/mabar"
+            className="group relative p-5 bg-white hover:bg-pink-50/40 rounded-3xl border border-pink-200/80 hover:border-pink-500/50 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer text-left flex items-center justify-between"
+          >
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#e11d48] text-white flex items-center justify-center shadow-lg shadow-rose-500/25 group-hover:scale-105 transition-transform">
+                <Users className="w-7 h-7 stroke-[2.2]" />
+              </div>
+              <div>
+                <span className="inline-block px-2 py-0.5 rounded-md bg-pink-100 text-pink-800 text-[10px] font-black uppercase tracking-wider mb-1">
+                  Open Mabar
+                </span>
+                <h3 className="text-base font-black text-slate-900 group-hover:text-pink-800 transition-colors">
+                  Open Mabar
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5 line-clamp-1">
+                  Catat pemasukan open mabar
+                </p>
+              </div>
+            </div>
+
+            <div className="w-8 h-8 rounded-full bg-slate-50 group-hover:bg-pink-600 group-hover:text-white text-slate-400 flex items-center justify-center transition-colors">
+              <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </Link>
         </div>
       </div>
 

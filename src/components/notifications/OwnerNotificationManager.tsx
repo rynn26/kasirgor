@@ -203,17 +203,13 @@ export const OwnerNotificationManager: React.FC = () => {
     } catch {}
 
     // 2. Supabase Realtime listener for cross-device alerts
-    let realtimeChannel: any = null;
+    let dbChannel: any = null;
+    let broadcastChan: any = null;
     try {
-      realtimeChannel = supabase
-        .channel('kasir_global_events', {
-          config: { broadcast: { ack: true } },
-        })
-        .on('broadcast', { event: 'activity_log' }, (data: any) => {
-          if (data?.payload) {
-            handleIncomingActivity(data.payload, true);
-          }
-        })
+      // Dedicated channel for postgres database changes to prevent collision with broadcast
+      const dbChannelName = `kasir_db_events_${Math.random().toString(36).substring(2, 8)}`;
+      dbChannel = supabase
+        .channel(dbChannelName)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'activity_logs' },
@@ -273,13 +269,26 @@ export const OwnerNotificationManager: React.FC = () => {
           }
         )
         .subscribe();
+
+      // Separate channel for cross-device broadcast events
+      broadcastChan = supabase
+        .channel('kasir_global_broadcast', {
+          config: { broadcast: { ack: true } },
+        })
+        .on('broadcast', { event: 'activity_log' }, (data: any) => {
+          if (data?.payload) {
+            handleIncomingActivity(data.payload, true);
+          }
+        })
+        .subscribe();
     } catch (err) {
       console.error('Supabase realtime subscription error:', err);
     }
 
     return () => {
       if (channel) channel.close();
-      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      if (dbChannel) supabase.removeChannel(dbChannel);
+      if (broadcastChan) supabase.removeChannel(broadcastChan);
       if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
     };
   }, []);

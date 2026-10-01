@@ -22,7 +22,11 @@ import {
   Wallet,
   Trash2,
   ShieldAlert,
+  Award,
+  Users2,
 } from 'lucide-react';
+import { AcademyReportSection } from '@/components/laporan/AcademyReportSection';
+import { OpenMabarReportSection } from '@/components/laporan/OpenMabarReportSection';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { PaymentMethodDetailModal } from '@/components/laporan/PaymentMethodDetailModal';
 import { CourtRevenueDetailModal } from '@/components/laporan/CourtRevenueDetailModal';
@@ -157,7 +161,7 @@ export default function LaporanPenjualanPage() {
   const { selectedUnit, setUnit } = useShiftStore();
   const { showToast } = useToastStore();
 
-  const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan'>('kantin');
+  const [activeUnit, setActiveUnit] = useState<'kantin' | 'lapangan' | 'academy' | 'mabar'>('kantin');
   const {
     selectedDate: customDate,
     customStartDate = customDate,
@@ -293,22 +297,36 @@ export default function LaporanPenjualanPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const unitParam = urlParams.get('unit');
+      if (unitParam === 'kantin' || unitParam === 'lapangan' || unitParam === 'academy' || unitParam === 'mabar') {
+        setActiveUnit(unitParam);
+        localStorage.setItem('active_dashboard_unit', unitParam);
+        return;
+      }
       const savedUnit = localStorage.getItem('active_dashboard_unit');
-      if (savedUnit === 'lapangan' || savedUnit === 'kantin') {
-        setActiveUnit(savedUnit);
+      if (savedUnit === 'lapangan' || savedUnit === 'kantin' || savedUnit === 'academy' || savedUnit === 'mabar') {
+        setActiveUnit(savedUnit as 'kantin' | 'lapangan' | 'academy' | 'mabar');
       } else if (selectedUnit === 'BOOKING_LAPANGAN') {
         setActiveUnit('lapangan');
       }
     }
   }, [selectedUnit]);
 
-  const handleSwitchUnit = (unit: 'kantin' | 'lapangan') => {
+  const handleSwitchUnit = (unit: 'kantin' | 'lapangan' | 'academy' | 'mabar') => {
     setActiveUnit(unit);
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_dashboard_unit', unit);
       window.dispatchEvent(new Event('dashboard_unit_change'));
+      const url = new URL(window.location.href);
+      url.searchParams.set('unit', unit);
+      window.history.replaceState({}, '', url.toString());
     }
-    setUnit(unit === 'kantin' ? 'POS_TOKO' : 'BOOKING_LAPANGAN');
+    if (unit === 'kantin') {
+      setUnit('POS_TOKO');
+    } else if (unit === 'lapangan') {
+      setUnit('BOOKING_LAPANGAN');
+    }
     setHoveredPoint(null);
   };
 
@@ -566,15 +584,15 @@ export default function LaporanPenjualanPage() {
   return (
     <div className="min-h-full bg-[#f8fafc] p-3.5 sm:p-6 max-w-md mx-auto space-y-4 pb-28">
 
-      {/* 1. UNIT SWITCHER (Bisa diakses Kasir & Owner untuk input data manual) */}
-      <div className="flex items-center justify-between bg-white p-1.5 rounded-2xl border border-slate-200 shadow-2xs">
-        <span className="text-[11px] font-bold text-slate-500 pl-2">Layanan Unit:</span>
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl gap-1">
+      {/* 1. UNIT SWITCHER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs gap-2">
+        <span className="text-[11px] font-bold text-slate-500 pl-1">Layanan Unit:</span>
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1 overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => handleSwitchUnit('kantin')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              !isLapangan ? 'bg-white text-[#a62512] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeUnit === 'kantin' ? 'bg-white text-[#a62512] shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Store className="w-3.5 h-3.5" />
@@ -583,25 +601,53 @@ export default function LaporanPenjualanPage() {
           <button
             type="button"
             onClick={() => handleSwitchUnit('lapangan')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-              isLapangan ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-emerald-700'
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeUnit === 'lapangan' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-emerald-700'
             }`}
           >
             <CalendarCheck className="w-3.5 h-3.5" />
             <span>Lapangan</span>
           </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchUnit('academy')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeUnit === 'academy' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-purple-700'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-purple-600" />
+            <span>Sinyo Academy</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchUnit('mabar')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              activeUnit === 'mabar' ? 'bg-white text-pink-700 shadow-xs' : 'text-slate-600 hover:text-pink-700'
+            }`}
+          >
+            <Users2 className="w-3.5 h-3.5 text-pink-600" />
+            <span>Open Mabar</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. TITLE & EXPORT */}
+      {/* 2. TITLE & HEADER ACTIONS */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              {isOwner ? (isLapangan ? 'Laporan Sewa Lapangan' : 'Laporan Penjualan') : 'Laporan Pembayaran Kasir'}
+              {activeUnit === 'academy'
+                ? 'Laporan Sinyo Academy'
+                : activeUnit === 'mabar'
+                ? 'Laporan Open Mabar'
+                : isOwner ? (isLapangan ? 'Laporan Sewa Lapangan' : 'Laporan Penjualan') : 'Laporan Pembayaran Kasir'}
             </h2>
             <p className="text-[11px] text-slate-400 font-medium">
-              {isLapangan ? 'Arena Lapangan GOR' : 'Kasir Toko & F&B'}
+              {activeUnit === 'academy'
+                ? 'Program Pelatihan Badminton & Pickleball'
+                : activeUnit === 'mabar'
+                ? 'Sesi Bermain Bersama Badminton & Pickleball'
+                : isLapangan ? 'Arena Lapangan GOR' : 'Kasir Toko & F&B'}
             </p>
           </div>
           <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5 justify-end">
@@ -609,13 +655,13 @@ export default function LaporanPenjualanPage() {
               type="button"
               onClick={() => setIsOwnerRevenueModalOpen(true)}
               className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-amber-600"
-              title="Lihat Rekap Total Omset Hari Ini (Kantin + DP + Pelunasan Lapangan)"
+              title="Lihat Rekap Total Omset Hari Ini"
             >
               <Wallet className="w-3.5 h-3.5" />
               <span>{isOwner ? 'Rekap Omset' : 'Rekap Omset Hari Ini'}</span>
             </button>
 
-            {!isLapangan && (
+            {activeUnit === 'kantin' && (
               <button
                 type="button"
                 onClick={() => setIsInputManualOpen(true)}
@@ -627,7 +673,7 @@ export default function LaporanPenjualanPage() {
               </button>
             )}
 
-            {isLapangan && (
+            {activeUnit === 'lapangan' && (
               <button
                 type="button"
                 onClick={() => setIsInputManualBookingOpen(true)}
@@ -639,7 +685,7 @@ export default function LaporanPenjualanPage() {
               </button>
             )}
 
-            {isOwner && (
+            {isOwner && (activeUnit === 'kantin' || activeUnit === 'lapangan') && (
               <>
                 <button
                   type="button"
@@ -668,6 +714,12 @@ export default function LaporanPenjualanPage() {
           </div>
         </div>
 
+
+
+
+
+
+
         {!isRoleChecked ? (
           <div className="h-10 bg-slate-100/70 rounded-2xl animate-pulse" />
         ) : isOwner ? (
@@ -691,7 +743,7 @@ export default function LaporanPenjualanPage() {
                     onClick={() => { setPeriod(item.id); setHoveredPoint(null); }}
                     className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                       isActive
-                        ? isLapangan
+                        ? isLapangan || activeUnit === 'academy' || activeUnit === 'mabar'
                           ? 'bg-emerald-700 text-white shadow-xs'
                           : 'bg-[#a62512] text-white shadow-xs'
                         : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
@@ -714,7 +766,7 @@ export default function LaporanPenjualanPage() {
                 }}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 border ${
                   period === 'CUSTOM'
-                    ? isLapangan
+                    ? isLapangan || activeUnit === 'academy' || activeUnit === 'mabar'
                       ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs'
                       : 'bg-[#a62512] text-white border-[#a62512] shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -855,8 +907,18 @@ export default function LaporanPenjualanPage() {
         )}
       </div>
 
-      {/* 3. HERO CARD: TOTAL PENDAPATAN (Baik Lapangan maupun Kantin/POS jika Owner) */}
-      {isOwner && (
+      {activeUnit === 'academy' && (
+        <AcademyReportSection dateRange={activeDateRange} isOwner={isOwner} />
+      )}
+
+      {activeUnit === 'mabar' && (
+        <OpenMabarReportSection dateRange={activeDateRange} isOwner={isOwner} />
+      )}
+
+      {(activeUnit === 'kantin' || activeUnit === 'lapangan') && (
+        <>
+          {/* 3. HERO CARD: TOTAL PENDAPATAN (Baik Lapangan maupun Kantin/POS jika Owner) */}
+          {isOwner && (
         <div
           className={`w-full rounded-[24px] p-5 text-white shadow-md space-y-2 relative overflow-hidden ${
             isLapangan
@@ -1082,6 +1144,8 @@ export default function LaporanPenjualanPage() {
         filteredTransactions={kantinData.filteredTransactions}
         onOpenKantinReceipt={(tx) => setSelectedTxForReceipt(tx)}
       />
+        </>
+      )}
 
       {/* Modal Rekap Omset Gabungan */}
       <OwnerDailyRevenueModal
