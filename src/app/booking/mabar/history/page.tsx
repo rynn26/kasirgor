@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { 
   ChevronLeft, 
   Search, 
-  Printer, 
   Trash2, 
   Calendar, 
   Users2, 
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react';
 import { fetchOpenMabarTransactions, deleteOpenMabarTransaction } from '@/lib/db/mabar';
 import { OpenMabarTransaction, MabarSportType } from '@/types/academy';
-import { OpenMabarReceiptModal } from '@/components/mabar/OpenMabarReceiptModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { useToastStore } from '@/lib/store/useToastStore';
 
@@ -44,10 +42,6 @@ export default function OpenMabarHistoryPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSport, setSelectedSport] = useState<'ALL' | MabarSportType>('ALL');
-
-  // Receipt Modal
-  const [activeReceipt, setActiveReceipt] = useState<OpenMabarTransaction | null>(null);
-  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -175,7 +169,7 @@ export default function OpenMabarHistoryPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari no. nota atau tanggal (YYYY-MM-DD)..."
+            placeholder="Cari tanggal mabar (YYYY-MM-DD)..."
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all font-medium"
           />
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -256,8 +250,8 @@ export default function OpenMabarHistoryPage() {
                         {isBadminton ? 'Badminton' : 'Pickleball'}
                       </span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-400">
-                      {item.receiptNumber} • {formatDate(item.date, false)}
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Tanggal: {formatDate(item.date, false)}
                     </span>
                   </div>
 
@@ -287,18 +281,6 @@ export default function OpenMabarHistoryPage() {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => {
-                        setActiveReceipt(item);
-                        setIsReceiptOpen(true);
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Nota</span>
-                    </button>
-
-                    <button
-                      type="button"
                       onClick={() => handleDelete(item)}
                       className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       title="Hapus Transaksi"
@@ -312,13 +294,6 @@ export default function OpenMabarHistoryPage() {
           })
         )}
       </div>
-
-      {/* Modal Nota */}
-      <OpenMabarReceiptModal
-        isOpen={isReceiptOpen}
-        transaction={activeReceipt}
-        onClose={() => setIsReceiptOpen(false)}
-      />
     </div>
   );
 }

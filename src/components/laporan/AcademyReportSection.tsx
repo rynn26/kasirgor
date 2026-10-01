@@ -11,12 +11,14 @@ import {
   X,
   QrCode,
   Banknote,
-  CheckCircle2
+  CheckCircle2,
+  Pencil
 } from 'lucide-react';
 import { fetchAcademyTransactions } from '@/lib/db/academy';
 import { AcademyTransaction, AcademyProgram } from '@/types/academy';
 import { AcademyReceiptModal } from '@/components/academy/AcademyReceiptModal';
 import { AcademySettlementModal } from '@/components/academy/AcademySettlementModal';
+import { EditAcademyModal } from '@/components/academy/EditAcademyModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { toJakartaDateString } from '@/lib/bookingUtils';
 
@@ -51,6 +53,9 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
 
   // Settlement Modal (Lunasi)
   const [settleTarget, setSettleTarget] = useState<AcademyTransaction | null>(null);
+
+  // Edit Transaction Modal
+  const [editingTransaction, setEditingTransaction] = useState<AcademyTransaction | null>(null);
 
   // Receipt Modal
   const [selectedReceipt, setSelectedReceipt] = useState<AcademyTransaction | null>(null);
@@ -480,6 +485,16 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      {/* Tombol Edit Transaksi */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingTransaction(item)}
+                        className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-indigo-600 border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                        title="Edit Transaksi Akademi"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
                       {/* Tombol Lunasi jika masih DP */}
                       {!isLunas && (
                         <button
@@ -601,13 +616,13 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
-                        <span>Nota: {item.transaction.receiptNumber}</span>
-                        <span>•</span>
                         <span>{formatDate(item.date, false)}</span>
+                        <span>•</span>
+                        <span>Kasir: {item.transaction.cashierName}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <div className="text-right">
                         <span className="text-xs font-black text-emerald-700 block">
                           {formatRupiah(item.amount)}
@@ -616,17 +631,29 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
                           {item.method}
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedReceipt(item.transaction);
-                          setIsReceiptOpen(true);
-                        }}
-                        className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs transition-colors cursor-pointer"
-                        title="Cetak Struk"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTransaction(item.transaction);
+                          }}
+                          className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-indigo-600 border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                          title="Edit Transaksi Akademi"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReceipt(item.transaction);
+                            setIsReceiptOpen(true);
+                          }}
+                          className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                          title="Cetak Struk"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -659,6 +686,17 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
           loadData();
           setSelectedReceipt(updated);
           setIsReceiptOpen(true);
+        }}
+      />
+
+      {/* Modal Edit Transaksi Akademi */}
+      <EditAcademyModal
+        isOpen={Boolean(editingTransaction)}
+        transaction={editingTransaction}
+        onClose={() => setEditingTransaction(null)}
+        onSuccess={(updated) => {
+          loadData();
+          setEditingTransaction(null);
         }}
       />
 

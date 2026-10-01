@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, QrCode, Banknote, Award, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, QrCode, Banknote, Award, AlertCircle, Calendar } from 'lucide-react';
 import { AcademyTransaction, AcademyPaymentMethod } from '@/types/academy';
 import { settleAcademyTransaction } from '@/lib/db/academy';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { useToastStore } from '@/lib/store/useToastStore';
+import { getJakartaToday } from '@/lib/bookingUtils';
 
 interface AcademySettlementModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const AcademySettlementModal: React.FC<AcademySettlementModalProps> = ({
 }) => {
   const { showToast } = useToastStore();
   const [paymentMethod, setPaymentMethod] = useState<AcademyPaymentMethod>('CASH');
+  const [settledDate, setSettledDate] = useState<string>(getJakartaToday());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !transaction) return null;
@@ -39,10 +41,15 @@ export const AcademySettlementModal: React.FC<AcademySettlementModalProps> = ({
         }
       } catch {}
 
+      const settledAtIso = settledDate === getJakartaToday()
+        ? new Date().toISOString()
+        : `${settledDate}T12:00:00+07:00`;
+
       const updated = await settleAcademyTransaction(transaction.id, {
         settlementAmount: transaction.remainingAmount,
         paymentMethod,
         cashierName: currentCashier,
+        settledAt: settledAtIso,
       });
 
       showToast(`Pelunasan untuk ${transaction.customerName} berhasil disimpan!`);
@@ -71,7 +78,7 @@ export const AcademySettlementModal: React.FC<AcademySettlementModalProps> = ({
                 Pelunasan Sinyo Academy
               </h3>
               <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                Nota: {transaction.receiptNumber}
+                {transaction.customerName} • {transaction.program}
               </p>
             </div>
           </div>
@@ -152,6 +159,28 @@ export const AcademySettlementModal: React.FC<AcademySettlementModalProps> = ({
                 <span>QRIS</span>
               </button>
             </div>
+          </div>
+
+          {/* TANGGAL PELUNASAN (DESAIN SESUAI GAMBAR 2) */}
+          <div className="space-y-2 pt-2 border-t border-slate-100 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+            <label className="font-bold text-emerald-950 text-xs flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Tanggal Pelunasan</span>
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                Lunas
+              </span>
+            </label>
+            <input
+              type="date"
+              value={settledDate}
+              onChange={(e) => setSettledDate(e.target.value)}
+              className="w-full py-2 px-2.5 bg-white border border-emerald-200 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:border-emerald-700 cursor-pointer"
+            />
+            <p className="text-[10px] text-emerald-700 font-medium">
+              Tanggal pelunasan ini akan tercatat pada laporan kasir & omset harian.
+            </p>
           </div>
 
         </div>

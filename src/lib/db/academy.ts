@@ -236,6 +236,74 @@ export async function settleAcademyTransaction(
   }
 }
 
+export async function updateAcademyTransaction(
+  id: string,
+  payload: Partial<AcademyTransaction>
+): Promise<AcademyTransaction> {
+  const current = getLocalTransactions();
+  let updatedItem: AcademyTransaction | null = null;
+
+  const updatedList = current.map((item) => {
+    if (item.id === id) {
+      updatedItem = {
+        ...item,
+        ...payload,
+      };
+      return updatedItem;
+    }
+    return item;
+  });
+
+  saveLocalTransactions(updatedList);
+
+  if (!isSupabaseConfigured() || !updatedItem) {
+    if (!updatedItem) throw new Error('Transaction not found');
+    return updatedItem;
+  }
+
+  try {
+    const dbPayload: Partial<DbAcademyTransaction> = {};
+    if (payload.customerName !== undefined) dbPayload.customer_name = payload.customerName;
+    if (payload.program !== undefined) dbPayload.program = payload.program;
+    if (payload.category !== undefined) dbPayload.category = payload.category || null;
+    if (payload.package !== undefined) dbPayload.package = payload.package || null;
+    if (payload.trainingMonth !== undefined) dbPayload.training_month = payload.trainingMonth || null;
+    if (payload.sessionTime !== undefined) dbPayload.session_time = payload.sessionTime || null;
+    if (payload.periodStart !== undefined) dbPayload.period_start = payload.periodStart || null;
+    if (payload.periodEnd !== undefined) dbPayload.period_end = payload.periodEnd || null;
+    if (payload.feeAmount !== undefined) dbPayload.fee_amount = payload.feeAmount;
+    if (payload.dpAmount !== undefined) dbPayload.dp_amount = payload.dpAmount;
+    if (payload.remainingAmount !== undefined) dbPayload.remaining_amount = payload.remainingAmount;
+    if (payload.paymentMethod !== undefined) dbPayload.payment_method = payload.paymentMethod;
+    if (payload.status !== undefined) dbPayload.status = payload.status;
+    if (payload.cashierName !== undefined) dbPayload.cashier_name = payload.cashierName;
+    if (payload.shift !== undefined) dbPayload.shift = payload.shift || null;
+    if (payload.notes !== undefined) dbPayload.notes = payload.notes || null;
+    if (payload.createdAt !== undefined) dbPayload.created_at = payload.createdAt;
+    if (payload.settledAt !== undefined) dbPayload.settled_at = payload.settledAt || null;
+    if (payload.settlementAmount !== undefined) dbPayload.settlement_amount = payload.settlementAmount || 0;
+    if (payload.settlementPaymentMethod !== undefined) dbPayload.settlement_payment_method = payload.settlementPaymentMethod || null;
+    if (payload.settlementCashierName !== undefined) dbPayload.settlement_cashier_name = payload.settlementCashierName || null;
+
+    const { data, error } = await supabase
+      .from('academy_transactions')
+      .update(dbPayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('Failed to update Supabase academy transaction (cached locally):', error.message);
+      return updatedItem;
+    }
+
+    return mapDbToDomain(data as DbAcademyTransaction);
+  } catch (err) {
+    console.warn('Network error updating academy transaction (cached locally):', err);
+    return updatedItem!;
+  }
+}
+
 export async function deleteAcademyTransaction(id: string): Promise<void> {
   const current = getLocalTransactions();
   saveLocalTransactions(current.filter((item) => item.id !== id));

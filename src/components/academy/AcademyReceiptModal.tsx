@@ -72,7 +72,6 @@ export const AcademyReceiptModal: React.FC<AcademyReceiptModalProps> = ({
     const text = `*BUKTI PEMBAYARAN - ${programTitle}*
 *${shopName.toUpperCase()}*
 ----------------------------------------
-No. Nota: *${transaction.receiptNumber}*
 Nama Peserta: *${transaction.customerName}*
 Tanggal Nota: *${formatDate(transaction.createdAt, false)}, ${realtimeTime} WIB*
 ${detailProgram}
@@ -134,10 +133,6 @@ Terima kasih telah bergabung bersama Sinyo Academy!`;
 
             {/* Info Transaksi */}
             <div className="space-y-1.5 text-[11px] pb-3 border-b border-dashed border-slate-300">
-              <div className="flex justify-between">
-                <span className="text-slate-500">No. Nota:</span>
-                <span className="font-bold">{transaction.receiptNumber}</span>
-              </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Tanggal Booking:</span>
                 <span>{formatDate(transaction.createdAt, true)}</span>

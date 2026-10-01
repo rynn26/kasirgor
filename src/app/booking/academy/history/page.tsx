@@ -13,12 +13,14 @@ import {
   CheckCircle2, 
   AlertCircle,
   Filter,
-  Plus
+  Plus,
+  Pencil
 } from 'lucide-react';
 import { fetchAcademyTransactions, deleteAcademyTransaction } from '@/lib/db/academy';
 import { AcademyTransaction, AcademyProgram } from '@/types/academy';
 import { AcademyReceiptModal } from '@/components/academy/AcademyReceiptModal';
 import { AcademySettlementModal } from '@/components/academy/AcademySettlementModal';
+import { EditAcademyModal } from '@/components/academy/EditAcademyModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
 import { useToastStore } from '@/lib/store/useToastStore';
 
@@ -50,6 +52,9 @@ export default function AcademyHistoryPage() {
 
   // Settlement Modal (Lunasi)
   const [settleTarget, setSettleTarget] = useState<AcademyTransaction | null>(null);
+
+  // Edit Transaction Modal
+  const [editingTransaction, setEditingTransaction] = useState<AcademyTransaction | null>(null);
 
   // Receipt Modal
   const [activeReceipt, setActiveReceipt] = useState<AcademyTransaction | null>(null);
@@ -350,6 +355,17 @@ export default function AcademyHistoryPage() {
                   </span>
 
                   <div className="flex items-center gap-1.5">
+                    {/* Tombol Edit */}
+                    <button
+                      type="button"
+                      onClick={() => setEditingTransaction(item)}
+                      className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold flex items-center gap-1 transition-colors cursor-pointer border border-indigo-200"
+                      title="Edit Transaksi"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+
                     {/* Tombol Lunasi jika masih DP */}
                     {!isLunas && (
                       <button
@@ -399,6 +415,17 @@ export default function AcademyHistoryPage() {
           loadData();
           setActiveReceipt(updated);
           setIsReceiptOpen(true);
+        }}
+      />
+
+      {/* Modal Edit Transaksi */}
+      <EditAcademyModal
+        isOpen={Boolean(editingTransaction)}
+        transaction={editingTransaction}
+        onClose={() => setEditingTransaction(null)}
+        onSuccess={() => {
+          loadData();
+          setEditingTransaction(null);
         }}
       />
 

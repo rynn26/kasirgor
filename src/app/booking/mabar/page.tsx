@@ -14,8 +14,7 @@ import {
 import { useShiftStore } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { createOpenMabarTransaction } from '@/lib/db/mabar';
-import { OpenMabarTransaction, MabarSportType } from '@/types/academy';
-import { OpenMabarReceiptModal } from '@/components/mabar/OpenMabarReceiptModal';
+import { MabarSportType } from '@/types/academy';
 import { formatRupiah } from '@/lib/utils';
 import { getJakartaToday } from '@/lib/bookingUtils';
 
@@ -48,10 +47,6 @@ export default function OpenMabarPage() {
   const [nominalQris, setNominalQris] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Receipt Modal State
-  const [savedTransaction, setSavedTransaction] = useState<OpenMabarTransaction | null>(null);
-  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-
   // Total calculation: Cash + QRIS
   const totalAmount = useMemo(() => {
     return (nominalCash || 0) + (nominalQris || 0);
@@ -70,7 +65,7 @@ export default function OpenMabarPage() {
       const activeCashier = cashierName || 'Yuli';
       const activeShift = selectedShift?.name || (activeCashier.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang');
 
-      const created = await createOpenMabarTransaction({
+      await createOpenMabarTransaction({
         sportType,
         date,
         nominalCash: nominalCash || 0,
@@ -80,21 +75,16 @@ export default function OpenMabarPage() {
         shift: activeShift,
       });
 
-      showToast('Pemasukan Open Mabar berhasil disimpan!');
-      setSavedTransaction(created);
-      setIsReceiptOpen(true);
+      showToast(`Pemasukan Open Mabar ${sportType === 'BADMINTON' ? 'Badminton' : 'Pickleball'} berhasil disimpan!`);
+      // Langsung reset nominal input tanpa struk
+      setNominalCash(0);
+      setNominalQris(0);
     } catch (err) {
       console.error('Error saving open mabar transaction:', err);
       showToast('Gagal menyimpan transaksi. Coba lagi.');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleResetForm = () => {
-    setNominalCash(0);
-    setNominalQris(0);
-    setIsReceiptOpen(false);
   };
 
   return (
@@ -118,7 +108,7 @@ export default function OpenMabarPage() {
           className="px-3 py-1.5 rounded-2xl bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
         >
           <History className="w-3.5 h-3.5" />
-          <span>Riwayat Nota</span>
+          <span>Riwayat Pemasukan</span>
         </Link>
       </div>
 
@@ -269,13 +259,6 @@ export default function OpenMabarPage() {
           <span>{isSubmitting ? 'Menyimpan...' : 'Simpan Pembayaran'}</span>
         </button>
       </form>
-
-      {/* Struk / Modal Nota */}
-      <OpenMabarReceiptModal
-        isOpen={isReceiptOpen}
-        transaction={savedTransaction}
-        onClose={handleResetForm}
-      />
     </div>
   );
 }

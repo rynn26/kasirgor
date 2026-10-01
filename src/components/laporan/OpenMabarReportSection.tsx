@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   ChevronRight, 
-  Printer, 
   Plus, 
   Search, 
   Receipt,
@@ -14,7 +13,6 @@ import {
 } from 'lucide-react';
 import { fetchOpenMabarTransactions } from '@/lib/db/mabar';
 import { OpenMabarTransaction, MabarSportType } from '@/types/academy';
-import { OpenMabarReceiptModal } from '@/components/mabar/OpenMabarReceiptModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
 
 interface OpenMabarReportSectionProps {
@@ -35,10 +33,6 @@ export const OpenMabarReportSection: React.FC<OpenMabarReportSectionProps> = ({
   // Detail Modal for Payment Method (QRIS / Cash)
   const [detailModalMethod, setDetailModalMethod] = useState<'QRIS' | 'CASH' | null>(null);
   const [modalSearch, setModalSearch] = useState('');
-
-  // Receipt Modal
-  const [selectedReceipt, setSelectedReceipt] = useState<OpenMabarTransaction | null>(null);
-  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -391,22 +385,10 @@ export const OpenMabarReportSection: React.FC<OpenMabarReportSectionProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
+                  <div>
                     <span className="text-xs font-black text-emerald-700 block">
                       {formatRupiah(item.totalAmount)}
                     </span>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedReceipt(item);
-                        setIsReceiptOpen(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs cursor-pointer"
-                      title="Lihat Struk"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 </div>
               );
@@ -500,33 +482,18 @@ export const OpenMabarReportSection: React.FC<OpenMabarReportSectionProps> = ({
                             {formatDate(tx.date, false)}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
-                          <span>Nota: {tx.receiptNumber}</span>
-                          <span>•</span>
-                          <span>Kasir: {tx.cashierName}</span>
+                        <div className="text-[10px] text-slate-400 mt-1">
+                          Kasir: {tx.cashierName}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-xs font-black text-emerald-700 block">
-                            {formatRupiah(nominal)}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400">
-                            Total: {formatRupiah(tx.totalAmount)}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedReceipt(tx);
-                            setIsReceiptOpen(true);
-                          }}
-                          className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs transition-colors cursor-pointer"
-                          title="Cetak Struk"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                        </button>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-emerald-700 block">
+                          {formatRupiah(nominal)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          Total: {formatRupiah(tx.totalAmount)}
+                        </span>
                       </div>
                     </div>
                   );
@@ -550,13 +517,6 @@ export const OpenMabarReportSection: React.FC<OpenMabarReportSectionProps> = ({
           </div>
         </div>
       )}
-
-      {/* Modal Struk */}
-      <OpenMabarReceiptModal
-        isOpen={isReceiptOpen}
-        transaction={selectedReceipt}
-        onClose={() => setIsReceiptOpen(false)}
-      />
     </div>
   );
 };
