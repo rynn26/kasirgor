@@ -102,13 +102,13 @@ export async function fetchAcademyTransactions(): Promise<AcademyTransaction[]> 
 }
 
 export async function createAcademyTransaction(
-  payload: Omit<AcademyTransaction, 'id' | 'createdAt' | 'receiptNumber'>
+  payload: Omit<AcademyTransaction, 'id' | 'createdAt' | 'receiptNumber'> & { createdAt?: string }
 ): Promise<AcademyTransaction> {
   const timestamp = Date.now();
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const now = payload.createdAt || new Date().toISOString();
+  const dateStr = now.slice(0, 10).replace(/-/g, '');
   const randomSuffix = Math.floor(1000 + Math.random() * 9000);
   const receiptNumber = `ACAD-${dateStr}-${randomSuffix}`;
-  const now = new Date().toISOString();
   const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `acad_${timestamp}`;
 
   const newItem: AcademyTransaction = {

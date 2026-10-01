@@ -12,6 +12,8 @@ import {
   BarChart3,
   Printer,
   FileSpreadsheet,
+  Users,
+  GraduationCap,
 } from 'lucide-react';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
@@ -21,6 +23,9 @@ import { getBookingPaymentItemsInPeriod, getJakartaToday, toJakartaDateString } 
 import { printCombinedReportPDF, exportCombinedReportToExcel } from '@/lib/exportUtils';
 import { useAppDateStore } from '@/lib/store/useAppDateStore';
 import { CourtBooking } from '@/types/booking';
+import { fetchAcademyTransactions } from '@/lib/db/academy';
+import { fetchOpenMabarTransactions } from '@/lib/db/mabar';
+import { AcademyTransaction, OpenMabarTransaction } from '@/types/academy';
 
 interface OwnerDailyRevenueModalProps {
   isOpen: boolean;
@@ -45,11 +50,16 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
   const { bookings, loadBookings } = useCourtBookingStore();
   const { showToast } = useToastStore();
 
+  const [academyTransactions, setAcademyTransactions] = useState<AcademyTransaction[]>([]);
+  const [mabarTransactions, setMabarTransactions] = useState<OpenMabarTransaction[]>([]);
+
   // Sinkronkan data terbaru dari database setiap kali modal dibuka
   useEffect(() => {
     if (isOpen) {
       loadBookings();
       loadTransactions();
+      fetchAcademyTransactions().then(setAcademyTransactions);
+      fetchOpenMabarTransactions().then(setMabarTransactions);
     }
   }, [isOpen, loadBookings, loadTransactions]);
 
@@ -257,9 +267,58 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     const lapanganTotal = badmintonTotal + pickleballTotal;
     const lapanganTxCount = dpCount + settleCount;
 
-    // 3. REKAP TOTAL CASH & QRIS
-    const totalCash = kantinCash + lapanganCash;
-    const totalQris = kantinQris + lapanganQris;
+    // 3. SINYO ACADEMY (DP & PELUNASAN DIPISAH CASH & QRIS)
+    let academyDpCash = 0;
+    let academyDpQris = 0;
+    let academySettleCash = 0;
+    let academySettleQris = 0;
+
+    academyTransactions.forEach((tx) => {
+      // Porsi DP (atau bayar langsung saat pendaftaran)
+      const dpDate = tx.createdAt.slice(0, 10);
+      if (dpDate >= effectiveStart && dpDate <= effectiveEnd && tx.dpAmount > 0) {
+        if (tx.paymentMethod === 'CASH') {
+          academyDpCash += tx.dpAmount;
+        } else {
+          academyDpQris += tx.dpAmount;
+        }
+      }
+
+      // Porsi Pelunasan (Settlement)
+      if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
+        const settleDate = tx.settledAt.slice(0, 10);
+        if (settleDate >= effectiveStart && settleDate <= effectiveEnd) {
+          const method = tx.settlementPaymentMethod || tx.paymentMethod;
+          if (method === 'CASH') {
+            academySettleCash += (tx.settlementAmount || 0);
+          } else {
+            academySettleQris += (tx.settlementAmount || 0);
+          }
+        }
+      }
+    });
+
+    const academyTotalCash = academyDpCash + academySettleCash;
+    const academyTotalQris = academyDpQris + academySettleQris;
+    const academyTotal = academyTotalCash + academyTotalQris;
+
+    // 4. OPEN MABAR (CASH & QRIS)
+    let mabarCash = 0;
+    let mabarQris = 0;
+
+    mabarTransactions.forEach((tx) => {
+      const txDate = tx.date || tx.createdAt.slice(0, 10);
+      if (txDate >= effectiveStart && txDate <= effectiveEnd) {
+        mabarCash += (tx.nominalCash || 0);
+        mabarQris += (tx.nominalQris || 0);
+      }
+    });
+
+    const mabarTotal = mabarCash + mabarQris;
+
+    // 5. REKAP TOTAL CASH & QRIS KESELURUHAN
+    const totalCash = kantinCash + lapanganCash + academyTotalCash + mabarCash;
+    const totalQris = kantinQris + lapanganQris + academyTotalQris + mabarQris;
     const grandTotal = totalCash + totalQris;
 
     return {
@@ -289,11 +348,23 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       lapanganTotal,
       lapanganTxCount,
 
+      academyDpCash,
+      academySettleCash,
+      academyTotalCash,
+      academyDpQris,
+      academySettleQris,
+      academyTotalQris,
+      academyTotal,
+
+      mabarCash,
+      mabarQris,
+      mabarTotal,
+
       totalCash,
       totalQris,
       grandTotal,
     };
-  }, [transactions, bookings, effectiveStart, effectiveEnd]);
+  }, [transactions, bookings, academyTransactions, mabarTransactions, effectiveStart, effectiveEnd]);
 
   if (!isOpen) return null;
 
@@ -340,7 +411,9 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       transactions,
       bookings,
       effectiveStart,
-      effectiveEnd
+      effectiveEnd,
+      academyTransactions,
+      mabarTransactions
     );
     showToast('Membuka format cetak PDF Laporan Omset Keseluruhan...');
   };
@@ -351,7 +424,9 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
       transactions,
       bookings,
       effectiveStart,
-      effectiveEnd
+      effectiveEnd,
+      academyTransactions,
+      mabarTransactions
     );
     showToast('Laporan Excel Omset Keseluruhan berhasil diunduh!');
   };
@@ -362,21 +437,29 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
 
 💵 *CASH (Uang Fisik di Kas): ${formatRupiah(revenueSummary.totalCash)}*
 • Kantin Cash: ${formatRupiah(revenueSummary.kantinCash)}
+• Open Mabar Cash: ${formatRupiah(revenueSummary.mabarCash)}
 • Badminton:
   - DP Badminton Cash: ${formatRupiah(revenueSummary.badmintonDpCash)}
   - Pelunasan Badminton Cash: ${formatRupiah(revenueSummary.badmintonSettleCash)}
 • Pickleball:
   - DP Pickleball Cash: ${formatRupiah(revenueSummary.pickleballDpCash)}
   - Pelunasan Pickleball Cash: ${formatRupiah(revenueSummary.pickleballSettleCash)}
+• Sinyo Academy:
+  - DP Akademi Cash: ${formatRupiah(revenueSummary.academyDpCash)}
+  - Pelunasan Akademi Cash: ${formatRupiah(revenueSummary.academySettleCash)}
 
 📱 *QRIS (Masuk ke Rekening): ${formatRupiah(revenueSummary.totalQris)}*
 • Kantin QRIS: ${formatRupiah(revenueSummary.kantinQris)}
+• Open Mabar QRIS: ${formatRupiah(revenueSummary.mabarQris)}
 • Badminton:
   - DP Badminton QRIS: ${formatRupiah(revenueSummary.badmintonDpQris)}
   - Pelunasan Badminton QRIS: ${formatRupiah(revenueSummary.badmintonSettleQris)}
 • Pickleball:
   - DP Pickleball QRIS: ${formatRupiah(revenueSummary.pickleballDpQris)}
   - Pelunasan Pickleball QRIS: ${formatRupiah(revenueSummary.pickleballSettleQris)}
+• Sinyo Academy:
+  - DP Akademi QRIS: ${formatRupiah(revenueSummary.academyDpQris)}
+  - Pelunasan Akademi QRIS: ${formatRupiah(revenueSummary.academySettleQris)}
 
 ━━━━━━━━━━━━━━━━━━━━
 ⭐ *TOTAL OMZET: ${formatRupiah(revenueSummary.grandTotal)}*
@@ -618,6 +701,43 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                 </div>
               </div>
 
+              {/* Open Mabar Cash Row */}
+              <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-amber-200/60 shadow-2xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-slate-800">
+                    Open Mabar Cash
+                  </span>
+                </div>
+                <span className="text-xs sm:text-sm font-black text-slate-900">
+                  {formatRupiah(revenueSummary.mabarCash)}
+                </span>
+              </div>
+
+              {/* Sinyo Academy Cash Section */}
+              <div className="bg-[#FAF5FF] border border-purple-100/90 rounded-2xl p-3 sm:p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-block text-[11px] font-black text-purple-900 bg-purple-100/80 px-2.5 py-0.5 rounded-lg">
+                    Sinyo Academy
+                  </span>
+                  <span className="text-xs font-black text-purple-900">
+                    {formatRupiah(revenueSummary.academyTotalCash)}
+                  </span>
+                </div>
+                <div className="space-y-1.5 pt-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-600">DP Akademi Cash</span>
+                    <span className="font-black text-slate-900">{formatRupiah(revenueSummary.academyDpCash)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-purple-100/60">
+                    <span className="font-semibold text-slate-600">Pelunasan Akademi Cash</span>
+                    <span className="font-black text-slate-900">{formatRupiah(revenueSummary.academySettleCash)}</span>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             {/* ======================================================== */}
@@ -665,6 +785,21 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                 </span>
               </div>
 
+              {/* Open Mabar QRIS Row */}
+              <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-sky-200/60 shadow-2xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center shrink-0">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-slate-800">
+                    Open Mabar QRIS
+                  </span>
+                </div>
+                <span className="text-xs sm:text-sm font-black text-slate-900">
+                  {formatRupiah(revenueSummary.mabarQris)}
+                </span>
+              </div>
+
               {/* Badminton QRIS Section */}
               <div className="bg-[#EEF6FE] border border-sky-100/90 rounded-2xl p-3 sm:p-3.5 space-y-2">
                 <div>
@@ -699,6 +834,28 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-sky-100/60">
                     <span className="font-semibold text-slate-600">Pelunasan Pickleball QRIS</span>
                     <span className="font-black text-slate-900">{formatRupiah(revenueSummary.pickleballSettleQris)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sinyo Academy QRIS Section */}
+              <div className="bg-[#EEF2FF] border border-indigo-100/90 rounded-2xl p-3 sm:p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-block text-[11px] font-black text-indigo-900 bg-indigo-100/80 px-2.5 py-0.5 rounded-lg">
+                    Sinyo Academy
+                  </span>
+                  <span className="text-xs font-black text-indigo-900">
+                    {formatRupiah(revenueSummary.academyTotalQris)}
+                  </span>
+                </div>
+                <div className="space-y-1.5 pt-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-600">DP Akademi QRIS</span>
+                    <span className="font-black text-slate-900">{formatRupiah(revenueSummary.academyDpQris)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-indigo-100/60">
+                    <span className="font-semibold text-slate-600">Pelunasan Akademi QRIS</span>
+                    <span className="font-black text-slate-900">{formatRupiah(revenueSummary.academySettleQris)}</span>
                   </div>
                 </div>
               </div>

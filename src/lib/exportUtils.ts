@@ -3,6 +3,7 @@ import { Transaction, normalizeProductCategory } from '@/types/pos';
 import { CourtBooking } from '@/types/booking';
 import { useProductStore } from '@/lib/store/useProductStore';
 import { getBookingAmountInPeriod, getBookingPaymentItemsInPeriod, getBookingSettleDate, getJakartaToday } from '@/lib/bookingUtils';
+import { AcademyTransaction, OpenMabarTransaction } from '@/types/academy';
 
 export interface KantinSalesItemRow {
   no: number;
@@ -826,7 +827,9 @@ export function printCombinedReportPDF(
   transactions: Transaction[],
   bookings: CourtBooking[],
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  academyTransactions?: AcademyTransaction[],
+  mabarTransactions?: OpenMabarTransaction[]
 ) {
   const printWindow = window.open('', '_blank');
   if (!printWindow) return;
@@ -844,6 +847,13 @@ export function printCombinedReportPDF(
     });
     activeBookings.forEach((b) => {
       if (b.date) allDates.push(b.date);
+    });
+    academyTransactions?.forEach((t) => {
+      if (t.createdAt) allDates.push(t.createdAt.split('T')[0]);
+      if (t.settledAt) allDates.push(t.settledAt.split('T')[0]);
+    });
+    mabarTransactions?.forEach((t) => {
+      if (t.date) allDates.push(t.date);
     });
     allDates.sort();
     s = allDates[0] || getJakartaToday();
@@ -879,6 +889,10 @@ export function printCombinedReportPDF(
   let totalLapCash = 0;
   let totalLapQris = 0;
   let totalLap = 0;
+  let totalAcadCash = 0;
+  let totalAcadQris = 0;
+  let totalMabarCash = 0;
+  let totalMabarQris = 0;
   let grandTotal = 0;
 
   const rowsHtml = dateList
@@ -931,7 +945,41 @@ export function printCombinedReportPDF(
       });
 
       const kanTotal = kanCash + kanQris;
-      const totalHarian = dpTotal + kanTotal + lapTotal;
+
+      // 4. AKADEMI & OPEN MABAR
+      let acadDayCash = 0;
+      let acadDayQris = 0;
+      if (academyTransactions) {
+        academyTransactions.forEach((tx) => {
+          const dpDate = tx.createdAt.slice(0, 10);
+          if (dpDate === dStr && tx.dpAmount > 0) {
+            if (tx.paymentMethod === 'CASH') acadDayCash += tx.dpAmount;
+            else acadDayQris += tx.dpAmount;
+          }
+          if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
+            const settleDate = tx.settledAt.slice(0, 10);
+            if (settleDate === dStr) {
+              const method = tx.settlementPaymentMethod || tx.paymentMethod;
+              if (method === 'CASH') acadDayCash += (tx.settlementAmount || 0);
+              else acadDayQris += (tx.settlementAmount || 0);
+            }
+          }
+        });
+      }
+
+      let mabarDayCash = 0;
+      let mabarDayQris = 0;
+      if (mabarTransactions) {
+        mabarTransactions.forEach((tx) => {
+          const txDate = tx.date || tx.createdAt.slice(0, 10);
+          if (txDate === dStr) {
+            mabarDayCash += (tx.nominalCash || 0);
+            mabarDayQris += (tx.nominalQris || 0);
+          }
+        });
+      }
+
+      const totalHarian = dpTotal + kanTotal + lapTotal + acadDayCash + acadDayQris + mabarDayCash + mabarDayQris;
 
       totalDpCash += dpCash;
       totalDpQris += dpQris;
@@ -942,6 +990,10 @@ export function printCombinedReportPDF(
       totalLapCash += lapCash;
       totalLapQris += lapQris;
       totalLap += lapTotal;
+      totalAcadCash += acadDayCash;
+      totalAcadQris += acadDayQris;
+      totalMabarCash += mabarDayCash;
+      totalMabarQris += mabarDayQris;
       grandTotal += totalHarian;
 
       const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
@@ -965,8 +1017,8 @@ export function printCombinedReportPDF(
     })
     .join('');
 
-  const grandCash = totalDpCash + totalKanCash + totalLapCash;
-  const grandQris = totalDpQris + totalKanQris + totalLapQris;
+  const grandCash = totalDpCash + totalKanCash + totalLapCash + totalAcadCash + totalMabarCash;
+  const grandQris = totalDpQris + totalKanQris + totalLapQris + totalAcadQris + totalMabarQris;
 
   printWindow.document.write(`
     <!DOCTYPE html>
@@ -1169,7 +1221,9 @@ export function exportCombinedReportToExcel(
   transactions: Transaction[],
   bookings: CourtBooking[],
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  academyTransactions?: AcademyTransaction[],
+  mabarTransactions?: OpenMabarTransaction[]
 ) {
   const validTx = transactions.filter((t) => t.status === 'COMPLETED');
   const activeBookings = bookings.filter((b) => b.status !== 'CANCELLED');
@@ -1180,6 +1234,13 @@ export function exportCombinedReportToExcel(
     const allDates: string[] = [];
     validTx.forEach((t) => { if (t.createdAt) allDates.push(t.createdAt.split('T')[0]); });
     activeBookings.forEach((b) => { if (b.date) allDates.push(b.date); });
+    academyTransactions?.forEach((t) => {
+      if (t.createdAt) allDates.push(t.createdAt.split('T')[0]);
+      if (t.settledAt) allDates.push(t.settledAt.split('T')[0]);
+    });
+    mabarTransactions?.forEach((t) => {
+      if (t.date) allDates.push(t.date);
+    });
     allDates.sort();
     s = allDates[0] || getJakartaToday();
     e = allDates[allDates.length - 1] || s;
@@ -1216,7 +1277,7 @@ export function exportCombinedReportToExcel(
   let grandTotal = 0;
 
   const excelRows: any[][] = [
-    ['LAPORAN REKAPITULASI OMSET (KANTIN & SEWA LAPANGAN)'],
+    ['LAPORAN REKAPITULASI OMSET (KANTIN, SEWA LAPANGAN, AKADEMI & OPEN MABAR)'],
     [`Periode: ${periodLabel}`, '', '', '', '', '', '', '', '', '', '', ''],
     ['HARI', 'TANGGAL', 'DP MASUK', '', '', 'KANTIN', '', '', 'PELUNASAN LAPANGAN', '', '', 'TOTAL'],
     ['', '', 'CASH', 'QRIS', 'TOTAL', 'CASH', 'QRIS', 'TOTAL', 'CASH', 'QRIS', 'TOTAL', ''],
@@ -1259,7 +1320,27 @@ export function exportCombinedReportToExcel(
     });
 
     const kanTotal = kanCash + kanQris;
-    const totalHarian = dpTotal + kanTotal + lapTotal;
+
+    // Tambahan Akademi & Open Mabar
+    let extraDay = 0;
+    if (academyTransactions) {
+      academyTransactions.forEach((tx) => {
+        const dpDate = tx.createdAt.slice(0, 10);
+        if (dpDate === dStr && tx.dpAmount > 0) extraDay += tx.dpAmount;
+        if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
+          const settleDate = tx.settledAt.slice(0, 10);
+          if (settleDate === dStr) extraDay += (tx.settlementAmount || 0);
+        }
+      });
+    }
+    if (mabarTransactions) {
+      mabarTransactions.forEach((tx) => {
+        const txDate = tx.date || tx.createdAt.slice(0, 10);
+        if (txDate === dStr) extraDay += (tx.totalAmount || (tx.nominalCash + tx.nominalQris) || 0);
+      });
+    }
+
+    const totalHarian = dpTotal + kanTotal + lapTotal + extraDay;
 
     totalDpCash += dpCash;
     totalDpQris += dpQris;

@@ -41,12 +41,25 @@ export default function AcademyBookingPage() {
   const [category, setCategory] = useState<AcademyCategory>('ANAK');
   const [pack, setPack] = useState<AcademyPackage>('4X');
   
-  // Month selector (Default to current month & year in Indonesian)
+  // Date and Month selector
+  const [registrationDate, setRegistrationDate] = useState(todayJakarta);
   const currentMonthLabel = useMemo(() => {
     const d = new Date();
     return new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(d);
   }, []);
   const [trainingMonth, setTrainingMonth] = useState(currentMonthLabel);
+
+  const handleDateChange = (newDate: string) => {
+    setRegistrationDate(newDate);
+    if (newDate) {
+      const [y, m] = newDate.split('-');
+      const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+      if (!isNaN(dateObj.getTime())) {
+        const monthName = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(dateObj);
+        setTrainingMonth(monthName);
+      }
+    }
+  };
 
   // Pickleball fields
   const [sessionTime, setSessionTime] = useState<AcademySessionTime>('PAGI_SIANG');
@@ -113,6 +126,11 @@ export default function AcademyBookingPage() {
       const activeCashier = cashierName || 'Yuli';
       const activeShift = selectedShift?.name || (activeCashier.toLowerCase() === 'asfia' ? 'Shift Sore - Malam' : 'Shift Pagi - Siang');
 
+      const nowTime = new Date().toTimeString().slice(0, 8);
+      const createdIso = registrationDate
+        ? `${registrationDate}T${nowTime}.000Z`
+        : new Date().toISOString();
+
       const created = await createAcademyTransaction({
         customerName: customerName.trim(),
         program,
@@ -129,6 +147,7 @@ export default function AcademyBookingPage() {
         status: remainingAmount === 0 ? 'LUNAS' : 'DP_PAID',
         cashierName: activeCashier,
         shift: activeShift,
+        createdAt: createdIso,
       });
 
       showToast('Pembayaran Sinyo Academy berhasil disimpan!');
@@ -146,6 +165,7 @@ export default function AcademyBookingPage() {
     setCustomerName('');
     setDpAmount(0);
     setCustomPickleballFee(0);
+    setRegistrationDate(todayJakarta);
     setIsReceiptOpen(false);
   };
 
@@ -407,20 +427,40 @@ export default function AcademyBookingPage() {
               </div>
             </div>
 
-            {/* Bulan Latihan */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-slate-800">
-                Bulan Latihan <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={trainingMonth}
-                  onChange={(e) => setTrainingMonth(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  placeholder="Misal: September 2026"
-                />
-                <Calendar className="w-4 h-4 text-rose-500 absolute left-4 top-1/2 -translate-y-1/2" />
+            {/* Tanggal Pendaftaran & Bulan Latihan */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Tanggal */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-800">
+                  Tanggal <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    required
+                    value={registrationDate}
+                    onChange={(e) => handleDateChange(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+                  />
+                  <Calendar className="w-4 h-4 text-rose-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Bulan Latihan */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-800">
+                  Bulan Latihan <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={trainingMonth}
+                    onChange={(e) => setTrainingMonth(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-800 font-semibold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    placeholder="Misal: Oktober 2026"
+                  />
+                  <Calendar className="w-4 h-4 text-indigo-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
               </div>
             </div>
           </div>
