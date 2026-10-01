@@ -51,14 +51,6 @@ export default function AcademyBookingPage() {
 
   const handleDateChange = (newDate: string) => {
     setRegistrationDate(newDate);
-    if (newDate) {
-      const [y, m] = newDate.split('-');
-      const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
-      if (!isNaN(dateObj.getTime())) {
-        const monthName = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(dateObj);
-        setTrainingMonth(monthName);
-      }
-    }
   };
 
   // Pickleball fields
@@ -419,10 +411,10 @@ export default function AcademyBookingPage() {
 
             {/* Tanggal Pendaftaran & Bulan Latihan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Tanggal */}
+              {/* Tanggal Booking */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-black text-slate-800">
-                  Tanggal <span className="text-rose-500">*</span>
+                  Tanggal Booking <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <input

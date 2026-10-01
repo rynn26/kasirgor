@@ -139,7 +139,7 @@ Terima kasih telah bergabung bersama Sinyo Academy!`;
                 <span className="font-bold">{transaction.receiptNumber}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Tanggal Daftar:</span>
+                <span className="text-slate-500">Tanggal Booking:</span>
                 <span>{formatDate(transaction.createdAt, true)}</span>
               </div>
               {hasSettlement && (
