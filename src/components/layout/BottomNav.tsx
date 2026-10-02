@@ -17,8 +17,10 @@ import {
   Settings,
   Sun,
   Moon,
-  Check
+  Check,
+  Wallet
 } from 'lucide-react';
+import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { useShiftStore, SHIFT_OPTIONS, ShiftInfo, getDefaultShift } from '@/lib/store/useShiftStore';
 
 export const BottomNav: React.FC = () => {
@@ -27,6 +29,7 @@ export const BottomNav: React.FC = () => {
   const { selectedUnit, setUnit, selectedShift, selectShift } = useShiftStore();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
   const [currentRole, setCurrentRole] = useState<'owner' | 'kasir'>('owner');
   const [cashierName, setCashierName] = useState('Owner');
   const [cashierRole, setCashierRole] = useState('Owner / Pemilik Bisnis');
@@ -386,6 +389,21 @@ export const BottomNav: React.FC = () => {
                 </div>
               )}
 
+              {/* Rekap Omset Hari Ini (Hanya Kasir) */}
+              {!isOwnerUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    setIsRevenueModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs border border-amber-600"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span>Rekap Omset Hari Ini</span>
+                </button>
+              )}
+
               {/* Ganti Shift (Hanya Kasir) & Logout */}
               <div className="pt-1 flex gap-2">
                 {!isOwnerUser && (
@@ -453,6 +471,13 @@ export const BottomNav: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Rekap Omset Hari Ini */}
+      <OwnerDailyRevenueModal
+        isOpen={isRevenueModalOpen}
+        onClose={() => setIsRevenueModalOpen(false)}
+        isOwner={isOwnerUser}
+      />
     </>
   );
 };

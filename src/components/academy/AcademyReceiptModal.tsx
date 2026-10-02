@@ -193,7 +193,7 @@ Terima kasih telah bergabung bersama Sinyo Academy!`;
               </div>
               
               <div className="flex justify-between text-slate-900 font-bold">
-                <span>DP ({transaction.paymentMethod}):</span>
+                <span>{isLunas && !hasSettlement ? 'Pembayaran' : 'DP'} ({transaction.paymentMethod}):</span>
                 <span>{formatRupiah(transaction.dpAmount)}</span>
               </div>
 

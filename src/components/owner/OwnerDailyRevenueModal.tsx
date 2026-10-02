@@ -115,9 +115,10 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     if (isOpen && !prevIsOpenRef.current) {
       if (!isOwnerUser) {
         setDateMode('single');
-        setSelectedDate(todayStr);
-        setStartDate(todayStr);
-        setEndDate(todayStr);
+        const s = initialStartDate || initialDate || globalCustomStartDate || globalSelectedDate || todayStr;
+        setSelectedDate(s);
+        setStartDate(s);
+        setEndDate(s);
       } else {
         const s = initialStartDate || initialDate || globalCustomStartDate || globalSelectedDate || todayStr;
         const e = initialEndDate || initialDate || globalCustomEndDate || globalSelectedDate || todayStr;
@@ -180,8 +181,8 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     }
   };
 
-  const effectiveStart = !isOwnerUser ? todayStr : (dateMode === 'single' ? selectedDate : (startDate <= endDate ? startDate : endDate));
-  const effectiveEnd = !isOwnerUser ? todayStr : (dateMode === 'single' ? selectedDate : (startDate <= endDate ? endDate : startDate));
+  const effectiveStart = dateMode === 'single' ? selectedDate : (startDate <= endDate ? startDate : endDate);
+  const effectiveEnd = dateMode === 'single' ? selectedDate : (startDate <= endDate ? endDate : startDate);
 
   // Perhitungan Data Pendapatan Berdasarkan Tanggal/Rentang yang Dipilih
   const revenueSummary = useMemo(() => {
@@ -274,25 +275,42 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
     let academySettleQris = 0;
 
     academyTransactions.forEach((tx) => {
-      // Porsi DP (atau bayar langsung saat pendaftaran)
-      const dpDate = toJakartaDateString(tx.createdAt);
-      if (dpDate >= effectiveStart && dpDate <= effectiveEnd && tx.dpAmount > 0) {
-        if (tx.paymentMethod === 'CASH') {
-          academyDpCash += tx.dpAmount;
-        } else {
-          academyDpQris += tx.dpAmount;
-        }
-      }
+      // Cek apakah transaksi ini langsung lunas penuh saat pendaftaran (bukan DP sebagian)
+      const isDirectLunas = (tx.status === 'LUNAS' || tx.remainingAmount === 0) && !tx.settledAt;
 
-      // Porsi Pelunasan (Settlement)
-      if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
-        const settleDate = toJakartaDateString(tx.settledAt);
-        if (settleDate >= effectiveStart && settleDate <= effectiveEnd) {
-          const method = tx.settlementPaymentMethod || tx.paymentMethod;
-          if (method === 'CASH') {
-            academySettleCash += (tx.settlementAmount || 0);
+      if (isDirectLunas) {
+        // Pembayaran lunas langsung saat pendaftaran masuk ke PELUNASAN, BUKAN DP!
+        const payDate = toJakartaDateString(tx.createdAt);
+        if (payDate >= effectiveStart && payDate <= effectiveEnd) {
+          const amt = tx.feeAmount || tx.dpAmount;
+          if (tx.paymentMethod === 'CASH') {
+            academySettleCash += amt;
           } else {
-            academySettleQris += (tx.settlementAmount || 0);
+            academySettleQris += amt;
+          }
+        }
+      } else {
+        // Transaksi sistem DP bertahap:
+        // 1. Porsi DP (Uang Muka) masuk ke DP Akademi pada tanggal booking/DP
+        const dpDate = toJakartaDateString(tx.createdAt);
+        if (dpDate >= effectiveStart && dpDate <= effectiveEnd && tx.dpAmount > 0) {
+          if (tx.paymentMethod === 'CASH') {
+            academyDpCash += tx.dpAmount;
+          } else {
+            academyDpQris += tx.dpAmount;
+          }
+        }
+
+        // 2. Porsi Pelunasan sisa tagihan masuk ke Pelunasan Akademi pada tanggal pelunasan
+        if (tx.settledAt && (tx.settlementAmount || 0) > 0) {
+          const settleDate = toJakartaDateString(tx.settledAt);
+          if (settleDate >= effectiveStart && settleDate <= effectiveEnd) {
+            const method = tx.settlementPaymentMethod || tx.paymentMethod;
+            if (method === 'CASH') {
+              academySettleCash += (tx.settlementAmount || 0);
+            } else {
+              academySettleQris += (tx.settlementAmount || 0);
+            }
           }
         }
       }
@@ -481,18 +499,18 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
         <div className="px-5 py-4 sm:px-7 sm:py-5 bg-white border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              {isOwnerUser ? 'Rekap Omset Harian' : 'Rekap Omset Hari Ini'}
+              {selectedDate === todayStr ? 'Rekap Omset Hari Ini' : 'Rekap Omset Harian'}
             </h2>
             {!isOwnerUser && (
               <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                Monitoring total omset kasir hari ini (Kantin + Booking)
+                Monitoring omset kasir (Kantin, Lapangan, Akademi & Mabar)
               </p>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Quick Button Hari Ini jika sedang melihat tanggal lampau (Hanya Owner) */}
-            {isOwnerUser && dateMode === 'single' && selectedDate !== todayStr && (
+            {/* Quick Button Hari Ini jika sedang melihat tanggal selain hari ini */}
+            {dateMode === 'single' && selectedDate !== todayStr && (
               <button
                 type="button"
                 onClick={handleQuickToday}
@@ -503,38 +521,33 @@ export const OwnerDailyRevenueModal: React.FC<OwnerDailyRevenueModalProps> = ({
               </button>
             )}
 
-            {/* Date Pill Picker (Owner) vs Badge Hari Ini Terkunci (Kasir) */}
-            {isOwnerUser ? (
-              <div className="relative">
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => {
-                    if (e.target.value) handleSingleDateChange(e.target.value);
-                  }}
-                  onClick={(e) => {
-                    try {
-                      (e.currentTarget as HTMLInputElement).showPicker?.();
-                    } catch {}
-                  }}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                  title="Pilih Tanggal"
-                />
-                <button
-                  type="button"
-                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
-                  <span className="truncate">{formattedDateLabel}</span>
-                </button>
-              </div>
-            ) : (
-              <div className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-amber-50 border border-amber-200/90 text-amber-900 text-xs sm:text-sm font-bold flex items-center gap-2 shadow-2xs select-none">
+            {/* Date Pill Picker (Bisa diklik untuk pilih tanggal oleh Owner maupun Kasir) */}
+            <div className="relative">
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  if (e.target.value) handleSingleDateChange(e.target.value);
+                }}
+                onClick={(e) => {
+                  try {
+                    (e.currentTarget as HTMLInputElement).showPicker?.();
+                  } catch {}
+                }}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                title="Klik untuk Pilih Tanggal"
+              />
+              <button
+                type="button"
+                className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-white border border-amber-200/90 shadow-2xs hover:bg-amber-50/50 text-slate-800 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer"
+              >
                 <Calendar className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="truncate">Hari Ini ({formattedDateLabel})</span>
-              </div>
-            )}
+                <span className="truncate">
+                  {selectedDate === todayStr ? `Hari Ini (${formattedDateLabel})` : formattedDateLabel}
+                </span>
+              </button>
+            </div>
 
             {/* Close Button */}
             <button

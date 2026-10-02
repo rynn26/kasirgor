@@ -17,9 +17,12 @@ import { useShiftStore, SHIFT_OPTIONS } from '@/lib/store/useShiftStore';
 import { useToastStore } from '@/lib/store/useToastStore';
 import { useTransactionStore } from '@/lib/store/useTransactionStore';
 import { useCourtBookingStore } from '@/lib/store/useCourtBookingStore';
-import { getBookingPaymentItemsInPeriod, getJakartaToday } from '@/lib/bookingUtils';
+import { getBookingPaymentItemsInPeriod, getJakartaToday, toJakartaDateString } from '@/lib/bookingUtils';
 import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { recordActivityLog, updateCashierPresence } from '@/lib/db/activityLogs';
+import { fetchAcademyTransactions } from '@/lib/db/academy';
+import { fetchOpenMabarTransactions } from '@/lib/db/mabar';
+import { AcademyTransaction, OpenMabarTransaction } from '@/types/academy';
 
 interface ShiftHandoverModalProps {
   isOpen: boolean;
@@ -41,8 +44,10 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
   const [nextCashier, setNextCashier] = useState<'Yuli' | 'Asfia' | string>('Asfia');
   const [handoverNotes, setHandoverNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [academyTransactions, setAcademyTransactions] = useState<AcademyTransaction[]>([]);
+  const [mabarTransactions, setMabarTransactions] = useState<OpenMabarTransaction[]>([]);
 
-  // Set default next cashier based on current cashier
+  // Set default next cashier based on current cashier and fetch latest transactions
   useEffect(() => {
     if (isOpen) {
       if (cashierName.toLowerCase() === 'yuli') {
@@ -54,6 +59,9 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
       }
       setClosingCashInput('');
       setHandoverNotes('');
+
+      fetchAcademyTransactions().then(setAcademyTransactions).catch(console.error);
+      fetchOpenMabarTransactions().then(setMabarTransactions).catch(console.error);
     }
   }, [isOpen, cashierName]);
 
@@ -102,8 +110,62 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
       .reduce((sum, t) => sum + t.grandTotal, 0);
   }, [todayCompletedTx]);
 
-  const totalSales = kantinSales + todayBookingTotal;
-  const totalCashSales = kantinCash + todayBookingCash;
+  // Pendapatan Sinyo Academy yang diterima hari ini (DP & Pelunasan)
+  const academyIncome = useMemo(() => {
+    let cash = 0;
+    let qris = 0;
+    let count = 0;
+
+    academyTransactions.forEach((tx) => {
+      const isDirectLunas = (tx.status === 'LUNAS' || tx.remainingAmount === 0) && !tx.settledAt;
+      const createdDate = toJakartaDateString(tx.createdAt);
+
+      if (isDirectLunas) {
+        if (createdDate === todayStr) {
+          const amt = tx.feeAmount || tx.dpAmount;
+          if (tx.paymentMethod === 'CASH') cash += amt;
+          else qris += amt;
+          count += 1;
+        }
+      } else {
+        if (createdDate === todayStr && tx.dpAmount > 0) {
+          if (tx.paymentMethod === 'CASH') cash += tx.dpAmount;
+          else qris += tx.dpAmount;
+          count += 1;
+        }
+        if (tx.settledAt && toJakartaDateString(tx.settledAt) === todayStr && (tx.settlementAmount || 0) > 0) {
+          const method = tx.settlementPaymentMethod || tx.paymentMethod;
+          if (method === 'CASH') cash += (tx.settlementAmount || 0);
+          else qris += (tx.settlementAmount || 0);
+          count += 1;
+        }
+      }
+    });
+
+    return { cash, qris, total: cash + qris, count };
+  }, [academyTransactions, todayStr]);
+
+  // Pendapatan Open Mabar yang diterima hari ini (Cash & QRIS)
+  const mabarIncome = useMemo(() => {
+    let cash = 0;
+    let qris = 0;
+    let count = 0;
+
+    mabarTransactions.forEach((tx) => {
+      const txDate = tx.date ? tx.date : toJakartaDateString(tx.createdAt);
+      if (txDate === todayStr) {
+        cash += (tx.nominalCash || 0);
+        qris += (tx.nominalQris || 0);
+        count += 1;
+      }
+    });
+
+    return { cash, qris, total: cash + qris, count };
+  }, [mabarTransactions, todayStr]);
+
+  const totalSales = kantinSales + todayBookingTotal + academyIncome.total + mabarIncome.total;
+  const totalCashSales = kantinCash + todayBookingCash + academyIncome.cash + mabarIncome.cash;
+  const totalTransactionsCount = todayCompletedTx.length + academyIncome.count + mabarIncome.count;
 
   const expectedCashInDrawer = (openingCash || 0) + totalCashSales;
   const actualClosingCash = parseNumberInput(closingCashInput);
@@ -138,7 +200,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
           opening_cash: openingCash || 0,
           closing_cash: actualClosingCash,
           total_sales: totalSales,
-          total_transactions: todayCompletedTx.length,
+          total_transactions: totalTransactionsCount,
           status: 'SELESAI',
         });
       } catch (err) {
@@ -156,7 +218,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
         role: 'Kasir',
         actionType: 'SHIFT_HANDOVER',
         title: 'Pergantian Shift (Handover)',
-        details: `Serah terima shift dari ${outgoingCashier} (${outgoingShiftName}) ke ${incomingCashier}. Omzet: ${formatRupiah(totalSales)} (${todayCompletedTx.length} Nota), Kas Akhir Laci: ${formatRupiah(actualClosingCash)} [${diffNote}]. Catatan: ${handoverNotes || 'Tidak ada catatan khusus.'}`,
+        details: `Serah terima shift dari ${outgoingCashier} (${outgoingShiftName}) ke ${incomingCashier}. Omzet: ${formatRupiah(totalSales)} (${totalTransactionsCount} Transaksi), Kas Akhir Laci: ${formatRupiah(actualClosingCash)} [${diffNote}]. Rincian: Kantin (${formatRupiah(kantinSales)}), Lapangan (${formatRupiah(todayBookingTotal)}), Akademi (${formatRupiah(academyIncome.total)}), Mabar (${formatRupiah(mabarIncome.total)}). Catatan: ${handoverNotes || 'Tidak ada catatan khusus.'}`,
         metadata: {
           fromStaff: outgoingCashier,
           toStaff: incomingCashier,
@@ -164,7 +226,11 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
           closingCash: actualClosingCash,
           cashDifference,
           totalSales,
-          totalTx: todayCompletedTx.length,
+          totalTx: totalTransactionsCount,
+          kantinSales,
+          todayBookingTotal,
+          academyIncome,
+          mabarIncome,
           notes: handoverNotes,
         },
       });
@@ -281,7 +347,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
               </span>
             </div>
 
-            <div className="space-y-1 pt-2 border-t border-slate-200/80 text-[11px]">
+            <div className="space-y-1.5 pt-2 border-t border-slate-200/80 text-[11px]">
               <div className="flex items-center justify-between text-slate-500">
                 <span>• Kas Masuk Toko / Kantin:</span>
                 <span className="font-semibold text-slate-700">{formatRupiah(kantinCash)}</span>
@@ -290,9 +356,17 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({
                 <span>• Kas Masuk Lapangan (DP / Lunas):</span>
                 <span className="font-semibold text-slate-700">{formatRupiah(todayBookingCash)}</span>
               </div>
-              <div className="flex items-center justify-between font-bold text-slate-800 pt-1 border-t border-dotted border-slate-200">
-                <span>Total Uang Kas Masuk:</span>
-                <span className="text-emerald-700">{formatRupiah(totalCashSales)}</span>
+              <div className="flex items-center justify-between text-slate-500">
+                <span>• Kas Masuk Sinyo Academy:</span>
+                <span className="font-semibold text-slate-700">{formatRupiah(academyIncome.cash)}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500">
+                <span>• Kas Masuk Open Mabar:</span>
+                <span className="font-semibold text-slate-700">{formatRupiah(mabarIncome.cash)}</span>
+              </div>
+              <div className="flex items-center justify-between font-bold text-slate-800 pt-1.5 border-t border-dotted border-slate-200">
+                <span>Total Uang Kas Masuk Laci:</span>
+                <span className="text-emerald-700 font-black">{formatRupiah(totalCashSales)}</span>
               </div>
             </div>
           </div>

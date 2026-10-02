@@ -331,7 +331,7 @@ export default function AcademyHistoryPage() {
                     <span>{formatRupiah(item.feeAmount)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-slate-900">
-                    <span>DP ({item.paymentMethod}):</span>
+                    <span>{isLunas && !hasSettlement ? 'Pembayaran' : 'DP'} ({item.paymentMethod}):</span>
                     <span>{formatRupiah(item.dpAmount)}</span>
                   </div>
                   {hasSettlement && (

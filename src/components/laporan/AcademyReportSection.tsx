@@ -144,9 +144,9 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
   const relevantTransactions = useMemo(() => {
     const { start, end } = dateRange;
     return transactions.filter((item) => {
-      const dpDate = item.createdAt.slice(0, 10);
+      const dpDate = toJakartaDateString(item.createdAt);
       const isDp = dpDate >= start && dpDate <= end;
-      const isSettle = item.settledAt && item.settledAt.slice(0, 10) >= start && item.settledAt.slice(0, 10) <= end;
+      const isSettle = item.settledAt && toJakartaDateString(item.settledAt) >= start && toJakartaDateString(item.settledAt) <= end;
       return isDp || isSettle;
     });
   }, [transactions, dateRange]);
@@ -457,7 +457,13 @@ export const AcademyReportSection: React.FC<AcademyReportSectionProps> = ({
 
                     <div className="text-[10px] text-slate-500 mt-1 space-y-0.5">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>DP: {formatDate(item.createdAt, false)} ({item.paymentMethod})</span>
+                        {isLunas && !hasSettlement ? (
+                          <span className="text-emerald-700 font-bold">
+                            Lunas: {formatDate(item.createdAt, false)} ({item.paymentMethod})
+                          </span>
+                        ) : (
+                          <span>DP: {formatDate(item.createdAt, false)} ({item.paymentMethod})</span>
+                        )}
                         {hasSettlement && (
                           <>
                             <span>•</span>

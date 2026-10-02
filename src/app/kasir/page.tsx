@@ -8,17 +8,19 @@ import { CartSidebar } from '@/components/pos/CartSidebar';
 import { PaymentModal } from '@/components/pos/PaymentModal';
 import { ReceiptModal } from '@/components/pos/ReceiptModal';
 import { CartRestoreNotice } from '@/components/common/CartRestoreNotice';
+import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { useCartStore } from '@/lib/store/useCartStore';
 import { useProductStore } from '@/lib/store/useProductStore';
 import { formatRupiah } from '@/lib/utils';
 import { Transaction } from '@/types/pos';
-import { ShoppingCart, ArrowRight } from 'lucide-react';
+import { ShoppingCart, ArrowRight, Wallet } from 'lucide-react';
 
 export default function KasirPage() {
   const { items, getTotalItems, getGrandTotal } = useCartStore();
   const { loadProducts } = useProductStore();
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isRevenueOpen, setIsRevenueOpen] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
   const [cashierName, setCashierName] = useState('Yuli');
 
@@ -64,6 +66,17 @@ export default function KasirPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Rekap Omset Hari Ini Button */}
+            <button
+              type="button"
+              onClick={() => setIsRevenueOpen(true)}
+              className="px-2.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Lihat Rekap Omset Hari Ini"
+            >
+              <Wallet className="w-4 h-4 text-amber-600" />
+              <span>Rekap</span>
+            </button>
+
             {/* Cart Icon Button */}
             <Link
               href="/keranjang"
@@ -146,6 +159,13 @@ export default function KasirPage() {
           setIsReceiptOpen(false);
           setLastTransaction(null);
         }}
+      />
+
+      {/* Rekap Omset Hari Ini Modal (Role Kasir) */}
+      <OwnerDailyRevenueModal
+        isOpen={isRevenueOpen}
+        onClose={() => setIsRevenueOpen(false)}
+        isOwner={false}
       />
     </div>
   );

@@ -592,8 +592,19 @@ export default function DashboardUnifiedPage() {
                 </div>
               </div>
 
-              {/* Cart & Notification Action Buttons */}
+              {/* Cart, Rekap & Notification Action Buttons */}
               <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOwnerRevenueModalOpen(true)}
+                  className="px-3 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer border border-amber-600"
+                  title="Lihat Total Omset Hari Ini"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Rekap Omset Hari Ini</span>
+                  <span className="sm:hidden">Rekap</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -731,8 +742,19 @@ export default function DashboardUnifiedPage() {
                 </div>
               </div>
 
-              {/* Actions: Notification & History */}
+              {/* Actions: Rekap, Notification & History */}
               <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOwnerRevenueModalOpen(true)}
+                  className="px-3 py-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-all cursor-pointer border border-amber-600"
+                  title="Lihat Total Omset Hari Ini"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Rekap Omset Hari Ini</span>
+                  <span className="sm:hidden">Rekap</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
