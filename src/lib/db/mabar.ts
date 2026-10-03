@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { OpenMabarTransaction } from '@/types/academy';
+import { formatRupiah } from '@/lib/utils';
+import { recordActivityLog } from '@/lib/db/activityLogs';
 
 const LOCAL_STORAGE_KEY = 'kasirgor_open_mabar_transactions';
 
@@ -98,6 +100,33 @@ export async function createOpenMabarTransaction(
   const current = getLocalTransactions();
   saveLocalTransactions([newItem, ...current]);
 
+  // Trigger activity log & owner notification
+  try {
+    const payDetails = [];
+    if (newItem.nominalCash > 0) payDetails.push(`Tunai: ${formatRupiah(newItem.nominalCash)}`);
+    if (newItem.nominalQris > 0) payDetails.push(`QRIS: ${formatRupiah(newItem.nominalQris)}`);
+    const payText = payDetails.join(', ') || formatRupiah(newItem.totalAmount);
+
+    recordActivityLog({
+      staffName: newItem.cashierName || 'Kasir',
+      role: 'Kasir',
+      actionType: 'CREATE_MABAR',
+      title: `Pencatatan Open Mabar (${newItem.sportType})`,
+      details: `Sesi Open Mabar ${newItem.sportType} (${newItem.receiptNumber}) tgl ${newItem.date}. Total: ${formatRupiah(newItem.totalAmount)} (${payText}). Dicatat oleh ${newItem.cashierName || 'Kasir'}.`,
+      metadata: {
+        transactionId: newItem.id,
+        receiptNumber: newItem.receiptNumber,
+        sportType: newItem.sportType,
+        date: newItem.date,
+        nominalCash: newItem.nominalCash,
+        nominalQris: newItem.nominalQris,
+        totalAmount: newItem.totalAmount,
+      },
+    }).catch(console.error);
+  } catch (err) {
+    console.warn('Failed to record activity log for createOpenMabarTransaction:', err);
+  }
+
   if (!isSupabaseConfigured()) {
     return newItem;
   }
@@ -137,7 +166,29 @@ export async function createOpenMabarTransaction(
 
 export async function deleteOpenMabarTransaction(id: string): Promise<void> {
   const current = getLocalTransactions();
+  const deletedItem = current.find((item) => item.id === id);
   saveLocalTransactions(current.filter((item) => item.id !== id));
+
+  if (deletedItem) {
+    try {
+      recordActivityLog({
+        staffName: deletedItem.cashierName || 'Kasir',
+        role: 'Kasir',
+        actionType: 'DELETE_MABAR',
+        title: `Hapus Sesi Open Mabar (${deletedItem.sportType})`,
+        details: `Penghapusan sesi Open Mabar ${deletedItem.sportType} (${deletedItem.receiptNumber}) tgl ${deletedItem.date} - Total: ${formatRupiah(deletedItem.totalAmount)}.`,
+        metadata: {
+          transactionId: deletedItem.id,
+          receiptNumber: deletedItem.receiptNumber,
+          sportType: deletedItem.sportType,
+          date: deletedItem.date,
+          totalAmount: deletedItem.totalAmount,
+        },
+      }).catch(console.error);
+    } catch (err) {
+      console.warn('Failed to record activity log for deleteOpenMabarTransaction:', err);
+    }
+  }
 
   if (!isSupabaseConfigured()) return;
 

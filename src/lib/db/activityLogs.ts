@@ -18,7 +18,13 @@ export type ActivityActionType =
   | 'CREATE_PRODUCT'
   | 'EDIT_PRODUCT'
   | 'DELETE_PRODUCT'
-  | 'MANUAL_EDIT';
+  | 'MANUAL_EDIT'
+  | 'CREATE_ACADEMY'
+  | 'SETTLE_ACADEMY'
+  | 'EDIT_ACADEMY'
+  | 'DELETE_ACADEMY'
+  | 'CREATE_MABAR'
+  | 'DELETE_MABAR';
 
 export interface ActivityLog {
   id: string;
@@ -196,7 +202,11 @@ export async function recordActivityLog(
         body: JSON.stringify({
           title: newLog.title,
           body: newLog.details,
-          url: newLog.actionType.includes('BOOKING')
+          url: newLog.actionType.includes('ACADEMY')
+            ? '/laporan?unit=academy'
+            : newLog.actionType.includes('MABAR')
+            ? '/laporan?unit=mabar'
+            : newLog.actionType.includes('BOOKING')
             ? '/booking/history'
             : newLog.actionType.includes('PRODUCT')
             ? '/produk'
@@ -235,7 +245,13 @@ export async function recordActivityLog(
         newLog.actionType === 'CREATE_TRANSACTION' ||
         newLog.actionType === 'CREATE_PRODUCT' ||
         newLog.actionType === 'EDIT_PRODUCT' ||
-        newLog.actionType === 'MANUAL_EDIT'
+        newLog.actionType === 'MANUAL_EDIT' ||
+        newLog.actionType === 'CREATE_ACADEMY' ||
+        newLog.actionType === 'SETTLE_ACADEMY' ||
+        newLog.actionType === 'EDIT_ACADEMY' ||
+        newLog.actionType === 'DELETE_ACADEMY' ||
+        newLog.actionType === 'CREATE_MABAR' ||
+        newLog.actionType === 'DELETE_MABAR'
       ) {
         import('@/lib/notifications/webPush').then(({ notifyOwner }) => {
           let title = '📢 Notifikasi Kasir GOR';
@@ -245,6 +261,14 @@ export async function recordActivityLog(
             newLog.actionType.includes('CANCEL')
           ) {
             title = '🚨 ' + newLog.title;
+          } else if (newLog.actionType === 'CREATE_ACADEMY') {
+            title = '🎓 ' + newLog.title;
+          } else if (newLog.actionType === 'SETTLE_ACADEMY') {
+            title = '💰 ' + newLog.title;
+          } else if (newLog.actionType === 'EDIT_ACADEMY') {
+            title = '🔄 ' + newLog.title;
+          } else if (newLog.actionType === 'CREATE_MABAR') {
+            title = '🏸 ' + newLog.title;
           } else if (newLog.actionType === 'EDIT_BOOKING') {
             title = '🔄 ' + newLog.title;
           } else if (newLog.actionType === 'SHIFT_HANDOVER') {
@@ -264,7 +288,11 @@ export async function recordActivityLog(
           }
 
           let url = '/dashboard';
-          if (newLog.actionType.includes('BOOKING')) {
+          if (newLog.actionType.includes('ACADEMY')) {
+            url = '/laporan?unit=academy';
+          } else if (newLog.actionType.includes('MABAR')) {
+            url = '/laporan?unit=mabar';
+          } else if (newLog.actionType.includes('BOOKING')) {
             url = '/booking/history';
           } else if (newLog.actionType.includes('PRODUCT') || newLog.actionType.includes('STOCK')) {
             url = '/produk';

@@ -22,6 +22,7 @@ import {
   Repeat,
   Wallet,
   Radio,
+  GraduationCap,
 } from 'lucide-react';
 import { OwnerDailyRevenueModal } from '@/components/owner/OwnerDailyRevenueModal';
 import { formatRupiah, formatDate } from '@/lib/utils';
@@ -82,6 +83,37 @@ function getActionBadge(actionType: string) {
         label: 'Booking Baru',
         bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         icon: CalendarCheck,
+      };
+    case 'CREATE_ACADEMY':
+      return {
+        label: 'Akademi Baru',
+        bg: 'bg-purple-50 text-purple-700 border-purple-200',
+        icon: GraduationCap,
+      };
+    case 'SETTLE_ACADEMY':
+      return {
+        label: 'Pelunasan Akademi',
+        bg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        icon: Wallet,
+      };
+    case 'EDIT_ACADEMY':
+      return {
+        label: 'Edit Akademi',
+        bg: 'bg-purple-50 text-purple-700 border-purple-200',
+        icon: Repeat,
+      };
+    case 'CREATE_MABAR':
+      return {
+        label: 'Open Mabar',
+        bg: 'bg-pink-50 text-pink-700 border-pink-200',
+        icon: Users,
+      };
+    case 'DELETE_ACADEMY':
+    case 'DELETE_MABAR':
+      return {
+        label: 'Hapus Data',
+        bg: 'bg-red-50 text-red-700 border-red-200',
+        icon: AlertTriangle,
       };
     case 'SETTLE_BOOKING':
       return {

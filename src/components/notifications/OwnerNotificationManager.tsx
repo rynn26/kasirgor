@@ -7,7 +7,9 @@ import {
   ShoppingCart, 
   Calendar, 
   AlertTriangle, 
-  ArrowRight
+  ArrowRight,
+  GraduationCap,
+  Users
 } from 'lucide-react';
 import {
   isUserOwner,
@@ -91,6 +93,14 @@ export const OwnerNotificationManager: React.FC = () => {
       actionType.includes('CANCEL')
     ) {
       title = '🚨 ' + (log.title || 'Pembatalan Transaksi Kasir');
+    } else if (actionType === 'CREATE_ACADEMY') {
+      title = '🎓 ' + (log.title || 'Pendaftaran Sinyo Academy Baru');
+    } else if (actionType === 'SETTLE_ACADEMY') {
+      title = '💰 ' + (log.title || 'Pelunasan Sinyo Academy');
+    } else if (actionType === 'EDIT_ACADEMY') {
+      title = '🔄 ' + (log.title || 'Perubahan Data Sinyo Academy');
+    } else if (actionType === 'CREATE_MABAR') {
+      title = '🏸 ' + (log.title || 'Sesi Open Mabar Baru');
     } else if (actionType === 'EDIT_BOOKING') {
       title = '🔄 ' + (log.title || 'Perubahan Data Booking');
     } else if (actionType === 'SHIFT_HANDOVER') {
@@ -110,7 +120,11 @@ export const OwnerNotificationManager: React.FC = () => {
     }
 
     let url = '/dashboard';
-    if (actionType.includes('BOOKING')) {
+    if (actionType.includes('ACADEMY')) {
+      url = '/laporan?unit=academy';
+    } else if (actionType.includes('MABAR')) {
+      url = '/laporan?unit=mabar';
+    } else if (actionType.includes('BOOKING')) {
       url = '/booking/history';
     } else if (actionType.includes('PRODUCT') || actionType.includes('STOCK')) {
       url = '/produk';
@@ -326,6 +340,8 @@ export const OwnerNotificationManager: React.FC = () => {
   }
 
   const getAlertIcon = (actionType: string) => {
+    if (actionType.includes('ACADEMY')) return <GraduationCap className="w-5 h-5 text-white" />;
+    if (actionType.includes('MABAR')) return <Users className="w-5 h-5 text-white" />;
     if (actionType.includes('TRANSACTION')) return <ShoppingCart className="w-5 h-5 text-white" />;
     if (actionType.includes('BOOKING')) return <Calendar className="w-5 h-5 text-white" />;
     if (actionType.includes('DELETE') || actionType.includes('CANCEL') || actionType.includes('VOID')) {

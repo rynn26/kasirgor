@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { AcademyTransaction, AcademyPaymentMethod } from '@/types/academy';
+import { formatRupiah } from '@/lib/utils';
+import { recordActivityLog } from '@/lib/db/activityLogs';
 
 const LOCAL_STORAGE_KEY = 'kasirgor_academy_transactions';
 
@@ -122,6 +124,32 @@ export async function createAcademyTransaction(
   const current = getLocalTransactions();
   saveLocalTransactions([newItem, ...current]);
 
+  // Trigger activity log & owner notification
+  try {
+    const isLunas = newItem.status === 'LUNAS' || newItem.remainingAmount === 0;
+    const paidAmt = isLunas ? newItem.feeAmount : newItem.dpAmount;
+    recordActivityLog({
+      staffName: newItem.cashierName || 'Kasir',
+      role: 'Kasir',
+      actionType: 'CREATE_ACADEMY',
+      title: `Pendaftaran Sinyo Academy (${newItem.program})`,
+      details: `${newItem.customerName} mendaftar program ${newItem.program}. Tarif: ${formatRupiah(newItem.feeAmount)}, Bayar ${isLunas ? 'Lunas' : 'DP'}: ${formatRupiah(paidAmt)} (${newItem.paymentMethod}). Dicatat oleh ${newItem.cashierName || 'Kasir'}.`,
+      metadata: {
+        transactionId: newItem.id,
+        receiptNumber: newItem.receiptNumber,
+        customerName: newItem.customerName,
+        program: newItem.program,
+        feeAmount: newItem.feeAmount,
+        dpAmount: newItem.dpAmount,
+        remainingAmount: newItem.remainingAmount,
+        paymentMethod: newItem.paymentMethod,
+        status: newItem.status,
+      },
+    }).catch(console.error);
+  } catch (err) {
+    console.warn('Failed to record activity log for createAcademyTransaction:', err);
+  }
+
   if (!isSupabaseConfigured()) {
     return newItem;
   }
@@ -202,6 +230,29 @@ export async function settleAcademyTransaction(
 
   saveLocalTransactions(updatedList);
 
+  if (updatedItem) {
+    const item = updatedItem as AcademyTransaction;
+    try {
+      recordActivityLog({
+        staffName: payload.cashierName || 'Kasir',
+        role: 'Kasir',
+        actionType: 'SETTLE_ACADEMY',
+        title: `Pelunasan Sinyo Academy (${item.program})`,
+        details: `${item.customerName} melunasi sisa tagihan ${item.program} sebesar ${formatRupiah(payload.settlementAmount)} (${payload.paymentMethod}). Dicatat oleh ${payload.cashierName || 'Kasir'}.`,
+        metadata: {
+          transactionId: item.id,
+          receiptNumber: item.receiptNumber,
+          customerName: item.customerName,
+          program: item.program,
+          settlementAmount: payload.settlementAmount,
+          settlementPaymentMethod: payload.paymentMethod,
+        },
+      }).catch(console.error);
+    } catch (err) {
+      console.warn('Failed to record activity log for settleAcademyTransaction:', err);
+    }
+  }
+
   if (!isSupabaseConfigured() || !updatedItem) {
     if (!updatedItem) throw new Error('Transaction not found');
     return updatedItem;
@@ -256,6 +307,27 @@ export async function updateAcademyTransaction(
 
   saveLocalTransactions(updatedList);
 
+  if (updatedItem) {
+    const item = updatedItem as AcademyTransaction;
+    try {
+      recordActivityLog({
+        staffName: payload.cashierName || item.cashierName || 'Kasir',
+        role: 'Kasir',
+        actionType: 'EDIT_ACADEMY',
+        title: `Edit Data Sinyo Academy (${item.program})`,
+        details: `Perubahan data peserta ${item.customerName} (${item.program}). Tarif: ${formatRupiah(item.feeAmount)}, Status: ${item.status}.`,
+        metadata: {
+          transactionId: item.id,
+          receiptNumber: item.receiptNumber,
+          customerName: item.customerName,
+          program: item.program,
+        },
+      }).catch(console.error);
+    } catch (err) {
+      console.warn('Failed to record activity log for updateAcademyTransaction:', err);
+    }
+  }
+
   if (!isSupabaseConfigured() || !updatedItem) {
     if (!updatedItem) throw new Error('Transaction not found');
     return updatedItem;
@@ -306,7 +378,28 @@ export async function updateAcademyTransaction(
 
 export async function deleteAcademyTransaction(id: string): Promise<void> {
   const current = getLocalTransactions();
+  const deletedItem = current.find((item) => item.id === id);
   saveLocalTransactions(current.filter((item) => item.id !== id));
+
+  if (deletedItem) {
+    try {
+      recordActivityLog({
+        staffName: deletedItem.cashierName || 'Kasir',
+        role: 'Kasir',
+        actionType: 'DELETE_ACADEMY',
+        title: `Hapus Data Sinyo Academy (${deletedItem.program})`,
+        details: `Penghapusan data peserta ${deletedItem.customerName} (${deletedItem.receiptNumber}) - Total: ${formatRupiah(deletedItem.feeAmount)}.`,
+        metadata: {
+          transactionId: deletedItem.id,
+          receiptNumber: deletedItem.receiptNumber,
+          customerName: deletedItem.customerName,
+          program: deletedItem.program,
+        },
+      }).catch(console.error);
+    } catch (err) {
+      console.warn('Failed to record activity log for deleteAcademyTransaction:', err);
+    }
+  }
 
   if (!isSupabaseConfigured()) return;
 
