@@ -58,17 +58,22 @@ export const useCartStore = create<CartState>()(
 
       addItem: (product: Product, quantity = 1) => {
         const { items } = get();
+        const liveProduct = useProductStore.getState().products.find((p) => p.id === product.id) || product;
+        const availableStock = typeof liveProduct.stock === 'number' ? liveProduct.stock : 9999;
+        if (availableStock <= 0) return;
+
         const existingIndex = items.findIndex((i) => i.product.id === product.id);
 
         if (existingIndex > -1) {
           const updated = [...items];
           const newQty = updated[existingIndex].quantity + quantity;
-          if (product.stock && newQty > product.stock) return;
-          updated[existingIndex] = { ...updated[existingIndex], quantity: newQty };
+          if (newQty > availableStock) return;
+          updated[existingIndex] = { ...updated[existingIndex], product: liveProduct, quantity: newQty };
           set({ items: updated });
         } else {
-          if (product.stock <= 0) return;
-          set({ items: [...items, { product, quantity, note: '' }] });
+          const initialQty = Math.min(quantity, availableStock);
+          if (initialQty <= 0) return;
+          set({ items: [...items, { product: liveProduct, quantity: initialQty, note: '' }] });
         }
       },
 
@@ -81,14 +86,20 @@ export const useCartStore = create<CartState>()(
           get().removeItem(productId);
           return;
         }
+        const liveProduct = useProductStore.getState().products.find((p) => p.id === productId);
         set((state) => ({
           items: state.items.map((i) => {
             if (i.product.id === productId) {
-              const maxStock = i.product.stock || 9999;
-              return { ...i, quantity: Math.min(quantity, maxStock) };
+              const availableStock = typeof liveProduct?.stock === 'number' ? liveProduct.stock : (typeof i.product.stock === 'number' ? i.product.stock : 9999);
+              if (availableStock <= 0) return { ...i, quantity: 0 };
+              return {
+                ...i,
+                product: liveProduct || i.product,
+                quantity: Math.min(quantity, Math.max(1, availableStock)),
+              };
             }
             return i;
-          }),
+          }).filter((i) => i.quantity > 0),
         }));
       },
 

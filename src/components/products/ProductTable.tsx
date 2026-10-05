@@ -96,7 +96,7 @@ export const ProductTable: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {filtered.map((prod) => {
             const isOutOfStock = prod.stock <= 0;
-            const isLow = prod.stock > 0 && prod.stock <= 5;
+            const isLow = prod.stock > 0 && prod.stock <= (prod.minimumStock ?? 5);
 
             return (
               <div

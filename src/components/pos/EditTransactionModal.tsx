@@ -119,6 +119,38 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
         amountPaid: subtotal,
       });
 
+      // Synchronize stock changes if transaction was COMPLETED
+      if (transaction.status === 'COMPLETED') {
+        const oldItemsMap = new Map<string, number>();
+        for (const item of transaction.items || []) {
+          if (item?.product?.id) {
+            oldItemsMap.set(item.product.id, (oldItemsMap.get(item.product.id) || 0) + item.quantity);
+          }
+        }
+
+        const newItemsMap = new Map<string, number>();
+        for (const item of items) {
+          if (item?.product?.id) {
+            newItemsMap.set(item.product.id, (newItemsMap.get(item.product.id) || 0) + item.quantity);
+          }
+        }
+
+        const allProductIds = new Set([...oldItemsMap.keys(), ...newItemsMap.keys()]);
+        const { updateStock } = await import('@/lib/db/products');
+        for (const prodId of allProductIds) {
+          const oldQty = oldItemsMap.get(prodId) || 0;
+          const newQty = newItemsMap.get(prodId) || 0;
+          const stockDelta = oldQty - newQty;
+          if (stockDelta !== 0) {
+            try {
+              await updateStock(prodId, stockDelta);
+            } catch (stockErr) {
+              console.error('Failed to adjust stock on editTransaction:', stockErr);
+            }
+          }
+        }
+      }
+
       showToast('✅ Transaksi berhasil diperbarui!');
       onSuccess(updated);
       onClose();

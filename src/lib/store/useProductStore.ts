@@ -1,6 +1,9 @@
 import { create } from 'zustand';
-import { Product, ProductCategory } from '@/types/pos';
+import { Product, ProductCategory, normalizeProductCategory } from '@/types/pos';
 import { fetchProducts, createProduct, updateProduct, deleteProduct, updateStock, setStockExact } from '@/lib/db/products';
+import { supabase } from '@/lib/supabase/client';
+
+let productRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
 interface ProductState {
   products: Product[];
@@ -35,6 +38,39 @@ export const useProductStore = create<ProductState>((set, get) => ({
     try {
       const products = await fetchProducts();
       set({ products, isLoading: false });
+
+      // Initialize realtime subscription if not already active
+      if (!productRealtimeChannel) {
+        productRealtimeChannel = supabase
+          .channel('kasir_products_realtime')
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'products' },
+            (payload) => {
+              const updated = payload.new as any;
+              if (updated && updated.id) {
+                set((state) => ({
+                  products: state.products.map((p) =>
+                    p.id === updated.id
+                      ? {
+                          ...p,
+                          stock: Number(updated.stock),
+                          isAvailable: updated.is_available,
+                          price: Number(updated.price),
+                          costPrice: updated.cost_price ? Number(updated.cost_price) : undefined,
+                          minimumStock: updated.minimum_stock ? Number(updated.minimum_stock) : undefined,
+                          name: updated.name,
+                          category: normalizeProductCategory(updated.category),
+                          unit: updated.unit || p.unit,
+                        }
+                      : p
+                  ),
+                }));
+              }
+            }
+          )
+          .subscribe();
+      }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Gagal memuat produk', isLoading: false });
     }

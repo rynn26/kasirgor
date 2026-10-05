@@ -96,6 +96,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const margin = numPrice > 0 && numCost > 0 ? numPrice - numCost : 0;
   const marginPercent = numPrice > 0 && numCost > 0 ? Math.round((margin / numPrice) * 100) : 0;
 
+  const isAdjustingRef = React.useRef(false);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     isSavingRef.current = true;
@@ -112,28 +114,37 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       return;
     }
 
-    let finalStock = stock;
-    const parsedCustom = parseInt(customStockInput, 10);
-    if (!isNaN(parsedCustom) && parsedCustom >= 0) {
-      finalStock = parsedCustom;
-    }
-
     const parsedMinStock = parseInt(minimumStock, 10);
     const minStockToSave = !isNaN(parsedMinStock) && parsedMinStock >= 0 ? parsedMinStock : undefined;
 
+    // Only update stock if user explicitly changed the manual stock input from original
+    const parsedCustom = parseInt(customStockInput, 10);
+    const hasCustomStockChange = !isNaN(parsedCustom) && parsedCustom >= 0 && parsedCustom !== product.stock;
+
     try {
-      await updateProduct(product.id, {
+      const updatePayload: Partial<Product> = {
         name,
         category,
         sku,
         price: numPrice > 0 ? numPrice : product.price,
         costPrice: numCost > 0 ? numCost : (numCost === 0 ? undefined : product.costPrice),
-        stock: finalStock,
         minimumStock: minStockToSave,
         unit,
         description: description.trim() || undefined,
-        isAvailable: finalStock > 0,
-      });
+      };
+
+      if (hasCustomStockChange) {
+        updatePayload.stock = parsedCustom;
+        updatePayload.isAvailable = parsedCustom > 0;
+      }
+
+      await updateProduct(product.id, updatePayload);
+
+      // If custom stock was changed, also call setStockExact to log activity properly
+      if (hasCustomStockChange) {
+        await setStockExact(product.id, parsedCustom);
+      }
+
       showToast(`Produk "${name}" berhasil diperbarui`);
       setIsEditing(false);
       onClose();
@@ -158,16 +169,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleAdjustStock = async (delta: number) => {
     setIsEditingCustomStock(false);
-    const newStock = Math.max(0, stock + delta);
-    setStock(newStock);
-    setCustomStockInput(String(newStock));
+    if (isAdjustingRef.current) return;
+    isAdjustingRef.current = true;
     try {
       await updateStock(product.id, delta);
-      showToast(`Stok "${product.name}" disesuaikan menjadi ${newStock} ${unit}`);
+      const latestProd = useProductStore.getState().products.find(p => p.id === product.id);
+      const updatedStock = latestProd ? latestProd.stock : Math.max(0, stock + delta);
+      setStock(updatedStock);
+      setCustomStockInput(String(updatedStock));
+      showToast(`Stok "${product.name}" disesuaikan menjadi ${updatedStock} ${unit}`);
     } catch (err) {
       setStock(product.stock); // revert on error
       setCustomStockInput(String(product.stock));
       showToast('Gagal menyesuaikan stok. Coba lagi.');
+    } finally {
+      isAdjustingRef.current = false;
     }
   };
 

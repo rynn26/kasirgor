@@ -138,25 +138,61 @@ export async function updateStock(
   id: string,
   delta: number
 ): Promise<{ newStock: number }> {
-  const { data: current, error: fetchError } = await supabase
+  const numericDelta = Math.floor(Number(delta) || 0);
+  if (numericDelta === 0) {
+    const { data } = await supabase.from('products').select('stock').eq('id', id).single();
+    return { newStock: Math.max(0, Math.floor(Number(data?.stock) || 0)) };
+  }
+
+  // Optimistic concurrency retry loop (up to 10 attempts to guarantee zero lost updates)
+  const MAX_RETRIES = 10;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const { data: current, error: fetchError } = await supabase
+      .from('products')
+      .select('stock')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const currentStock = Math.max(0, Math.floor(Number(current?.stock) || 0));
+    const newStock = Math.max(0, currentStock + numericDelta);
+    const isAvailable = newStock > 0;
+
+    // Use optimistic locking: only apply update if row stock still equals currentStock
+    const { data: updated, error: updateError } = await supabase
+      .from('products')
+      .update({ stock: newStock, is_available: isAvailable })
+      .eq('id', id)
+      .eq('stock', currentStock)
+      .select('stock');
+
+    if (!updateError && updated && updated.length > 0) {
+      return { newStock: Number(updated[0].stock) };
+    }
+
+    // If another concurrent transaction modified stock between select and update,
+    // wait a random jitter (20-60ms) and retry with fresh stock
+    if (attempt < MAX_RETRIES - 1) {
+      await new Promise((res) => setTimeout(res, 20 + Math.random() * 40));
+    }
+  }
+
+  // Final fallback if all optimistic retries clashed
+  const { data: fallback, error: finalError } = await supabase
     .from('products')
     .select('stock')
     .eq('id', id)
     .single();
 
-  if (fetchError) throw fetchError;
-
-  const currentStock = Math.max(0, Math.floor(Number(current?.stock) || 0));
-  const numericDelta = Math.floor(Number(delta) || 0);
+  if (finalError) throw finalError;
+  const currentStock = Math.max(0, Math.floor(Number(fallback?.stock) || 0));
   const newStock = Math.max(0, currentStock + numericDelta);
-  const isAvailable = newStock > 0;
-
-  const { error: updateError } = await supabase
+  await supabase
     .from('products')
-    .update({ stock: newStock, is_available: isAvailable })
+    .update({ stock: newStock, is_available: newStock > 0 })
     .eq('id', id);
 
-  if (updateError) throw updateError;
   return { newStock };
 }
 

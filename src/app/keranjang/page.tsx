@@ -58,6 +58,7 @@ export default function KeranjangPage() {
   const [activeCashier, setActiveCashier] = useState('Yuli');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = React.useRef(false);
   const [discountTypeLocal, setDiscountTypeLocal] = useState<'percent' | 'fixed'>(discountType || 'percent');
   const [discountValueLocal, setDiscountValueLocal] = useState<number>(
     discountType === 'percent' ? discountPercent : discountAmount
@@ -100,8 +101,9 @@ export default function KeranjangPage() {
   const discountTotal = getDiscountTotal();
 
   const handleProcessPayment = async () => {
-    if (items.length === 0 || isProcessing) return;
+    if (items.length === 0 || isProcessing || isProcessingRef.current) return;
 
+    isProcessingRef.current = true;
     setIsProcessing(true);
 
     const newTxData: Omit<Transaction, 'id'> = {
@@ -155,12 +157,14 @@ export default function KeranjangPage() {
       clearCart();
       setTimeout(() => {
         setIsProcessing(false);
+        isProcessingRef.current = false;
         router.push('/kasir');
       }, 400);
     } catch (err) {
       console.error('Gagal menyimpan transaksi:', err);
       showToast('Gagal menyimpan transaksi. Coba lagi.');
       setIsProcessing(false);
+      isProcessingRef.current = false;
     }
   };
 
