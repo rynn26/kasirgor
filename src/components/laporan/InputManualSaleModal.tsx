@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Calendar, 
@@ -58,6 +58,7 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
   // Detail Mode State (List of items)
   const [selectedItems, setSelectedItems] = useState<{ productId: string; qty: number }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -151,6 +152,8 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
       return;
     }
 
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -180,6 +183,7 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
         if (detailItems.length === 0) {
           showToast('Silakan pilih minimal satu produk toko');
           setIsSubmitting(false);
+          isSubmittingRef.current = false;
           return;
         }
         itemsPayload = detailItems;
@@ -190,23 +194,37 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
         }
       }
 
-      await addTransaction({
-        invoiceNumber: generateInvoiceNumber(),
-        createdAt: finalCreatedAt,
-        cashierName: cashierName.trim() || 'Owner',
-        customerName: customerName.trim() || 'Pelanggan Umum',
-        items: itemsPayload,
-        subtotal: finalGrandTotal,
-        discountTotal: 0,
-        taxTotal: 0,
-        serviceTotal: 0,
-        grandTotal: finalGrandTotal,
-        paymentMethod,
-        amountPaid: finalGrandTotal,
-        change: 0,
-        status: 'COMPLETED',
-        notes: `[Input Manual Owner] Tanggal Transaksi: ${date}`,
-      });
+      try {
+        await addTransaction({
+          invoiceNumber: generateInvoiceNumber(),
+          createdAt: finalCreatedAt,
+          cashierName: cashierName.trim() || 'Owner',
+          customerName: customerName.trim() || 'Pelanggan Umum',
+          items: itemsPayload,
+          subtotal: finalGrandTotal,
+          discountTotal: 0,
+          taxTotal: 0,
+          serviceTotal: 0,
+          grandTotal: finalGrandTotal,
+          paymentMethod,
+          amountPaid: finalGrandTotal,
+          change: 0,
+          status: 'COMPLETED',
+          notes: `[Input Manual Owner] Tanggal Transaksi: ${date}`,
+        });
+      } catch (txErr) {
+        // Rollback stock if adding transaction failed
+        if (inputMode === 'DETAIL') {
+          for (const item of detailItems) {
+            try {
+              await updateStock(item.product.id, item.quantity);
+            } catch {
+              console.error('Rollback stock failed for:', item.product.id);
+            }
+          }
+        }
+        throw txErr;
+      }
 
       showToast(`Data penjualan tanggal ${date} berhasil dicatat ke laporan!`);
       if (onSuccess) onSuccess(date);
@@ -215,6 +233,7 @@ export const InputManualSaleModal: React.FC<InputManualSaleModalProps> = ({
       console.error('Gagal mencatat penjualan manual:', err);
       showToast('Gagal menyimpan data penjualan. Coba lagi.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

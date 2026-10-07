@@ -55,6 +55,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [lastLoadedProductId, setLastLoadedProductId] = useState<string | null>(null);
 
   const isSavingRef = React.useRef(false);
+  const isAdjustingRef = React.useRef(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -65,8 +66,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
     if (product) {
       if (product.id !== lastLoadedProductId) {
-        setLastLoadedProductId(product.id);
         setName(product.name);
+        setLastLoadedProductId(product.id);
         let cat = product.category;
         if (cat === 'Makanan' || cat === 'Snack & Cemilan') cat = 'Makanan & Snack';
         if (cat === 'Peralatan & Raket' || cat === 'Aksesoris & Grip' || cat === 'Pakaian & Kaos Kaki') cat = 'Perlengkapan Olahraga';
@@ -96,12 +97,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const margin = numPrice > 0 && numCost > 0 ? numPrice - numCost : 0;
   const marginPercent = numPrice > 0 && numCost > 0 ? Math.round((margin / numPrice) * 100) : 0;
 
-  const isAdjustingRef = React.useRef(false);
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     isSavingRef.current = true;
-    setIsEditingCustomStock(false);
+
+    // If user was actively typing in the custom stock input without blurring, commit it first
+    if (isEditingCustomStock) {
+      await handleCommitCustomStock();
+    }
 
     if (!name.trim()) {
       showToast('Nama produk wajib diisi');
@@ -117,10 +120,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     const parsedMinStock = parseInt(minimumStock, 10);
     const minStockToSave = !isNaN(parsedMinStock) && parsedMinStock >= 0 ? parsedMinStock : undefined;
 
-    // Only update stock if user explicitly changed the manual stock input from original
-    const parsedCustom = parseInt(customStockInput, 10);
-    const hasCustomStockChange = !isNaN(parsedCustom) && parsedCustom >= 0 && parsedCustom !== product.stock;
-
     try {
       const updatePayload: Partial<Product> = {
         name,
@@ -133,17 +132,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         description: description.trim() || undefined,
       };
 
-      if (hasCustomStockChange) {
-        updatePayload.stock = parsedCustom;
-        updatePayload.isAvailable = parsedCustom > 0;
-      }
-
       await updateProduct(product.id, updatePayload);
-
-      // If custom stock was changed, also call setStockExact to log activity properly
-      if (hasCustomStockChange) {
-        await setStockExact(product.id, parsedCustom);
-      }
 
       showToast(`Produk "${name}" berhasil diperbarui`);
       setIsEditing(false);
