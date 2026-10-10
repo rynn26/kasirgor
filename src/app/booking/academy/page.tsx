@@ -57,9 +57,16 @@ export default function AcademyBookingPage() {
   const [sessionTime, setSessionTime] = useState<AcademySessionTime>('PAGI_SIANG');
   const [periodStart, setPeriodStart] = useState(todayJakarta);
   const [periodEnd, setPeriodEnd] = useState(todayJakarta);
-  const [customPickleballFee, setCustomPickleballFee] = useState<number>(0);
+  // Helper for badminton default fee
+  const getBadmintonDefaultFee = (cat: AcademyCategory, p: AcademyPackage) => {
+    if (cat === 'ANAK') {
+      return p === '4X' ? 200000 : 250000;
+    }
+    return p === '4X' ? 250000 : 300000;
+  };
 
   // Financials & Payment
+  const [feeAmount, setFeeAmount] = useState<number>(200000);
   const [dpAmount, setDpAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'QRIS' | 'CASH'>('QRIS');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,21 +74,6 @@ export default function AcademyBookingPage() {
   // Receipt Modal State
   const [savedTransaction, setSavedTransaction] = useState<AcademyTransaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-
-  // Dynamic fee calculation for Badminton
-  const feeAmount = useMemo(() => {
-    if (program === 'BADMINTON') {
-      if (category === 'ANAK') {
-        return pack === '4X' ? 200000 : 250000;
-      } else {
-        // DEWASA
-        return pack === '4X' ? 250000 : 300000;
-      }
-    } else {
-      // PICKLEBALL
-      return customPickleballFee || 0;
-    }
-  }, [program, category, pack, customPickleballFee]);
 
   // Remaining balance
   const remainingAmount = useMemo(() => {
@@ -156,7 +148,7 @@ export default function AcademyBookingPage() {
   const handleResetForm = () => {
     setCustomerName('');
     setDpAmount(0);
-    setCustomPickleballFee(0);
+    setFeeAmount(getBadmintonDefaultFee(category, pack));
     setRegistrationDate(todayJakarta);
     setIsReceiptOpen(false);
   };
@@ -257,6 +249,7 @@ export default function AcademyBookingPage() {
               type="button"
               onClick={() => {
                 setProgram('BADMINTON');
+                setFeeAmount(getBadmintonDefaultFee(category, pack));
               }}
               className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                 program === 'BADMINTON'
@@ -280,6 +273,7 @@ export default function AcademyBookingPage() {
               type="button"
               onClick={() => {
                 setProgram('PICKLEBALL');
+                setFeeAmount(0);
               }}
               className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                 program === 'PICKLEBALL'
@@ -314,7 +308,10 @@ export default function AcademyBookingPage() {
                 {/* Anak */}
                 <button
                   type="button"
-                  onClick={() => setCategory('ANAK')}
+                  onClick={() => {
+                    setCategory('ANAK');
+                    setFeeAmount(getBadmintonDefaultFee('ANAK', pack));
+                  }}
                   className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                     category === 'ANAK'
                       ? 'bg-[#c5221f] text-white border-[#c5221f] shadow-md shadow-red-600/20'
@@ -337,7 +334,10 @@ export default function AcademyBookingPage() {
                 {/* Dewasa */}
                 <button
                   type="button"
-                  onClick={() => setCategory('DEWASA')}
+                  onClick={() => {
+                    setCategory('DEWASA');
+                    setFeeAmount(getBadmintonDefaultFee('DEWASA', pack));
+                  }}
                   className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                     category === 'DEWASA'
                       ? 'bg-[#c5221f] text-white border-[#c5221f] shadow-md shadow-red-600/20'
@@ -368,7 +368,10 @@ export default function AcademyBookingPage() {
                 {/* 4x Pertemuan */}
                 <button
                   type="button"
-                  onClick={() => setPack('4X')}
+                  onClick={() => {
+                    setPack('4X');
+                    setFeeAmount(getBadmintonDefaultFee(category, '4X'));
+                  }}
                   className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                     pack === '4X'
                       ? 'bg-[#c5221f] text-white border-[#c5221f] shadow-md shadow-red-600/20'
@@ -389,7 +392,10 @@ export default function AcademyBookingPage() {
                 {/* 5x Pertemuan */}
                 <button
                   type="button"
-                  onClick={() => setPack('5X')}
+                  onClick={() => {
+                    setPack('5X');
+                    setFeeAmount(getBadmintonDefaultFee(category, '5X'));
+                  }}
                   className={`p-3 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                     pack === '5X'
                       ? 'bg-[#c5221f] text-white border-[#c5221f] shadow-md shadow-red-600/20'
@@ -544,7 +550,7 @@ export default function AcademyBookingPage() {
             </label>
             <span className="text-[11px] text-slate-400 font-medium">
               {program === 'BADMINTON'
-                ? `Harga untuk kategori ${category === 'ANAK' ? 'Anak' : 'Dewasa'}`
+                ? 'Bisa disesuaikan manual'
                 : 'Isi sesuai ketentuan'}
             </span>
           </div>
@@ -553,26 +559,25 @@ export default function AcademyBookingPage() {
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
               Rp
             </span>
-            {program === 'BADMINTON' ? (
-              <input
-                type="text"
-                readOnly
-                value={feeAmount ? feeAmount.toLocaleString('id-ID') : '0'}
-                className="w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-100/80 border border-slate-200 text-sm text-slate-900 font-bold cursor-not-allowed select-none"
-              />
-            ) : (
-              <input
-                type="text"
-                inputMode="numeric"
-                value={customPickleballFee ? customPickleballFee.toLocaleString('id-ID') : ''}
-                onChange={(e) => {
-                  const raw = e.target.value.replace(/\D/g, '');
-                  setCustomPickleballFee(raw ? parseInt(raw, 10) : 0);
-                }}
-                placeholder="Masukkan nominal"
-                className="w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-              />
-            )}
+            <input
+              type="text"
+              inputMode="numeric"
+              value={feeAmount ? feeAmount.toLocaleString('id-ID') : ''}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\D/g, '');
+                const val = raw ? parseInt(raw, 10) : 0;
+                setFeeAmount(val);
+                if (dpAmount > val) {
+                  setDpAmount(val);
+                }
+              }}
+              placeholder="Masukkan tarif pelatihan"
+              className={`w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 font-bold focus:outline-hidden focus:ring-2 transition-all ${
+                program === 'BADMINTON'
+                  ? 'focus:ring-red-500/20 focus:border-red-500'
+                  : 'focus:ring-emerald-500/20 focus:border-emerald-500'
+              }`}
+            />
           </div>
         </div>
 
