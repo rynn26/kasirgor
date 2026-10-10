@@ -23,7 +23,7 @@ import { useToastStore } from '@/lib/store/useToastStore';
 import { createAcademyTransaction } from '@/lib/db/academy';
 import { AcademyTransaction, AcademyProgram, AcademyCategory, AcademyPackage, AcademySessionTime } from '@/types/academy';
 import { AcademyReceiptModal } from '@/components/academy/AcademyReceiptModal';
-import { formatRupiah } from '@/lib/utils';
+import { formatRupiah, formatNumber, parseNumberInput } from '@/lib/utils';
 import { getJakartaToday } from '@/lib/bookingUtils';
 
 export default function AcademyBookingPage() {
@@ -548,11 +548,25 @@ export default function AcademyBookingPage() {
             <label className="block text-xs font-black text-slate-800">
               Tarif Pelatihan (Rp)
             </label>
-            <span className="text-[11px] text-slate-400 font-medium">
-              {program === 'BADMINTON'
-                ? 'Bisa disesuaikan manual'
-                : 'Isi sesuai ketentuan'}
-            </span>
+            <div className="flex items-center gap-2">
+              {program === 'BADMINTON' && feeAmount !== getBadmintonDefaultFee(category, pack) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const def = getBadmintonDefaultFee(category, pack);
+                    setFeeAmount(def);
+                  }}
+                  className="text-[10px] font-bold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                >
+                  Reset Standar ({formatRupiah(getBadmintonDefaultFee(category, pack))})
+                </button>
+              )}
+              <span className="text-[11px] text-slate-400 font-medium">
+                {program === 'BADMINTON'
+                  ? 'Bisa disesuaikan manual'
+                  : 'Isi sesuai ketentuan'}
+              </span>
+            </div>
           </div>
 
           <div className="relative">
@@ -562,22 +576,32 @@ export default function AcademyBookingPage() {
             <input
               type="text"
               inputMode="numeric"
-              value={feeAmount ? feeAmount.toLocaleString('id-ID') : ''}
+              value={feeAmount ? formatNumber(feeAmount) : ''}
+              onFocus={(e) => e.target.select()}
               onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, '');
-                const val = raw ? parseInt(raw, 10) : 0;
+                const val = parseNumberInput(e.target.value);
                 setFeeAmount(val);
                 if (dpAmount > val) {
                   setDpAmount(val);
                 }
               }}
               placeholder="Masukkan tarif pelatihan"
-              className={`w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 font-bold focus:outline-hidden focus:ring-2 transition-all ${
+              className={`w-full pl-12 pr-10 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 font-bold focus:outline-hidden focus:ring-2 transition-all ${
                 program === 'BADMINTON'
                   ? 'focus:ring-red-500/20 focus:border-red-500'
                   : 'focus:ring-emerald-500/20 focus:border-emerald-500'
               }`}
             />
+            {feeAmount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFeeAmount(0)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold transition-all cursor-pointer"
+                title="Kosongkan tarif"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
@@ -631,15 +655,25 @@ export default function AcademyBookingPage() {
             <input
               type="text"
               inputMode="numeric"
-              value={dpAmount ? dpAmount.toLocaleString('id-ID') : ''}
+              value={dpAmount ? formatNumber(dpAmount) : ''}
+              onFocus={(e) => e.target.select()}
               onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, '');
-                const num = raw ? parseInt(raw, 10) : 0;
-                setDpAmount(Math.min(num, feeAmount));
+                const val = parseNumberInput(e.target.value);
+                setDpAmount(Math.min(val, feeAmount));
               }}
               placeholder="Masukkan nominal DP"
-              className="w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full pl-12 pr-10 py-3 rounded-2xl bg-slate-50/80 border border-slate-200 text-sm text-slate-900 font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
             />
+            {dpAmount > 0 && (
+              <button
+                type="button"
+                onClick={() => setDpAmount(0)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold transition-all cursor-pointer"
+                title="Kosongkan DP"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
